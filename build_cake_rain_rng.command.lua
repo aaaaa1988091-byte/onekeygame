@@ -357,6 +357,24 @@ for index = 1, 8 do
     local stroke = newGui("UIStroke", "Outline", slot)
     stroke.Thickness = 3
     stroke.Color = Color3.fromRGB(255, 255, 255)
+    local cooldown = newGui("Frame", "CooldownFill", slot)
+    cooldown.AnchorPoint = Vector2.new(0, 1)
+    cooldown.Position = UDim2.new(0, 0, 1, 0)
+    cooldown.Size = UDim2.new(1, 0, 0, 0)
+    cooldown.BackgroundColor3 = Color3.fromRGB(20, 30, 55)
+    cooldown.BackgroundTransparency = 0.22
+    cooldown.BorderSizePixel = 0
+    cooldown.Visible = false
+    cooldown.ZIndex = 2
+    local cooldownText = newGui("TextLabel", "CooldownText", slot)
+    cooldownText.BackgroundTransparency = 1
+    cooldownText.Size = UDim2.fromScale(1, 1)
+    cooldownText.Font = Enum.Font.GothamBlack
+    cooldownText.TextScaled = true
+    cooldownText.TextColor3 = Color3.fromRGB(255, 255, 255)
+    cooldownText.TextStrokeTransparency = 0
+    cooldownText.ZIndex = 3
+    cooldownText.Visible = false
 end
 local tooltip = newGui("TextLabel", "Tooltip", buffFrame)
 tooltip.Size = UDim2.new(0, 260, 0, 34)
@@ -642,7 +660,7 @@ function StateService.ActiveBuffs(player)
             end
         end
         if best then
-            active[buffType] = { Name = text(best.NameKey), Rarity = best.Rarity, Value = best.Value or best.Level or 0, Remaining = math.max(0, math.floor(best.ExpiresAt - now)), Icon = best.Icon or "", OutlineColor = WheelConfig.RarityColors[best.Rarity] or Color3.fromRGB(255, 255, 255), Interval = best.Interval, SkillId = best.SkillId, Stacks = best.Stacks or 1 }
+            active[buffType] = { Name = text(best.NameKey), Rarity = best.Rarity, Value = best.Value or best.Level or 0, Remaining = math.max(0, math.floor(best.ExpiresAt - now)), Icon = best.Icon or "", OutlineColor = WheelConfig.RarityColors[best.Rarity] or Color3.fromRGB(255, 255, 255), Interval = best.Interval, SkillId = best.SkillId, Stacks = best.Stacks or 1, CooldownRemaining = math.max(0, (best.CooldownEndsAt or 0) - now), CooldownDuration = best.TriggerInterval or 0 }
         end
     end
     return active
@@ -934,8 +952,12 @@ function SkillService.Activate(player, cardKey, card)
         if not skill then warn("Cake Rain RNG: missing skill script", card.ScriptName); return end
         local run = require(skill)
         while player.Parent and os.clock() < stack.ExpiresAt do
+            local cooldown = math.max(.1, stack.TriggerInterval)
+            stack.CooldownEndsAt = os.clock() + cooldown
+            StateService.Push(player)
             run(player, stack.Parameters)
-            task.wait(math.max(.1, stack.TriggerInterval))
+            task.wait(cooldown)
+            StateService.Push(player)
         end
         StateService.Push(player)
     end) end
@@ -1173,11 +1195,23 @@ local function refreshEffectBar()
             slot.Image = buff.Icon or ""
             slot.Outline.Color = buff.OutlineColor or Color3.fromRGB(255, 255, 255)
             slot:SetAttribute("Tooltip", string.format("%s [%s] 層數:%s / %ss", buff.Name, buff.Rarity, tostring(buff.Stacks or 1), tostring(buff.Remaining)))
+            local cooldown = slot:FindFirstChild("CooldownFill")
+            local cooldownText = slot:FindFirstChild("CooldownText")
+            local remaining, duration = buff.CooldownRemaining or 0, buff.CooldownDuration or 0
+            if cooldown and cooldownText and duration > 0 and remaining > 0 then
+                cooldown.Visible = true
+                cooldown.Size = UDim2.new(1, 0, math.clamp(remaining / duration, 0, 1), 0)
+                cooldownText.Text = string.format("%.1f", remaining)
+                cooldownText.Visible = true
+            elseif cooldown and cooldownText then
+                cooldown.Visible = false
+                cooldownText.Visible = false
+            end
         end
     end
     for slotIndex = index + 1, 8 do
         local slot = buffFrame:FindFirstChild("EffectIcon" .. slotIndex)
-        if slot then slot.Visible = false slot.Image = "" slot:SetAttribute("Tooltip", "") end
+        if slot then slot.Visible = false slot.Image = "" slot:SetAttribute("Tooltip", ""); local cooldown = slot:FindFirstChild("CooldownFill"); local cooldownText = slot:FindFirstChild("CooldownText"); if cooldown then cooldown.Visible = false end; if cooldownText then cooldownText.Visible = false end end
     end
     buffFrame.Visible = index > 0
 end
