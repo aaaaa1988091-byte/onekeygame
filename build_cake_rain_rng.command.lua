@@ -104,6 +104,9 @@ local CakeConfig = {
     SpawnHeight = 85,
     MaxCakesPerPlayer = 18,
     GlowBaseChance = 0.03,
+    InitialBurstCount = 6,
+    MeteorFallSpeed = 105,
+    MeteorTrailLifetime = 0.45,
     SinkSeconds = 1.1,
     StainVisibleSeconds = 2,
     Rarities = {
@@ -685,6 +688,42 @@ local function decorateCake(cake, rarityKey, rarityData, isGlow)
     outline.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
     outline.Parent = cake
 
+    local trailTop = Instance.new("Attachment")
+    trailTop.Name = "MeteorTrailTop"
+    trailTop.Position = Vector3.new(0, 2.8, 0)
+    trailTop.Parent = primary
+    local trailBottom = Instance.new("Attachment")
+    trailBottom.Name = "MeteorTrailBottom"
+    trailBottom.Position = Vector3.new(0, -2.8, 0)
+    trailBottom.Parent = primary
+    local meteorTrail = Instance.new("Trail")
+    meteorTrail.Name = "RarityMeteorTrail"
+    meteorTrail.Attachment0 = trailTop
+    meteorTrail.Attachment1 = trailBottom
+    meteorTrail.Color = ColorSequence.new(rarityData.OutlineColor)
+    meteorTrail.LightEmission = 0.65
+    meteorTrail.Lifetime = CakeConfig.MeteorTrailLifetime
+    meteorTrail.MinLength = 0.1
+    meteorTrail.Transparency = NumberSequence.new({
+        NumberSequenceKeypoint.new(0, 0.05),
+        NumberSequenceKeypoint.new(1, 1),
+    })
+    meteorTrail.WidthScale = NumberSequence.new({
+        NumberSequenceKeypoint.new(0, 1),
+        NumberSequenceKeypoint.new(1, 0),
+    })
+    meteorTrail.Parent = primary
+
+    local meteorDust = Instance.new("ParticleEmitter")
+    meteorDust.Name = "RarityMeteorDust"
+    meteorDust.Color = ColorSequence.new(rarityData.OutlineColor)
+    meteorDust.LightEmission = 0.45
+    meteorDust.Rate = 35
+    meteorDust.Lifetime = NumberRange.new(0.25, 0.65)
+    meteorDust.Speed = NumberRange.new(0.2, 1.5)
+    meteorDust.SpreadAngle = Vector2.new(18, 18)
+    meteorDust.Parent = trailTop
+
     if isGlow then
         local attachment = Instance.new("Attachment")
         attachment.Name = "GlowAttachment"
@@ -854,6 +893,9 @@ local function spawnCakeNear(player)
         cake:PivotTo(CFrame.new(spawnPos) * CFrame.Angles(0, math.random() * math.pi * 2, 0))
     end
     decorateCake(cake, rarityKey, rarityData, isGlow)
+    if cake.PrimaryPart then
+        cake.PrimaryPart.AssemblyLinearVelocity = Vector3.new(0, -CakeConfig.MeteorFallSpeed, 0)
+    end
     refreshCakeLabel(cake)
     cakeOwners[cake] = player
     hookCakeTouches(cake)
@@ -894,8 +936,30 @@ Players.PlayerAdded:Connect(function(player)
     updateLeaderstats(player)
     pushState(player)
 
+    local function startCakeRainBurst()
+        task.spawn(function()
+            for _ = 1, CakeConfig.InitialBurstCount do
+                if not player.Parent then
+                    return
+                end
+                spawnCakeNear(player)
+                task.wait(0.18)
+            end
+        end)
+    end
+
+    player.CharacterAdded:Connect(function()
+        task.wait(1)
+        startCakeRainBurst()
+    end)
+    if player.Character then
+        startCakeRainBurst()
+    end
+
     task.spawn(function()
         while player.Parent do
+            local character = player.Character or player.CharacterAdded:Wait()
+            character:WaitForChild("HumanoidRootPart", 10)
             spawnCakeNear(player)
             pushState(player)
             task.wait(CakeConfig.SpawnInterval)
