@@ -118,10 +118,10 @@ local CakeConfig = {
     StainVisibleSeconds = 2,
     Rarities = {
         Common = { NameKey = "Cake_Common", RarityText = "COMMON", OutlineColor = Color3.fromRGB(210, 210, 210), DropWeight = 500, Health = 1, RewardCakePoints = 1 },
-        Rare = { NameKey = "Cake_Rare", RarityText = "RARE", OutlineColor = Color3.fromRGB(70, 170, 255), DropWeight = 3, RewardCakePoints = 3 },
-        Epic = { NameKey = "Cake_Epic", RarityText = "EPIC", OutlineColor = Color3.fromRGB(185, 85, 255), DropWeight = 6, RewardCakePoints = 7 },
-        Legendary = { NameKey = "Cake_Legendary", RarityText = "LEGENDARY", OutlineColor = Color3.fromRGB(255, 170, 0), DropWeight = 12, RewardCakePoints = 15 },
-        Mythic = { NameKey = "Cake_Mythic", RarityText = "MYTHIC", OutlineColor = Color3.fromRGB(255, 60, 120), DropWeight = 24, RewardCakePoints = 40 },
+        Rare = { NameKey = "Cake_Rare", RarityText = "RARE", OutlineColor = Color3.fromRGB(70, 170, 255), DropWeight = 110, Health = 3, RewardCakePoints = 3 },
+        Epic = { NameKey = "Cake_Epic", RarityText = "EPIC", OutlineColor = Color3.fromRGB(185, 85, 255), DropWeight = 35, Health = 6, RewardCakePoints = 7 },
+        Legendary = { NameKey = "Cake_Legendary", RarityText = "LEGENDARY", OutlineColor = Color3.fromRGB(255, 170, 0), DropWeight = 8, Health = 12, RewardCakePoints = 15 },
+        Mythic = { NameKey = "Cake_Mythic", RarityText = "MYTHIC", OutlineColor = Color3.fromRGB(255, 60, 120), DropWeight = 2, Health = 24, RewardCakePoints = 40 },
     },
 }
 return CakeConfig
@@ -626,6 +626,7 @@ local Debris = game:GetService("Debris")
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local TweenService = game:GetService("TweenService")
+local RunService = game:GetService("RunService")
 local Workspace = game:GetService("Workspace")
 
 local Configs = ReplicatedStorage.Configs
@@ -694,11 +695,20 @@ function CakeService.Finish(player, cake)
         if cake:GetAttribute("IsGlow") then state.PendingCardDraw = true end
         StateService.UpdateLeaderstats(player); StateService.Push(player)
     end
-    local root = rootOf(player)
-    for _, part in ipairs(cake:GetDescendants()) do
-        if part:IsA("BasePart") then part.CanCollide = false; TweenService:Create(part, TweenInfo.new(CakeConfig.EatAnimationSeconds, Enum.EasingStyle.Quad, Enum.EasingDirection.In), { CFrame = CFrame.new((root and root.Position or part.Position) + Vector3.new(0,1,0)), Transparency = 1 }):Play() end
-    end
-    cake:ScaleTo(0.05); Debris:AddItem(cake, CakeConfig.EatAnimationSeconds + .1)
+    -- Eating is deliberately distinct from expiry: disable physics, then shrink/fade into the player.
+    local startPivot, startScale, started = cake:GetPivot(), cake:GetScale(), os.clock()
+    for _, part in ipairs(cake:GetDescendants()) do if part:IsA("BasePart") then part.CanCollide, part.Anchored = false, true end end
+    task.spawn(function()
+        while cake.Parent do
+            local alpha = math.clamp((os.clock() - started) / CakeConfig.EatAnimationSeconds, 0, 1)
+            local root = rootOf(player)
+            local target = CFrame.new((root and root.Position or startPivot.Position) + Vector3.new(0, 1, 0))
+            cake:PivotTo(startPivot:Lerp(target, alpha)); cake:ScaleTo(math.max(.03, startScale * (1 - alpha)))
+            for _, part in ipairs(cake:GetDescendants()) do if part:IsA("BasePart") then part.Transparency = alpha end end
+            if alpha >= 1 then cake:Destroy(); break end
+            RunService.Heartbeat:Wait()
+        end
+    end)
 end
 function CakeService.Expire(cake)
     if not cake.Parent or cake:GetAttribute("Finishing") then return end
@@ -736,7 +746,7 @@ function CakeService.MoveNearPlayer(player, cake, distance, travelSeconds)
     else
         cake:PivotTo(destination)
     end
-    return true
+    return destination
 end
 function CakeService.BeginAutoEat(player, cake)
     if CakeService.EatingByPlayer[player] or CakeService.Eating[cake] or CakeService.Owners[cake] ~= player then return end
@@ -767,7 +777,17 @@ end
 function CakeService.StartPlayer(player)
     local function burst() task.spawn(function() for _=1,CakeConfig.InitialBurstCount do if not player.Parent then return end; CakeService.SpawnNear(player); task.wait(.18) end end) end
     player.CharacterAdded:Connect(function(character) character:WaitForChild("HumanoidRootPart",10); task.wait(.35); burst() end); if player.Character then burst() end
-    task.spawn(function() while player.Parent do local character=player.Character or player.CharacterAdded:Wait(); character:WaitForChild("HumanoidRootPart",10); CakeService.SpawnNear(player); StateService.Push(player); task.wait(CakeConfig.SpawnInterval) end end)
+    -- A failed individual drop must never terminate the endless rain coroutine.
+    task.spawn(function()
+        while player.Parent do
+            local character = player.Character or player.CharacterAdded:Wait()
+            character:WaitForChild("HumanoidRootPart", 10)
+            local ok, err = pcall(CakeService.SpawnNear, player)
+            if not ok then warn("Cake Rain RNG: spawn failed; rain will continue", err) end
+            StateService.Push(player)
+            task.wait(CakeConfig.SpawnInterval)
+        end
+    end)
 end
 function CakeService.CleanupPlayer(player) for cake,owner in pairs(CakeService.Owners) do if owner==player then CakeService.Owners[cake]=nil; if cake.Parent then cake:Destroy() end end end; CakeService.EatingByPlayer[player]=nil end
 return CakeService
@@ -775,28 +795,89 @@ return CakeService
 
 local skillService = getOrCreate(servicesPackage, "ModuleScript", "SkillService")
 skillService.Source = [=[
--- Skill handler registry. Add config in ReplicatedStorage.Configs.SkillConfig and a
--- handler below with the same SkillId; duration, cadence and purchase eligibility stay data-driven.
+-- Skill handler registry. Add a SkillConfig card and a handler with the matching SkillId.
+-- The effects live server-side so every player sees the hook, tornado, and ant transport.
+local Debris = game:GetService("Debris")
+local RunService = game:GetService("RunService")
+local TweenService = game:GetService("TweenService")
+local Workspace = game:GetService("Workspace")
 local CakeService = require(script.Parent.CakeService)
 local StateService = require(script.Parent.StateService)
 local SkillService = { Handlers = {} }
+local Effects = Workspace.Map:FindFirstChild("SkillEffects") or Instance.new("Folder")
+Effects.Name, Effects.Parent = "SkillEffects", Workspace.Map
+
+local function rootOf(player) return player.Character and player.Character:FindFirstChild("HumanoidRootPart") end
+local function hookEffect(root, cake)
+    if not root or not cake.PrimaryPart then return end
+    local source, target = Instance.new("Attachment"), Instance.new("Attachment")
+    source.Parent, target.Parent = root, cake.PrimaryPart
+    local beam = Instance.new("Beam")
+    beam.Name, beam.Attachment0, beam.Attachment1 = "GrapplingHookChain", source, target
+    beam.Color, beam.Width0, beam.Width1, beam.FaceCamera = ColorSequence.new(Color3.fromRGB(210, 210, 225)), .16, .16, true
+    beam.Texture, beam.TextureSpeed, beam.TextureLength, beam.Parent = "rbxassetid://446111271", 3, 1, Effects
+    local hook = Instance.new("Part")
+    hook.Name, hook.Shape, hook.Size, hook.Material, hook.Color, hook.Anchored, hook.CanCollide = "HookHead", Enum.PartType.Ball, Vector3.new(.55,.55,.55), Enum.Material.Metal, Color3.fromRGB(180,180,190), true, false
+    hook.CFrame, hook.Parent = cake.PrimaryPart.CFrame, Effects
+    Debris:AddItem(beam, .85); Debris:AddItem(source, .85); Debris:AddItem(target, .85); Debris:AddItem(hook, .85)
+end
+local function tornadoEffect(root)
+    if not root then return end
+    local visual = Instance.new("Folder"); visual.Name, visual.Parent = "Tornado", Effects
+    local pieces = {}
+    for index = 1, 16 do
+        local part = Instance.new("Part")
+        part.Name, part.Shape, part.Size, part.Material, part.Color = "WindSpiral", Enum.PartType.Ball, Vector3.new(.35,.35,.35), Enum.Material.Neon, Color3.fromRGB(180,235,255)
+        part.Anchored, part.CanCollide, part.Parent = true, false, visual
+        pieces[index] = part
+    end
+    task.spawn(function()
+        local started = os.clock()
+        while visual.Parent and os.clock() - started < 1.4 do
+            local elapsed = os.clock() - started
+            for index, part in ipairs(pieces) do
+                local height = ((index - 1) / #pieces) * 9
+                local radius = 1.1 + height * .32
+                local angle = elapsed * 14 + index * math.pi * 2 / #pieces
+                part.CFrame = CFrame.new(root.Position + Vector3.new(math.cos(angle)*radius, height, math.sin(angle)*radius))
+            end
+            RunService.Heartbeat:Wait()
+        end
+        visual:Destroy()
+    end)
+end
+local function antEffect(cake, destination, seconds)
+    if not cake.PrimaryPart or not destination then return end
+    local ant = Instance.new("Model"); ant.Name, ant.Parent = "AntCourier", Effects
+    local body = Instance.new("Part"); body.Name, body.Shape, body.Size, body.Color, body.Material = "AntBody", Enum.PartType.Ball, Vector3.new(.7,.45,.45), Color3.fromRGB(35,20,12), Enum.Material.SmoothPlastic
+    body.Anchored, body.CanCollide, body.CFrame, body.Parent = true, false, cake.PrimaryPart.CFrame * CFrame.new(0,-1,0), ant
+    local head = Instance.new("Part"); head.Name, head.Shape, head.Size, head.Color, head.Material = "AntHead", Enum.PartType.Ball, Vector3.new(.42,.35,.35), body.Color, body.Material
+    head.Anchored, head.CanCollide, head.CFrame, head.Parent = true, false, body.CFrame * CFrame.new(.48,0,0), ant
+    TweenService:Create(body, TweenInfo.new(seconds, Enum.EasingStyle.Linear), { CFrame = destination * CFrame.new(0,-1,0) }):Play()
+    TweenService:Create(head, TweenInfo.new(seconds, Enum.EasingStyle.Linear), { CFrame = destination * CFrame.new(.48,-1,0) }):Play()
+    Debris:AddItem(ant, seconds + .1)
+end
 
 function SkillService.Handlers.PullNearest(player, parameters)
     local item = CakeService.GetCakes(player, parameters.Count or 1)[1]
-    if item then CakeService.MoveNearPlayer(player, item.Cake, parameters.Distance or 2) end
+    local root = rootOf(player)
+    if item then hookEffect(root, item.Cake); CakeService.MoveNearPlayer(player, item.Cake, parameters.Distance or 2, .75) end
 end
 function SkillService.Handlers.Tornado(player, parameters)
+    local root = rootOf(player); tornadoEffect(root)
     for _, item in ipairs(CakeService.GetCakes(player, parameters.Count or 5)) do
-        CakeService.MoveNearPlayer(player, item.Cake, parameters.Distance or 5)
+        CakeService.MoveNearPlayer(player, item.Cake, parameters.Distance or 5, .8)
         CakeService.DamageCake(player, item.Cake, (item.Cake:GetAttribute("Health") or 0) * (parameters.DamagePercent or .4))
     end
 end
 function SkillService.Handlers.AntCourier(player, parameters)
-    -- One distant cake is carried each second; it is damaged only while being transported.
     local item = CakeService.GetCakes(player, 1, parameters.MinimumDistance or 14)[1]
     if item then
         CakeService.DamageCake(player, item.Cake, (item.Cake:GetAttribute("Health") or 0) * (parameters.DamagePercentPerSecond or .02))
-        if item.Cake.Parent then CakeService.MoveNearPlayer(player, item.Cake, parameters.Distance or 4, 1) end
+        if item.Cake.Parent then
+            local destination = CakeService.MoveNearPlayer(player, item.Cake, parameters.Distance or 4, 1)
+            antEffect(item.Cake, destination, 1)
+        end
     end
 end
 function SkillService.Activate(player, cardKey, card)
