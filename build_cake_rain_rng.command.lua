@@ -356,6 +356,18 @@ tooltip.TextColor3 = Color3.fromRGB(255, 255, 255)
 tooltip.Visible = false
 newGui("UICorner", "Corner", tooltip).CornerRadius = UDim.new(0, 8)
 
+-- Persistent bottom readout: the player can verify the most recently drawn skill and stacked time.
+local currentDrawLabel = newGui("TextLabel", "CurrentDrawLabel", mainGui)
+currentDrawLabel.Size = UDim2.new(0, 392, 0, 28)
+currentDrawLabel.Position = UDim2.new(0, 18, 1, -124)
+currentDrawLabel.BackgroundColor3 = Color3.fromRGB(20, 35, 45)
+currentDrawLabel.BackgroundTransparency = 0.12
+currentDrawLabel.Font = Enum.Font.GothamBold
+currentDrawLabel.TextScaled = true
+currentDrawLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
+currentDrawLabel.Visible = false
+newGui("UICorner", "Corner", currentDrawLabel).CornerRadius = UDim.new(0, 8)
+
 local cardFrame = newGui("Frame", "CardDraw", mainGui)
 cardFrame.Size = UDim2.new(0, 420, 0, 230)
 cardFrame.Position = UDim2.new(0.5, -210, 0.5, -115)
@@ -514,6 +526,7 @@ function StateService.Create(player, loaded)
         WheelPoints = loaded.WheelPoints or 0,
         CakePoints = loaded.CakePoints or 0,
         PendingCardDraw = false,
+        LastDraw = nil,
         Buffs = {},
         UnlockedWheelRewards = loaded.UnlockedWheelRewards or {},
         UnlockedCards = loaded.UnlockedCards or {},
@@ -577,11 +590,19 @@ end
 function StateService.AddCardBuff(player, key, card)
     local state = StateService.Get(player)
     if not state then return end
-    local buffType = "Skill_" .. key
+    local buffType, now = "Skill_" .. key, os.clock()
     state.Buffs[buffType] = state.Buffs[buffType] or {}
-    local stack = { Key = key, NameKey = card.NameKey, Rarity = card.Rarity, Value = 1, Icon = card.Icon, SkillId = card.SkillId, Parameters = card.Parameters or {}, TriggerInterval = card.TriggerInterval or 1, ExpiresAt = os.clock() + card.Duration }
+    -- Re-drawing the same ability extends its existing timer rather than creating an invisible parallel timer.
+    for _, existing in ipairs(state.Buffs[buffType]) do
+        if existing.Key == key and existing.ExpiresAt > now then
+            existing.ExpiresAt += card.Duration
+            existing.Stacks = (existing.Stacks or 1) + 1
+            return existing, false
+        end
+    end
+    local stack = { Key = key, NameKey = card.NameKey, Rarity = card.Rarity, Value = 1, Icon = card.Icon, SkillId = card.SkillId, Parameters = card.Parameters or {}, TriggerInterval = card.TriggerInterval or 1, Stacks = 1, ExpiresAt = now + card.Duration }
     table.insert(state.Buffs[buffType], stack)
-    return stack
+    return stack, true
 end
 
 function StateService.ActiveBuffs(player)
@@ -598,7 +619,7 @@ function StateService.ActiveBuffs(player)
             end
         end
         if best then
-            active[buffType] = { Name = text(best.NameKey), Rarity = best.Rarity, Value = best.Value or best.Level or 0, Remaining = math.max(0, math.floor(best.ExpiresAt - now)), Icon = best.Icon or "", OutlineColor = WheelConfig.RarityColors[best.Rarity] or Color3.fromRGB(255, 255, 255), Interval = best.Interval, SkillId = best.SkillId }
+            active[buffType] = { Name = text(best.NameKey), Rarity = best.Rarity, Value = best.Value or best.Level or 0, Remaining = math.max(0, math.floor(best.ExpiresAt - now)), Icon = best.Icon or "", OutlineColor = WheelConfig.RarityColors[best.Rarity] or Color3.fromRGB(255, 255, 255), Interval = best.Interval, SkillId = best.SkillId, Stacks = best.Stacks or 1 }
         end
     end
     return active
@@ -607,11 +628,20 @@ end
 function StateService.Push(player)
     local state = StateService.Get(player)
     if not state then return end
+    local lastDraw = state.LastDraw
+    if lastDraw and lastDraw.Key then
+        local activeStack
+        for _, stack in ipairs(state.Buffs["Skill_" .. lastDraw.Key] or {}) do
+            if stack.Key == lastDraw.Key and stack.ExpiresAt > os.clock() then activeStack = stack break end
+        end
+        lastDraw = activeStack and { Key = lastDraw.Key, Name = text(activeStack.NameKey), Rarity = activeStack.Rarity, Remaining = math.max(0, math.floor(activeStack.ExpiresAt - os.clock())), Stacks = activeStack.Stacks or 1 } or nil
+    end
     UpdateClientState:FireClient(player, {
         WheelSpins = state.WheelSpins,
         WheelPoints = state.WheelPoints,
         CakePoints = state.CakePoints,
         PendingCardDraw = state.PendingCardDraw,
+        LastDraw = lastDraw,
         ActiveBuffs = StateService.ActiveBuffs(player),
         UnlockedWheelRewards = state.UnlockedWheelRewards,
         UnlockedCards = state.UnlockedCards,
@@ -882,16 +912,19 @@ function SkillService.Handlers.AntCourier(player, parameters)
     end
 end
 function SkillService.Activate(player, cardKey, card)
-    local stack = StateService.AddCardBuff(player, cardKey, card)
+    local stack, isNew = StateService.AddCardBuff(player, cardKey, card)
     if not stack then return end
-    task.spawn(function()
-        local handler = SkillService.Handlers[stack.SkillId]
-        while player.Parent and os.clock() < stack.ExpiresAt do
-            if handler then handler(player, stack.Parameters) else warn("Cake Rain RNG: missing SkillId handler", stack.SkillId) break end
-            task.wait(math.max(.1, stack.TriggerInterval))
-        end
-        StateService.Push(player)
-    end)
+    if isNew then
+        task.spawn(function()
+            local handler = SkillService.Handlers[stack.SkillId]
+            while player.Parent and os.clock() < stack.ExpiresAt do
+                if handler then handler(player, stack.Parameters) else warn("Cake Rain RNG: missing SkillId handler", stack.SkillId) break end
+                task.wait(math.max(.1, stack.TriggerInterval))
+            end
+            StateService.Push(player)
+        end)
+    end
+    return stack
 end
 return SkillService
 ]=]
@@ -969,9 +1002,12 @@ function WheelService.Start()
         if not state or not state.PendingCardDraw then return { Ok = false, Error = "NO_CARD_DRAW" } end
         state.PendingCardDraw = false
         local key, card = weightedPick(unlockedCards(state))
-        if card then SkillService.Activate(player, key, card) end
+        local stack = card and SkillService.Activate(player, key, card)
+        if stack then
+            state.LastDraw = { Key = key }
+        end
         StateService.Push(player)
-        return { Ok = true, Card = card and { Key = key, Name = text(card.NameKey), Rarity = card.Rarity, Duration = card.Duration, Effect = card.SkillId } or nil }
+        return { Ok = true, Card = card and { Key = key, Name = text(card.NameKey), Rarity = card.Rarity, Duration = card.Duration, Effect = card.SkillId, Stacks = stack and stack.Stacks or 1 } or nil }
     end
 
     Events.RequestShopPurchase.OnServerInvoke = function(player, itemId)
@@ -1049,6 +1085,7 @@ local spinButton = wheel:WaitForChild("SpinButton")
 local autoRollToggle = wheel:WaitForChild("AutoRollToggle")
 local buffFrame = gui:WaitForChild("EffectBar")
 local tooltip = buffFrame:WaitForChild("Tooltip")
+local currentDrawLabel = gui:WaitForChild("CurrentDrawLabel")
 local cardFrame = gui:WaitForChild("CardDraw")
 local drawButton = cardFrame:WaitForChild("DrawButton")
 local cardResult = cardFrame:WaitForChild("Result")
@@ -1056,7 +1093,7 @@ local shopButton = gui:WaitForChild("ShopButton")
 local shopHub = gui:WaitForChild("ShopHub")
 local closeShop = shopHub:WaitForChild("CloseButton")
 
-local state = { WheelSpins = 0, WheelPoints = 0, CakePoints = 0, ActiveBuffs = {}, PendingCardDraw = false }
+local state = { WheelSpins = 0, WheelPoints = 0, CakePoints = 0, ActiveBuffs = {}, PendingCardDraw = false, LastDraw = nil }
 local spinning = false
 local autoRollEnabled = false
 local autoRollThread = nil
@@ -1121,7 +1158,7 @@ local function refreshEffectBar()
             slot.Visible = true
             slot.Image = buff.Icon or ""
             slot.Outline.Color = buff.OutlineColor or Color3.fromRGB(255, 255, 255)
-            slot:SetAttribute("Tooltip", string.format("%s [%s] +%s / %ss", buff.Name, buff.Rarity, tostring(buff.Value), tostring(buff.Remaining)))
+            slot:SetAttribute("Tooltip", string.format("%s [%s] 層數:%s / %ss", buff.Name, buff.Rarity, tostring(buff.Stacks or 1), tostring(buff.Remaining)))
         end
     end
     for slotIndex = index + 1, 8 do
@@ -1142,6 +1179,9 @@ local function refreshStats()
     autoRollToggle.BackgroundColor3 = autoRollEnabled and Color3.fromRGB(95, 190, 120) or Color3.fromRGB(80, 95, 120)
     wheel.Visible = state.WheelSpins > 0 or spinning or autoAvailable
     cardFrame.Visible = state.PendingCardDraw
+    local draw = state.LastDraw
+    currentDrawLabel.Visible = draw ~= nil
+    if draw then currentDrawLabel.Text = string.format("目前抽到：%s [%s]｜層數 %d｜剩餘 %d 秒", draw.Name, draw.Rarity, draw.Stacks or 1, draw.Remaining or 0) end
     refreshEffectBar()
 end
 
