@@ -58,7 +58,10 @@ local WheelConfig = {
     },
     Rewards = {
         EatSpeed_Common = { NameKey = "Reward_EatSpeed_Common", Rarity = "Common", Weight = 300, BaseDuration = 60, Type = "Stat", Stat = "EatSpeed", Value = 1, Icon = "rbxassetid://6031265976", IsUnlockedDefault = true },
+        EatSpeed_Rare = { NameKey = "Reward_EatSpeed_Rare", Rarity = "Rare", Weight = 110, BaseDuration = 60, Type = "Stat", Stat = "EatSpeed", Value = 2, Icon = "rbxassetid://6031265976", IsUnlockedDefault = true },
+        EatSpeed_Epic = { NameKey = "Reward_EatSpeed_Epic", Rarity = "Epic", Weight = 35, BaseDuration = 60, Type = "Stat", Stat = "EatSpeed", Value = 3, Icon = "rbxassetid://6031265976", IsUnlockedDefault = true },
         EatSpeed_Legendary = { NameKey = "Reward_EatSpeed_Legendary", Rarity = "Legendary", Weight = 10, BaseDuration = 60, Type = "Stat", Stat = "EatSpeed", Value = 5, Icon = "rbxassetid://6031265976", IsUnlockedDefault = true },
+        EatSpeed_Mythic = { NameKey = "Reward_EatSpeed_Mythic", Rarity = "Mythic", Weight = 2, BaseDuration = 60, Type = "Stat", Stat = "EatSpeed", Value = 8, Icon = "rbxassetid://6031265976", IsUnlockedDefault = true },
         GlowCakeBoost_Rare = { NameKey = "Reward_GlowBoost_Rare", Rarity = "Rare", Weight = 50, BaseDuration = 20, Type = "GlowCakeRate", Value = 0.10, Icon = "rbxassetid://6031075938", IsUnlockedDefault = false, UnlockCostWheelPoints = 50 },
         GlowCakeBoost_Mythic = { NameKey = "Reward_GlowBoost_Mythic", Rarity = "Mythic", Weight = 5, BaseDuration = 20, Type = "GlowCakeRate", Value = 0.50, Icon = "rbxassetid://6031075938", IsUnlockedDefault = false, UnlockCostWheelPoints = 200 },
         AutoRoll_Common = { NameKey = "Reward_AutoRoll_Common", Rarity = "Common", Weight = 50, BaseDuration = 180, Type = "AutoRoll", Level = 1, Interval = 1.0, Icon = "rbxassetid://6031094678", IsUnlockedDefault = true },
@@ -76,9 +79,9 @@ local LocalizationConfig = {
         UI_WheelShop_Title = "轉盤點數商店", UI_Time_Left = "剩餘時間: ", UI_No_Buff = "目前沒有 Buff", UI_Spin = "旋轉",
         UI_Card_Draw = "發光蛋糕抽卡", UI_Open_Shop = "商店", UI_Close = "關閉", UI_Buy = "購買",
         Cake_Common = "普通蛋糕", Cake_Rare = "稀有蛋糕", Cake_Epic = "史詩蛋糕", Cake_Legendary = "傳說蛋糕", Cake_Mythic = "神話蛋糕", Cake_Special = "發光蛋糕",
-        Reward_EatSpeed_Common = "+1 吞食速度 (普通)", Reward_EatSpeed_Legendary = "+5 吞食速度 (傳說)",
+        Reward_EatSpeed_Common = "+1 吞食速度 (普通)", Reward_EatSpeed_Rare = "+2 吞食速度 (稀有)", Reward_EatSpeed_Epic = "+3 吞食速度 (史詩)", Reward_EatSpeed_Legendary = "+5 吞食速度 (傳說)", Reward_EatSpeed_Mythic = "+8 吞食速度 (神話)",
         Reward_GlowBoost_Rare = "+10% 發光蛋糕率 (20秒)", Reward_GlowBoost_Mythic = "+50% 發光蛋糕率 (20秒)", Reward_AutoRoll_Common = "初級自動抽獎 (普通)",
-        Card_Hook = "勾索", Card_Tornado = "龍捲風", Card_Ant = "螞蟻運輸隊",
+        Card_Hook = "勾索", Card_Tornado = "龍捲風", Card_Ant = "螞蟻運輸隊", Card_Attract = "蛋糕吸引",
     },
     ["en-us"] = {
         UI_Spins_Left = "Spins Left: ", UI_WheelPoints = "Wheel Points: ", UI_CakePoints = "Cake Points: ",
@@ -86,9 +89,9 @@ local LocalizationConfig = {
         UI_WheelShop_Title = "Wheel Point Shop", UI_Time_Left = "Time Left: ", UI_No_Buff = "No Active Buff", UI_Spin = "Spin",
         UI_Card_Draw = "Glow Cake Card Draw", UI_Open_Shop = "Shop", UI_Close = "Close", UI_Buy = "Buy",
         Cake_Common = "Common Cake", Cake_Rare = "Rare Cake", Cake_Epic = "Epic Cake", Cake_Legendary = "Legendary Cake", Cake_Mythic = "Mythic Cake", Cake_Special = "Glow Cake",
-        Reward_EatSpeed_Common = "+1 Eat Speed (Common)", Reward_EatSpeed_Legendary = "+5 Eat Speed (Legendary)",
+        Reward_EatSpeed_Common = "+1 Eat Speed (Common)", Reward_EatSpeed_Rare = "+2 Eat Speed (Rare)", Reward_EatSpeed_Epic = "+3 Eat Speed (Epic)", Reward_EatSpeed_Legendary = "+5 Eat Speed (Legendary)", Reward_EatSpeed_Mythic = "+8 Eat Speed (Mythic)",
         Reward_GlowBoost_Rare = "+10% Glow Cake Spawn (20s)", Reward_GlowBoost_Mythic = "+50% Glow Cake Spawn (20s)", Reward_AutoRoll_Common = "Basic Auto-Roll (Common)",
-        Card_Hook = "Grappling Hook", Card_Tornado = "Tornado", Card_Ant = "Ant Courier",
+        Card_Hook = "Grappling Hook", Card_Tornado = "Tornado", Card_Ant = "Ant Courier", Card_Attract = "Cake Attraction",
     },
 }
 return LocalizationConfig
@@ -100,13 +103,14 @@ local CakeConfig = {
     DataStoreKey = "CakeRainRNG_PlayerData_v2",
     BaseEatDamagePerSecond = 1,
     EatTickSeconds = 1,
-    SpawnInterval = 2.75,
+    SpawnInterval = 1.25,
     SpawnRadius = 55,
     SpawnHeight = 85,
     MaxCakesPerPlayer = 18,
     GlowBaseChance = 0.03,
     InitialBurstCount = 6,
     MeteorFallSpeed = 105,
+    CakeBounciness = 0.05,
     MeteorTrailLifetime = 0.45,
     SinkSeconds = 1.1,
     EatAnimationSeconds = 0.45,
@@ -135,6 +139,7 @@ skillConfig.Source = [=[
 local SkillConfig = {
     Cards = {
         Card_Hook = { NameKey = "Card_Hook", Rarity = "Rare", Weight = 20, Duration = 60, SkillId = "PullNearest", ScriptName = "HookSkill", TriggerInterval = 5, Parameters = { Count = 1, Distance = 2 }, Icon = "rbxassetid://6031068421", IsUnlockedDefault = true },
+        Card_Attract = { NameKey = "Card_Attract", Rarity = "Common", Weight = 45, Duration = 40, SkillId = "Attract", ScriptName = "AttractSkill", TriggerInterval = 1, Parameters = { DamagePercentPerSecond = 0.01, Distance = 3 }, Icon = "rbxassetid://6031068421", IsUnlockedDefault = true },
         Card_Tornado = { NameKey = "Card_Tornado", Rarity = "Epic", Weight = 10, Duration = 60, SkillId = "Tornado", ScriptName = "TornadoSkill", TriggerInterval = 10, Parameters = { Count = 5, DamagePercent = 0.40, Distance = 5 }, Icon = "rbxassetid://6031068421", IsUnlockedDefault = false, UnlockCostCakePoints = 1500 },
         Card_Ant = { NameKey = "Card_Ant", Rarity = "Legendary", Weight = 5, Duration = 810, SkillId = "AntCourier", ScriptName = "AntSkill", TriggerInterval = 1, Parameters = { MinimumDistance = 14, DamagePercentPerSecond = 0.02, Distance = 4 }, Icon = "rbxassetid://6031068421", IsUnlockedDefault = false, UnlockCostCakePoints = 3000 },
     },
@@ -712,7 +717,7 @@ function CakeService.Decorate(cake, rarityKey, rarity, isGlow)
     cake.PrimaryPart = primary
     cake:SetAttribute("RarityKey", rarityKey); cake:SetAttribute("Health", rarity.Health); cake:SetAttribute("MaxHealth", rarity.Health)
     cake:SetAttribute("RewardCakePoints", rarity.RewardCakePoints); cake:SetAttribute("IsGlow", isGlow)
-    for _, part in ipairs(cake:GetDescendants()) do if part:IsA("BasePart") then part.Anchored, part.CanCollide = false, true end end
+    for _, part in ipairs(cake:GetDescendants()) do if part:IsA("BasePart") then part.Anchored, part.CanCollide = false, true; part.CustomPhysicalProperties = PhysicalProperties.new(1, .7, CakeConfig.CakeBounciness) end end
     local outline = Instance.new("Highlight"); outline.Name = "RarityOutline"; outline.FillTransparency = 1; outline.OutlineColor = rarity.OutlineColor; outline.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop; outline.Parent = cake
     local top = Instance.new("Attachment"); top.Name = "MeteorTrailTop"; top.Position = Vector3.new(0, 2.8, 0); top.Parent = primary
     local bottom = Instance.new("Attachment"); bottom.Name = "MeteorTrailBottom"; bottom.Position = Vector3.new(0, -2.8, 0); bottom.Parent = primary
@@ -758,6 +763,7 @@ function CakeService.Expire(cake)
 end
 function CakeService.DamageCake(player, cake, amount)
     if CakeService.Owners[cake] ~= player or cake:GetAttribute("Finishing") then return false end
+    amount = math.max(0, tonumber(amount) or 0)
     local hp = math.max(0, (cake:GetAttribute("Health") or 1) - amount); cake:SetAttribute("Health", hp); CakeService.RefreshLabel(cake)
     if hp <= 0 then CakeService.Finish(player, cake) end
     return true
@@ -846,7 +852,7 @@ function Template.New(player, parameters)
         Player = player, Parameters = parameters, Root = root,
         GetCakes = function(_, count, minimumDistance) return CakeService.GetCakes(player, count, minimumDistance) end,
         Damage = function(_, cake, amount) return CakeService.DamageCake(player, cake, amount) end,
-        DamagePercent = function(_, cake, percent) return CakeService.DamageCake(player, cake, (cake:GetAttribute("Health") or 0) * percent) end,
+        DamagePercent = function(_, cake, percent) local hp = cake:GetAttribute("Health") or 0; return CakeService.DamageCake(player, cake, math.max(.01, hp * percent)) end,
         MoveNear = function(_, cake, distance, seconds) return CakeService.MoveNearPlayer(player, cake, distance, seconds) end,
     }
 end
@@ -898,6 +904,19 @@ return function(player, parameters)
     if not destination then return end
     local ant = Instance.new("Part"); ant.Name="AntCourier"; ant.Shape=Enum.PartType.Ball; ant.Size=Vector3.new(.7,.45,.45); ant.Color=Color3.fromRGB(35,20,12); ant.Anchored=true; ant.CanCollide=false; ant.CFrame=item.Cake.PrimaryPart.CFrame; ant.Parent=workspace.Map
     TweenService:Create(ant,TweenInfo.new(1,Enum.EasingStyle.Linear),{CFrame=destination}):Play(); Debris:AddItem(ant,1.1)
+end
+]=]
+
+local attractSkill = getOrCreate(skillScripts, "ModuleScript", "AttractSkill")
+attractSkill.Source = [=[
+-- Default card: all owned cakes drift closer once per second and lose 1% current HP.
+local Template = require(script.Parent.SkillTemplate)
+return function(player, parameters)
+    local context = Template.New(player, parameters)
+    for _, item in ipairs(context:GetCakes(999)) do
+        context:MoveNear(item.Cake, parameters.Distance or 3, .9)
+        context:DamagePercent(item.Cake, parameters.DamagePercentPerSecond or .01)
+    end
 end
 ]=]
 
