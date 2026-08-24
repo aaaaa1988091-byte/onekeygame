@@ -54,13 +54,14 @@ local WheelConfig = {
         Epic = Color3.fromRGB(185, 85, 255),
         Legendary = Color3.fromRGB(255, 170, 0),
         Mythic = Color3.fromRGB(255, 60, 120),
+        SSR = Color3.fromRGB(120, 255, 255),
     },
     Rewards = {
-        EatSpeed_Common = { NameKey = "Reward_EatSpeed_Common", Rarity = "Common", Weight = 300, BaseDuration = 60, Type = "Stat", Stat = "EatSpeed", Value = 1, IsUnlockedDefault = true },
-        EatSpeed_Legendary = { NameKey = "Reward_EatSpeed_Legendary", Rarity = "Legendary", Weight = 10, BaseDuration = 60, Type = "Stat", Stat = "EatSpeed", Value = 5, IsUnlockedDefault = true },
-        GlowCakeBoost_Rare = { NameKey = "Reward_GlowBoost_Rare", Rarity = "Rare", Weight = 50, BaseDuration = 20, Type = "GlowCakeRate", Value = 0.10, IsUnlockedDefault = false, UnlockCostWheelPoints = 50 },
-        GlowCakeBoost_Mythic = { NameKey = "Reward_GlowBoost_Mythic", Rarity = "Mythic", Weight = 5, BaseDuration = 20, Type = "GlowCakeRate", Value = 0.50, IsUnlockedDefault = false, UnlockCostWheelPoints = 200 },
-        AutoRoll_Common = { NameKey = "Reward_AutoRoll_Common", Rarity = "Common", Weight = 50, BaseDuration = 180, Type = "AutoRoll", Level = 1, Interval = 1.0, IsUnlockedDefault = true },
+        EatSpeed_Common = { NameKey = "Reward_EatSpeed_Common", Rarity = "Common", Weight = 300, BaseDuration = 60, Type = "Stat", Stat = "EatSpeed", Value = 1, Icon = "rbxassetid://6031265976", IsUnlockedDefault = true },
+        EatSpeed_Legendary = { NameKey = "Reward_EatSpeed_Legendary", Rarity = "Legendary", Weight = 10, BaseDuration = 60, Type = "Stat", Stat = "EatSpeed", Value = 5, Icon = "rbxassetid://6031265976", IsUnlockedDefault = true },
+        GlowCakeBoost_Rare = { NameKey = "Reward_GlowBoost_Rare", Rarity = "Rare", Weight = 50, BaseDuration = 20, Type = "GlowCakeRate", Value = 0.10, Icon = "rbxassetid://6031075938", IsUnlockedDefault = false, UnlockCostWheelPoints = 50 },
+        GlowCakeBoost_Mythic = { NameKey = "Reward_GlowBoost_Mythic", Rarity = "Mythic", Weight = 5, BaseDuration = 20, Type = "GlowCakeRate", Value = 0.50, Icon = "rbxassetid://6031075938", IsUnlockedDefault = false, UnlockCostWheelPoints = 200 },
+        AutoRoll_Common = { NameKey = "Reward_AutoRoll_Common", Rarity = "Common", Weight = 50, BaseDuration = 180, Type = "AutoRoll", Level = 1, Interval = 1.0, Icon = "rbxassetid://6031094678", IsUnlockedDefault = true },
     },
 }
 return WheelConfig
@@ -124,8 +125,8 @@ local cardConfig = getOrCreate(configsFolder, "ModuleScript", "CardConfig")
 cardConfig.Source = [=[
 local CardConfig = {
     Cards = {
-        Card_Base_01 = { NameKey = "Card_Gluttony", Rarity = "SSR", Weight = 10, Duration = 300, Effect = "RangeEat", IsUnlockedDefault = true },
-        Card_Shop_01 = { NameKey = "Card_BlackHole", Rarity = "SSR", Weight = 5, Duration = 240, Effect = "BlackHole", IsUnlockedDefault = false, UnlockCostCakePoints = 5000 },
+        Card_Base_01 = { NameKey = "Card_Gluttony", Rarity = "SSR", Weight = 10, Duration = 300, Effect = "RangeEat", Icon = "rbxassetid://6031068421", IsUnlockedDefault = true },
+        Card_Shop_01 = { NameKey = "Card_BlackHole", Rarity = "SSR", Weight = 5, Duration = 240, Effect = "BlackHole", Icon = "rbxassetid://6031068421", IsUnlockedDefault = false, UnlockCostCakePoints = 5000 },
     },
 }
 return CardConfig
@@ -297,21 +298,47 @@ spinButton.Text = "旋轉"
 spinButton.TextScaled = true
 spinButton.TextColor3 = Color3.fromRGB(60, 35, 10)
 newGui("UICorner", "Corner", spinButton).CornerRadius = UDim.new(0, 14)
+local autoRollToggle = newGui("TextButton", "AutoRollToggle", wheel)
+autoRollToggle.Size = UDim2.new(0, 150, 0, 38)
+autoRollToggle.Position = UDim2.new(0, 18, 1, -48)
+autoRollToggle.BackgroundColor3 = Color3.fromRGB(80, 95, 120)
+autoRollToggle.Font = Enum.Font.GothamBlack
+autoRollToggle.Text = "自動抽獎: OFF"
+autoRollToggle.TextScaled = true
+autoRollToggle.TextColor3 = Color3.fromRGB(255, 255, 255)
+autoRollToggle.Visible = false
+newGui("UICorner", "Corner", autoRollToggle).CornerRadius = UDim.new(0, 12)
 
-local buffFrame = newGui("Frame", "BuffStatus", mainGui)
-buffFrame.Size = UDim2.new(0, 390, 0, 78)
-buffFrame.Position = UDim2.new(0.5, -195, 1, -98)
+local buffFrame = newGui("Frame", "EffectBar", mainGui)
+buffFrame.Size = UDim2.new(0, 392, 0, 74)
+buffFrame.Position = UDim2.new(0, 18, 1, -92)
 buffFrame.BackgroundColor3 = Color3.fromRGB(20, 35, 45)
 buffFrame.BackgroundTransparency = 0.12
 buffFrame.Visible = false
 newGui("UICorner", "Corner", buffFrame).CornerRadius = UDim.new(0, 16)
-local buffLabel = newGui("TextLabel", "BuffLabel", buffFrame)
-buffLabel.BackgroundTransparency = 1
-buffLabel.Size = UDim2.new(1, -20, 1, -16)
-buffLabel.Position = UDim2.new(0, 10, 0, 8)
-buffLabel.Font = Enum.Font.GothamBold
-buffLabel.TextScaled = true
-buffLabel.TextColor3 = Color3.fromRGB(180, 255, 180)
+for index = 1, 8 do
+    local slot = newGui("ImageButton", "EffectIcon" .. index, buffFrame)
+    slot.Size = UDim2.new(0, 46, 0, 46)
+    slot.Position = UDim2.new(0, 10 + (index - 1) * 47, 0, 14)
+    slot.BackgroundColor3 = Color3.fromRGB(45, 55, 70)
+    slot.AutoButtonColor = false
+    slot.Image = ""
+    slot.Visible = false
+    newGui("UICorner", "Corner", slot).CornerRadius = UDim.new(0, 10)
+    local stroke = newGui("UIStroke", "Outline", slot)
+    stroke.Thickness = 3
+    stroke.Color = Color3.fromRGB(255, 255, 255)
+end
+local tooltip = newGui("TextLabel", "Tooltip", buffFrame)
+tooltip.Size = UDim2.new(0, 260, 0, 34)
+tooltip.Position = UDim2.new(0, 8, 0, -38)
+tooltip.BackgroundColor3 = Color3.fromRGB(15, 15, 20)
+tooltip.BackgroundTransparency = 0.08
+tooltip.Font = Enum.Font.GothamBold
+tooltip.TextScaled = true
+tooltip.TextColor3 = Color3.fromRGB(255, 255, 255)
+tooltip.Visible = false
+newGui("UICorner", "Corner", tooltip).CornerRadius = UDim.new(0, 8)
 
 local cardFrame = newGui("Frame", "CardDraw", mainGui)
 cardFrame.Size = UDim2.new(0, 420, 0, 230)
@@ -532,14 +559,14 @@ function StateService.AddBuff(player, key, reward)
     if not state then return end
     local buffType = reward.Type == "Stat" and reward.Stat or reward.Type
     state.Buffs[buffType] = state.Buffs[buffType] or {}
-    table.insert(state.Buffs[buffType], { Key = key, NameKey = reward.NameKey, Rarity = reward.Rarity, Value = reward.Value, Level = reward.Level, ExpiresAt = os.clock() + reward.BaseDuration })
+    table.insert(state.Buffs[buffType], { Key = key, NameKey = reward.NameKey, Rarity = reward.Rarity, Value = reward.Value, Level = reward.Level, Icon = reward.Icon, Interval = reward.Interval, ExpiresAt = os.clock() + reward.BaseDuration })
 end
 
 function StateService.AddCardBuff(player, key, card)
     local state = StateService.Get(player)
     if not state then return end
     state.Buffs[card.Effect] = state.Buffs[card.Effect] or {}
-    table.insert(state.Buffs[card.Effect], { Key = key, NameKey = card.NameKey, Rarity = card.Rarity, Value = 1, ExpiresAt = os.clock() + card.Duration })
+    table.insert(state.Buffs[card.Effect], { Key = key, NameKey = card.NameKey, Rarity = card.Rarity, Value = 1, Icon = card.Icon, ExpiresAt = os.clock() + card.Duration })
 end
 
 function StateService.ActiveBuffs(player)
@@ -556,7 +583,7 @@ function StateService.ActiveBuffs(player)
             end
         end
         if best then
-            active[buffType] = { Name = text(best.NameKey), Rarity = best.Rarity, Value = best.Value or best.Level or 0, Remaining = math.max(0, math.floor(best.ExpiresAt - now)) }
+            active[buffType] = { Name = text(best.NameKey), Rarity = best.Rarity, Value = best.Value or best.Level or 0, Remaining = math.max(0, math.floor(best.ExpiresAt - now)), Icon = best.Icon or "", OutlineColor = WheelConfig.RarityColors[best.Rarity] or Color3.fromRGB(255, 255, 255), Interval = best.Interval }
         end
     end
     return active
@@ -994,8 +1021,9 @@ local stats = gui:WaitForChild("StatsFrame")
 local wheel = gui:WaitForChild("WheelPanel")
 local disc = wheel:WaitForChild("WheelDisc")
 local spinButton = wheel:WaitForChild("SpinButton")
-local buffFrame = gui:WaitForChild("BuffStatus")
-local buffLabel = buffFrame:WaitForChild("BuffLabel")
+local autoRollToggle = wheel:WaitForChild("AutoRollToggle")
+local buffFrame = gui:WaitForChild("EffectBar")
+local tooltip = buffFrame:WaitForChild("Tooltip")
 local cardFrame = gui:WaitForChild("CardDraw")
 local drawButton = cardFrame:WaitForChild("DrawButton")
 local cardResult = cardFrame:WaitForChild("Result")
@@ -1005,6 +1033,8 @@ local closeShop = shopHub:WaitForChild("CloseButton")
 
 local state = { WheelSpins = 0, WheelPoints = 0, CakePoints = 0, ActiveBuffs = {}, PendingCardDraw = false }
 local spinning = false
+local autoRollEnabled = false
+local autoRollThread = nil
 
 local function buttonLabel(item)
     local name = L[item.NameKey] or item.NameKey
@@ -1034,20 +1064,56 @@ local function bindShopButtons()
     end
 end
 bindShopButtons()
+for index = 1, 8 do
+    local slot = buffFrame:WaitForChild("EffectIcon" .. index)
+    slot.MouseEnter:Connect(function()
+        local text = slot:GetAttribute("Tooltip")
+        if text and text ~= "" then
+            tooltip.Text = text
+            tooltip.Visible = true
+        end
+    end)
+    slot.MouseLeave:Connect(function()
+        tooltip.Visible = false
+    end)
+end
+
+local function hasAutoRoll()
+    local buff = state.ActiveBuffs and state.ActiveBuffs.AutoRoll
+    return buff ~= nil and (buff.Remaining or 0) > 0
+end
+
+local function refreshEffectBar()
+    local index = 0
+    for _, buff in pairs(state.ActiveBuffs or {}) do
+        index += 1
+        local slot = buffFrame:FindFirstChild("EffectIcon" .. index)
+        if slot then
+            slot.Visible = true
+            slot.Image = buff.Icon or ""
+            slot.Outline.Color = buff.OutlineColor or Color3.fromRGB(255, 255, 255)
+            slot:SetAttribute("Tooltip", string.format("%s [%s] +%s / %ss", buff.Name, buff.Rarity, tostring(buff.Value), tostring(buff.Remaining)))
+        end
+    end
+    for slotIndex = index + 1, 8 do
+        local slot = buffFrame:FindFirstChild("EffectIcon" .. slotIndex)
+        if slot then slot.Visible = false slot.Image = "" slot:SetAttribute("Tooltip", "") end
+    end
+    buffFrame.Visible = index > 0
+end
 
 local function refreshStats()
     stats.CakePointsLabel.Text = L.UI_CakePoints .. tostring(state.CakePoints)
     stats.WheelPointsLabel.Text = L.UI_WheelPoints .. tostring(state.WheelPoints)
     stats.SpinsLabel.Text = L.UI_Spins_Left .. tostring(state.WheelSpins)
-    wheel.Visible = state.WheelSpins > 0
+    local autoAvailable = hasAutoRoll()
+    if not autoAvailable then autoRollEnabled = false end
+    autoRollToggle.Visible = autoAvailable
+    autoRollToggle.Text = autoRollEnabled and "自動抽獎: ON" or "自動抽獎: OFF"
+    autoRollToggle.BackgroundColor3 = autoRollEnabled and Color3.fromRGB(95, 190, 120) or Color3.fromRGB(80, 95, 120)
+    wheel.Visible = state.WheelSpins > 0 or spinning or autoAvailable
     cardFrame.Visible = state.PendingCardDraw
-    local text
-    for _, buff in state.ActiveBuffs do
-        text = string.format("%s [%s] +%s / %ss", buff.Name, buff.Rarity, tostring(buff.Value), tostring(buff.Remaining))
-        break
-    end
-    buffFrame.Visible = text ~= nil
-    buffLabel.Text = text or L.UI_No_Buff
+    refreshEffectBar()
 end
 
 local function paintSlots(slots, pickedIndex)
@@ -1077,16 +1143,44 @@ local function playWheelAnimation(slots, pickedIndex)
     pulse:Play()
 end
 
-spinButton.Activated:Connect(function()
-    if spinning then
-        return
-    end
+local function performSpin()
+    if spinning or state.WheelSpins <= 0 then return false end
     spinning = true
+    refreshStats()
     local result = RequestWheelSpin:InvokeServer()
     if result and result.Ok then
         playWheelAnimation(result.Slots, result.PickedIndex)
     end
     spinning = false
+    refreshStats()
+    return result and result.Ok
+end
+
+local function ensureAutoRollLoop()
+    if autoRollThread then return end
+    autoRollThread = task.spawn(function()
+        while autoRollEnabled and hasAutoRoll() do
+            if state.WheelSpins > 0 then
+                performSpin()
+            end
+            local interval = (state.ActiveBuffs.AutoRoll and state.ActiveBuffs.AutoRoll.Interval) or 1
+            task.wait(math.max(0.5, interval))
+        end
+        autoRollEnabled = false
+        autoRollThread = nil
+        refreshStats()
+    end)
+end
+
+spinButton.Activated:Connect(function()
+    performSpin()
+end)
+
+autoRollToggle.Activated:Connect(function()
+    if not hasAutoRoll() then return end
+    autoRollEnabled = not autoRollEnabled
+    refreshStats()
+    if autoRollEnabled then ensureAutoRollLoop() end
 end)
 
 drawButton.Activated:Connect(function()
