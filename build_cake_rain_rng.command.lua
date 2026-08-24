@@ -279,6 +279,7 @@ local disc = newGui("Frame", "WheelDisc", wheel)
 disc.Size = UDim2.new(0, 360, 0, 360)
 disc.Position = UDim2.new(0, 0, 0, 0)
 disc.BackgroundColor3 = Color3.fromRGB(42, 30, 70)
+disc.ClipsDescendants = true
 newGui("UICorner", "Circle", disc).CornerRadius = UDim.new(1, 0)
 local pointer = newGui("TextLabel", "Pointer", wheel)
 pointer.BackgroundTransparency = 1
@@ -289,21 +290,23 @@ pointer.Text = "▶"
 pointer.TextScaled = true
 pointer.TextColor3 = Color3.fromRGB(255, 240, 110)
 for index = 1, 5 do
-    -- Five equally spaced item panels match WheelConfig.DisplayedSlots and remain inside the 360px disc.
+    -- A radial slice starts at the centre and is clipped by the circular disc, producing a pie-chart wheel.
     local angle = -90 + (index - 1) * 72
     local sector = newGui("Frame", "Sector" .. index, disc)
-    sector.AnchorPoint = Vector2.new(0.5, 0.5)
-    sector.Size = UDim2.new(0, 112, 0, 48)
-    sector.Position = UDim2.new(0.5, math.cos(math.rad(angle)) * 112, 0.5, math.sin(math.rad(angle)) * 112)
-    sector.Rotation = 0
+    sector.AnchorPoint = Vector2.new(0.5, 1)
+    sector.Size = UDim2.new(0, 132, 0, 174)
+    sector.Position = UDim2.new(0.5, 0, 0.5, 0)
+    sector.Rotation = angle + 90
     sector:SetAttribute("WheelAngle", angle)
     sector.BackgroundColor3 = index % 2 == 0 and Color3.fromRGB(76, 54, 120) or Color3.fromRGB(95, 63, 145)
+    sector.BackgroundTransparency = 0.05
     sector.BorderSizePixel = 0
-    newGui("UICorner", "Corner", sector).CornerRadius = UDim.new(0, 22)
     local text = newGui("TextLabel", "Text", sector)
     text.BackgroundTransparency = 1
-    text.Size = UDim2.new(1, -20, 1, 0)
-    text.Position = UDim2.new(0, 12, 0, 0)
+    text.Size = UDim2.new(1, -14, 0, 46)
+    text.Position = UDim2.new(0, 7, 0, 102)
+    -- Keep text readable while its slice rotates around the centre.
+    text.Rotation = -sector.Rotation
     text.Font = Enum.Font.GothamBold
     text.Text = "?"
     text.TextScaled = true
