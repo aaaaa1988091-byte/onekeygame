@@ -134,9 +134,9 @@ skillConfig.Source = [=[
 -- then implement the matching handler in SkillService.  Purchase policy stays on the card.
 local SkillConfig = {
     Cards = {
-        Card_Hook = { NameKey = "Card_Hook", Rarity = "Rare", Weight = 20, Duration = 60, SkillId = "PullNearest", TriggerInterval = 5, Parameters = { Count = 1, Distance = 2 }, Icon = "rbxassetid://6031068421", IsUnlockedDefault = true },
-        Card_Tornado = { NameKey = "Card_Tornado", Rarity = "Epic", Weight = 10, Duration = 60, SkillId = "Tornado", TriggerInterval = 10, Parameters = { Count = 5, DamagePercent = 0.40, Distance = 5 }, Icon = "rbxassetid://6031068421", IsUnlockedDefault = false, UnlockCostCakePoints = 1500 },
-        Card_Ant = { NameKey = "Card_Ant", Rarity = "Legendary", Weight = 5, Duration = 810, SkillId = "AntCourier", TriggerInterval = 1, Parameters = { MinimumDistance = 14, DamagePercentPerSecond = 0.02, Distance = 4 }, Icon = "rbxassetid://6031068421", IsUnlockedDefault = false, UnlockCostCakePoints = 3000 },
+        Card_Hook = { NameKey = "Card_Hook", Rarity = "Rare", Weight = 20, Duration = 60, SkillId = "PullNearest", ScriptName = "HookSkill", TriggerInterval = 5, Parameters = { Count = 1, Distance = 2 }, Icon = "rbxassetid://6031068421", IsUnlockedDefault = true },
+        Card_Tornado = { NameKey = "Card_Tornado", Rarity = "Epic", Weight = 10, Duration = 60, SkillId = "Tornado", ScriptName = "TornadoSkill", TriggerInterval = 10, Parameters = { Count = 5, DamagePercent = 0.40, Distance = 5 }, Icon = "rbxassetid://6031068421", IsUnlockedDefault = false, UnlockCostCakePoints = 1500 },
+        Card_Ant = { NameKey = "Card_Ant", Rarity = "Legendary", Weight = 5, Duration = 810, SkillId = "AntCourier", ScriptName = "AntSkill", TriggerInterval = 1, Parameters = { MinimumDistance = 14, DamagePercentPerSecond = 0.02, Distance = 4 }, Icon = "rbxassetid://6031068421", IsUnlockedDefault = false, UnlockCostCakePoints = 3000 },
     },
 }
 return SkillConfig
@@ -364,7 +364,7 @@ tooltip.TextColor3 = Color3.fromRGB(255, 255, 255)
 tooltip.Visible = false
 newGui("UICorner", "Corner", tooltip).CornerRadius = UDim.new(0, 8)
 
--- Persistent bottom readout: the player can verify the most recently drawn skill and stacked time.
+-- A short bottom readout shows the most recent wheel reward (not card draw).
 local currentDrawLabel = newGui("TextLabel", "CurrentDrawLabel", mainGui)
 currentDrawLabel.Size = UDim2.new(0, 392, 0, 28)
 currentDrawLabel.Position = UDim2.new(0, 18, 1, -124)
@@ -534,7 +534,7 @@ function StateService.Create(player, loaded)
         WheelPoints = loaded.WheelPoints or 0,
         CakePoints = loaded.CakePoints or 0,
         PendingCardDraw = false,
-        LastDraw = nil,
+        LastWheelReward = nil,
         Buffs = {},
         UnlockedWheelRewards = loaded.UnlockedWheelRewards or {},
         UnlockedCards = loaded.UnlockedCards or {},
@@ -590,9 +590,19 @@ end
 function StateService.AddBuff(player, key, reward)
     local state = StateService.Get(player)
     if not state then return end
-    local buffType = reward.Type == "Stat" and reward.Stat or reward.Type
+    local buffType, now = reward.Type == "Stat" and reward.Stat or reward.Type, os.clock()
     state.Buffs[buffType] = state.Buffs[buffType] or {}
-    table.insert(state.Buffs[buffType], { Key = key, NameKey = reward.NameKey, Rarity = reward.Rarity, Value = reward.Value, Level = reward.Level, Icon = reward.Icon, Interval = reward.Interval, ExpiresAt = os.clock() + reward.BaseDuration })
+    -- Matching wheel rewards stack their duration and share one effective buff.
+    for _, existing in ipairs(state.Buffs[buffType]) do
+        if existing.Key == key and existing.ExpiresAt > now then
+            existing.ExpiresAt += reward.BaseDuration
+            existing.Stacks = (existing.Stacks or 1) + 1
+            return existing
+        end
+    end
+    local stack = { Key = key, NameKey = reward.NameKey, Rarity = reward.Rarity, Value = reward.Value, Level = reward.Level, Icon = reward.Icon, Interval = reward.Interval, Stacks = 1, ExpiresAt = now + reward.BaseDuration }
+    table.insert(state.Buffs[buffType], stack)
+    return stack
 end
 
 function StateService.AddCardBuff(player, key, card)
@@ -636,26 +646,17 @@ end
 function StateService.Push(player)
     local state = StateService.Get(player)
     if not state then return end
-    local lastDraw = state.LastDraw
-    if lastDraw and lastDraw.Key then
-        local activeStack
-        for _, stack in ipairs(state.Buffs["Skill_" .. lastDraw.Key] or {}) do
-            if stack.Key == lastDraw.Key and stack.ExpiresAt > os.clock() then activeStack = stack break end
-        end
-        lastDraw = activeStack and { Key = lastDraw.Key, Name = text(activeStack.NameKey), Rarity = activeStack.Rarity, Remaining = math.max(0, math.floor(activeStack.ExpiresAt - os.clock())), Stacks = activeStack.Stacks or 1 } or nil
+    local wheelReward = state.LastWheelReward
+    if wheelReward then
+        local displayFor = math.max(0, wheelReward.ShownUntil - os.clock())
+        wheelReward = displayFor > 0 and { Name = wheelReward.Name, Rarity = wheelReward.Rarity, Stacks = wheelReward.Stacks, DisplayFor = displayFor } or nil
     end
     UpdateClientState:FireClient(player, {
-        WheelSpins = state.WheelSpins,
-        WheelPoints = state.WheelPoints,
-        CakePoints = state.CakePoints,
-        PendingCardDraw = state.PendingCardDraw,
-        LastDraw = lastDraw,
-        ActiveBuffs = StateService.ActiveBuffs(player),
-        UnlockedWheelRewards = state.UnlockedWheelRewards,
-        UnlockedCards = state.UnlockedCards,
+        WheelSpins = state.WheelSpins, WheelPoints = state.WheelPoints, CakePoints = state.CakePoints,
+        PendingCardDraw = state.PendingCardDraw, LastWheelReward = wheelReward,
+        ActiveBuffs = StateService.ActiveBuffs(player), UnlockedWheelRewards = state.UnlockedWheelRewards, UnlockedCards = state.UnlockedCards,
     })
 end
-
 return StateService
 ]=]
 
@@ -832,106 +833,93 @@ function CakeService.CleanupPlayer(player) for cake,owner in pairs(CakeService.O
 return CakeService
 ]=]
 
+local skillScripts = getOrCreate(servicesPackage, "Folder", "SkillScripts")
+local skillTemplate = getOrCreate(skillScripts, "ModuleScript", "SkillTemplate")
+skillTemplate.Source = [=[
+-- Template for an independent skill script. Use Context:GetCakes / DamagePercent / MoveNear;
+-- CakeService remains the single authority for ownership, HP, rewards, and removal.
+local CakeService = require(script.Parent.Parent.CakeService)
+local Template = {}
+function Template.New(player, parameters)
+    local root = player.Character and player.Character:FindFirstChild("HumanoidRootPart")
+    return {
+        Player = player, Parameters = parameters, Root = root,
+        GetCakes = function(_, count, minimumDistance) return CakeService.GetCakes(player, count, minimumDistance) end,
+        Damage = function(_, cake, amount) return CakeService.DamageCake(player, cake, amount) end,
+        DamagePercent = function(_, cake, percent) return CakeService.DamageCake(player, cake, (cake:GetAttribute("Health") or 0) * percent) end,
+        MoveNear = function(_, cake, distance, seconds) return CakeService.MoveNearPlayer(player, cake, distance, seconds) end,
+    }
+end
+return Template
+]=]
+
+local hookSkill = getOrCreate(skillScripts, "ModuleScript", "HookSkill")
+hookSkill.Source = [=[
+local Debris = game:GetService("Debris")
+local Workspace = game:GetService("Workspace")
+local Template = require(script.Parent.SkillTemplate)
+return function(player, parameters)
+    local context, item = Template.New(player, parameters), nil
+    item = context:GetCakes(parameters.Count or 1)[1]
+    if not item or not context.Root or not item.Cake.PrimaryPart then return end
+    local source, target = Instance.new("Attachment"), Instance.new("Attachment")
+    source.Parent, target.Parent = context.Root, item.Cake.PrimaryPart
+    local beam = Instance.new("Beam"); beam.Name = "GrapplingHookChain"; beam.Attachment0, beam.Attachment1 = source, target
+    beam.Color, beam.Width0, beam.Width1, beam.FaceCamera = ColorSequence.new(Color3.fromRGB(210,210,225)), .16, .16, true; beam.Parent = Workspace.Map
+    Debris:AddItem(beam,.8); Debris:AddItem(source,.8); Debris:AddItem(target,.8)
+    context:MoveNear(item.Cake, parameters.Distance or 2, .75)
+end
+]=]
+
+local tornadoSkill = getOrCreate(skillScripts, "ModuleScript", "TornadoSkill")
+tornadoSkill.Source = [=[
+local Debris = game:GetService("Debris")
+local Template = require(script.Parent.SkillTemplate)
+return function(player, parameters)
+    local context = Template.New(player, parameters)
+    if context.Root then
+        local wind = Instance.new("Part"); wind.Name="Tornado"; wind.Shape=Enum.PartType.Cylinder; wind.Size=Vector3.new(8,1,8); wind.Material=Enum.Material.Neon; wind.Color=Color3.fromRGB(180,235,255); wind.Transparency=.35; wind.Anchored=true; wind.CanCollide=false; wind.CFrame=CFrame.new(context.Root.Position + Vector3.new(0,4,0)); wind.Parent=workspace.Map; Debris:AddItem(wind,1.2)
+    end
+    for _, item in ipairs(context:GetCakes(parameters.Count or 5)) do context:MoveNear(item.Cake, parameters.Distance or 5, .8); context:DamagePercent(item.Cake, parameters.DamagePercent or .4) end
+end
+]=]
+
+local antSkill = getOrCreate(skillScripts, "ModuleScript", "AntSkill")
+antSkill.Source = [=[
+local Debris = game:GetService("Debris")
+local TweenService = game:GetService("TweenService")
+local Template = require(script.Parent.SkillTemplate)
+return function(player, parameters)
+    local context = Template.New(player, parameters)
+    local item = context:GetCakes(1, parameters.MinimumDistance or 14)[1]
+    if not item or not item.Cake.PrimaryPart then return end
+    context:DamagePercent(item.Cake, parameters.DamagePercentPerSecond or .02)
+    local destination = context:MoveNear(item.Cake, parameters.Distance or 4, 1)
+    if not destination then return end
+    local ant = Instance.new("Part"); ant.Name="AntCourier"; ant.Shape=Enum.PartType.Ball; ant.Size=Vector3.new(.7,.45,.45); ant.Color=Color3.fromRGB(35,20,12); ant.Anchored=true; ant.CanCollide=false; ant.CFrame=item.Cake.PrimaryPart.CFrame; ant.Parent=workspace.Map
+    TweenService:Create(ant,TweenInfo.new(1,Enum.EasingStyle.Linear),{CFrame=destination}):Play(); Debris:AddItem(ant,1.1)
+end
+]=]
+
 local skillService = getOrCreate(servicesPackage, "ModuleScript", "SkillService")
 skillService.Source = [=[
--- Skill handler registry. Add a SkillConfig card and a handler with the matching SkillId.
--- The effects live server-side so every player sees the hook, tornado, and ant transport.
-local Debris = game:GetService("Debris")
-local RunService = game:GetService("RunService")
-local TweenService = game:GetService("TweenService")
-local Workspace = game:GetService("Workspace")
-local CakeService = require(script.Parent.CakeService)
+-- Generic dispatcher: a card selects one independent ModuleScript; skill visuals and movement stay there.
 local StateService = require(script.Parent.StateService)
-local SkillService = { Handlers = {} }
-local Effects = Workspace.Map:FindFirstChild("SkillEffects") or Instance.new("Folder")
-Effects.Name, Effects.Parent = "SkillEffects", Workspace.Map
-
-local function rootOf(player) return player.Character and player.Character:FindFirstChild("HumanoidRootPart") end
-local function hookEffect(root, cake)
-    if not root or not cake.PrimaryPart then return end
-    local source, target = Instance.new("Attachment"), Instance.new("Attachment")
-    source.Parent, target.Parent = root, cake.PrimaryPart
-    local beam = Instance.new("Beam")
-    beam.Name, beam.Attachment0, beam.Attachment1 = "GrapplingHookChain", source, target
-    beam.Color, beam.Width0, beam.Width1, beam.FaceCamera = ColorSequence.new(Color3.fromRGB(210, 210, 225)), .16, .16, true
-    beam.Texture, beam.TextureSpeed, beam.TextureLength, beam.Parent = "rbxassetid://446111271", 3, 1, Effects
-    local hook = Instance.new("Part")
-    hook.Name, hook.Shape, hook.Size, hook.Material, hook.Color, hook.Anchored, hook.CanCollide = "HookHead", Enum.PartType.Ball, Vector3.new(.55,.55,.55), Enum.Material.Metal, Color3.fromRGB(180,180,190), true, false
-    hook.CFrame, hook.Parent = cake.PrimaryPart.CFrame, Effects
-    Debris:AddItem(beam, .85); Debris:AddItem(source, .85); Debris:AddItem(target, .85); Debris:AddItem(hook, .85)
-end
-local function tornadoEffect(root)
-    if not root then return end
-    local visual = Instance.new("Folder"); visual.Name, visual.Parent = "Tornado", Effects
-    local pieces = {}
-    for index = 1, 16 do
-        local part = Instance.new("Part")
-        part.Name, part.Shape, part.Size, part.Material, part.Color = "WindSpiral", Enum.PartType.Ball, Vector3.new(.35,.35,.35), Enum.Material.Neon, Color3.fromRGB(180,235,255)
-        part.Anchored, part.CanCollide, part.Parent = true, false, visual
-        pieces[index] = part
-    end
-    task.spawn(function()
-        local started = os.clock()
-        while visual.Parent and os.clock() - started < 1.4 do
-            local elapsed = os.clock() - started
-            for index, part in ipairs(pieces) do
-                local height = ((index - 1) / #pieces) * 9
-                local radius = 1.1 + height * .32
-                local angle = elapsed * 14 + index * math.pi * 2 / #pieces
-                part.CFrame = CFrame.new(root.Position + Vector3.new(math.cos(angle)*radius, height, math.sin(angle)*radius))
-            end
-            RunService.Heartbeat:Wait()
-        end
-        visual:Destroy()
-    end)
-end
-local function antEffect(cake, destination, seconds)
-    if not cake.PrimaryPart or not destination then return end
-    local ant = Instance.new("Model"); ant.Name, ant.Parent = "AntCourier", Effects
-    local body = Instance.new("Part"); body.Name, body.Shape, body.Size, body.Color, body.Material = "AntBody", Enum.PartType.Ball, Vector3.new(.7,.45,.45), Color3.fromRGB(35,20,12), Enum.Material.SmoothPlastic
-    body.Anchored, body.CanCollide, body.CFrame, body.Parent = true, false, cake.PrimaryPart.CFrame * CFrame.new(0,-1,0), ant
-    local head = Instance.new("Part"); head.Name, head.Shape, head.Size, head.Color, head.Material = "AntHead", Enum.PartType.Ball, Vector3.new(.42,.35,.35), body.Color, body.Material
-    head.Anchored, head.CanCollide, head.CFrame, head.Parent = true, false, body.CFrame * CFrame.new(.48,0,0), ant
-    TweenService:Create(body, TweenInfo.new(seconds, Enum.EasingStyle.Linear), { CFrame = destination * CFrame.new(0,-1,0) }):Play()
-    TweenService:Create(head, TweenInfo.new(seconds, Enum.EasingStyle.Linear), { CFrame = destination * CFrame.new(.48,-1,0) }):Play()
-    Debris:AddItem(ant, seconds + .1)
-end
-
-function SkillService.Handlers.PullNearest(player, parameters)
-    local item = CakeService.GetCakes(player, parameters.Count or 1)[1]
-    local root = rootOf(player)
-    if item then hookEffect(root, item.Cake); CakeService.MoveNearPlayer(player, item.Cake, parameters.Distance or 2, .75) end
-end
-function SkillService.Handlers.Tornado(player, parameters)
-    local root = rootOf(player); tornadoEffect(root)
-    for _, item in ipairs(CakeService.GetCakes(player, parameters.Count or 5)) do
-        CakeService.MoveNearPlayer(player, item.Cake, parameters.Distance or 5, .8)
-        CakeService.DamageCake(player, item.Cake, (item.Cake:GetAttribute("Health") or 0) * (parameters.DamagePercent or .4))
-    end
-end
-function SkillService.Handlers.AntCourier(player, parameters)
-    local item = CakeService.GetCakes(player, 1, parameters.MinimumDistance or 14)[1]
-    if item then
-        CakeService.DamageCake(player, item.Cake, (item.Cake:GetAttribute("Health") or 0) * (parameters.DamagePercentPerSecond or .02))
-        if item.Cake.Parent then
-            local destination = CakeService.MoveNearPlayer(player, item.Cake, parameters.Distance or 4, 1)
-            antEffect(item.Cake, destination, 1)
-        end
-    end
-end
+local SkillScripts = script.Parent.SkillScripts
+local SkillService = {}
 function SkillService.Activate(player, cardKey, card)
     local stack, isNew = StateService.AddCardBuff(player, cardKey, card)
     if not stack then return end
-    if isNew then
-        task.spawn(function()
-            local handler = SkillService.Handlers[stack.SkillId]
-            while player.Parent and os.clock() < stack.ExpiresAt do
-                if handler then handler(player, stack.Parameters) else warn("Cake Rain RNG: missing SkillId handler", stack.SkillId) break end
-                task.wait(math.max(.1, stack.TriggerInterval))
-            end
-            StateService.Push(player)
-        end)
-    end
+    if isNew then task.spawn(function()
+        local skill = SkillScripts:FindFirstChild(card.ScriptName)
+        if not skill then warn("Cake Rain RNG: missing skill script", card.ScriptName); return end
+        local run = require(skill)
+        while player.Parent and os.clock() < stack.ExpiresAt do
+            run(player, stack.Parameters)
+            task.wait(math.max(.1, stack.TriggerInterval))
+        end
+        StateService.Push(player)
+    end) end
     return stack
 end
 return SkillService
@@ -999,7 +987,8 @@ function WheelService.Start()
         if #slots == 0 then return { Ok = false, Error = "EMPTY_POOL" } end
         local pickedIndex = math.random(1, #slots)
         local picked = slots[pickedIndex]
-        StateService.AddBuff(player, picked.Key, WheelConfig.Rewards[picked.Key])
+        local stack = StateService.AddBuff(player, picked.Key, WheelConfig.Rewards[picked.Key])
+        state.LastWheelReward = { Name = picked.Name, Rarity = picked.Rarity, Stacks = stack and stack.Stacks or 1, ShownUntil = os.clock() + 3 }
         StateService.UpdateLeaderstats(player)
         StateService.Push(player)
         return { Ok = true, Slots = slots, Picked = picked, PickedIndex = pickedIndex }
@@ -1011,9 +1000,6 @@ function WheelService.Start()
         state.PendingCardDraw = false
         local key, card = weightedPick(unlockedCards(state))
         local stack = card and SkillService.Activate(player, key, card)
-        if stack then
-            state.LastDraw = { Key = key }
-        end
         StateService.Push(player)
         return { Ok = true, Card = card and { Key = key, Name = text(card.NameKey), Rarity = card.Rarity, Duration = card.Duration, Effect = card.SkillId, Stacks = stack and stack.Stacks or 1 } or nil }
     end
@@ -1101,10 +1087,11 @@ local shopButton = gui:WaitForChild("ShopButton")
 local shopHub = gui:WaitForChild("ShopHub")
 local closeShop = shopHub:WaitForChild("CloseButton")
 
-local state = { WheelSpins = 0, WheelPoints = 0, CakePoints = 0, ActiveBuffs = {}, PendingCardDraw = false, LastDraw = nil }
+local state = { WheelSpins = 0, WheelPoints = 0, CakePoints = 0, ActiveBuffs = {}, PendingCardDraw = false, LastWheelReward = nil }
 local spinning = false
 local autoRollEnabled = false
 local autoRollThread = nil
+local wheelRewardGeneration = 0
 
 local function buttonLabel(item)
     local name = L[item.NameKey] or item.NameKey
@@ -1187,9 +1174,9 @@ local function refreshStats()
     autoRollToggle.BackgroundColor3 = autoRollEnabled and Color3.fromRGB(95, 190, 120) or Color3.fromRGB(80, 95, 120)
     wheel.Visible = state.WheelSpins > 0 or spinning or autoAvailable
     cardFrame.Visible = state.PendingCardDraw
-    local draw = state.LastDraw
-    currentDrawLabel.Visible = draw ~= nil
-    if draw then currentDrawLabel.Text = string.format("目前抽到：%s [%s]｜層數 %d｜剩餘 %d 秒", draw.Name, draw.Rarity, draw.Stacks or 1, draw.Remaining or 0) end
+    local reward = state.LastWheelReward
+    currentDrawLabel.Visible = reward ~= nil
+    if reward then currentDrawLabel.Text = string.format("轉盤抽到：%s [%s]｜層數 %d", reward.Name, reward.Rarity, reward.Stacks or 1) end
     refreshEffectBar()
 end
 
@@ -1280,8 +1267,13 @@ closeShop.Activated:Connect(function()
 end)
 
 UpdateClientState.OnClientEvent:Connect(function(newState)
-    for key, value in newState do
-        state[key] = value
+    for key, value in newState do state[key] = value end
+    if newState.LastWheelReward then
+        wheelRewardGeneration += 1
+        local generation, seconds = wheelRewardGeneration, newState.LastWheelReward.DisplayFor or 0
+        task.delay(seconds, function()
+            if generation == wheelRewardGeneration then state.LastWheelReward = nil; refreshStats() end
+        end)
     end
     refreshStats()
 end)
@@ -1293,5 +1285,5 @@ if recording then
     ChangeHistoryService:FinishRecording(recording, Enum.FinishRecordingOperation.Commit)
 end
 
-Selection:Set({serverScript, clientScript, mainGui, wheelConfig, cakeConfig, skillConfig, cardConfig, shopConfig, uiConfig, localizationConfig, cakeModelsFolder, mapBase})
+Selection:Set({serverScript, clientScript, mainGui, wheelConfig, cakeConfig, skillConfig, cardConfig, shopConfig, skillScripts, uiConfig, localizationConfig, cakeModelsFolder, mapBase})
 print("✅ Cake Rain RNG 已重構完成：靜態 UI/HUB/轉盤分區、動畫抽獎、非錨定下落蛋糕、自動吞食、稀有度 outline、發光特效、下沉與咖啡色痕跡、DataStore 個人資料皆已配置。")
