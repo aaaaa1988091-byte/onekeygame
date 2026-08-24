@@ -269,7 +269,9 @@ newGui("UICorner", "Corner", shopButton).CornerRadius = UDim.new(0, 12)
 
 local wheel = newGui("Frame", "WheelPanel", mainGui)
 wheel.Size = UDim2.new(0, 360, 0, 360)
-wheel.Position = UDim2.new(1, -180, 0.5, -180)
+-- Keep the entire wheel on-screen; the previous top-left positioning put half of it outside the viewport.
+wheel.AnchorPoint = Vector2.new(1, 0.5)
+wheel.Position = UDim2.new(1, -18, 0.5, 0)
 wheel.BackgroundTransparency = 1
 wheel.ClipsDescendants = true
 wheel.Visible = false
@@ -281,17 +283,20 @@ newGui("UICorner", "Circle", disc).CornerRadius = UDim.new(1, 0)
 local pointer = newGui("TextLabel", "Pointer", wheel)
 pointer.BackgroundTransparency = 1
 pointer.Size = UDim2.new(0, 58, 0, 58)
-pointer.Position = UDim2.new(0, 125, 0.5, -29)
+pointer.Position = UDim2.new(0, 4, 0.5, -29)
 pointer.Font = Enum.Font.GothamBlack
-pointer.Text = "◀"
+pointer.Text = "▶"
 pointer.TextScaled = true
 pointer.TextColor3 = Color3.fromRGB(255, 240, 110)
 for index = 1, 5 do
+    -- Five equally spaced item panels match WheelConfig.DisplayedSlots and remain inside the 360px disc.
+    local angle = -90 + (index - 1) * 72
     local sector = newGui("Frame", "Sector" .. index, disc)
-    sector.AnchorPoint = Vector2.new(1, 0.5)
-    sector.Size = UDim2.new(0, 175, 0, 58)
-    sector.Position = UDim2.new(0.5, 0, 0.5, 0)
-    sector.Rotation = -72 + (index - 1) * 36
+    sector.AnchorPoint = Vector2.new(0.5, 0.5)
+    sector.Size = UDim2.new(0, 112, 0, 48)
+    sector.Position = UDim2.new(0.5, math.cos(math.rad(angle)) * 112, 0.5, math.sin(math.rad(angle)) * 112)
+    sector.Rotation = 0
+    sector:SetAttribute("WheelAngle", angle)
     sector.BackgroundColor3 = index % 2 == 0 and Color3.fromRGB(76, 54, 120) or Color3.fromRGB(95, 63, 145)
     sector.BorderSizePixel = 0
     newGui("UICorner", "Corner", sector).CornerRadius = UDim.new(0, 22)
@@ -307,7 +312,7 @@ for index = 1, 5 do
 end
 local spinButton = newGui("TextButton", "SpinButton", wheel)
 spinButton.Size = UDim2.new(0, 110, 0, 52)
-spinButton.Position = UDim2.new(0, 34, 0.5, -26)
+spinButton.Position = UDim2.new(0.5, -55, 0.5, -26)
 spinButton.BackgroundColor3 = Color3.fromRGB(255, 185, 80)
 spinButton.Font = Enum.Font.GothamBlack
 spinButton.Text = "旋轉"
@@ -1203,7 +1208,10 @@ end
 local function playWheelAnimation(slots, pickedIndex)
     paintSlots(slots, nil)
     disc.Rotation = 0
-    local targetRotation = 1080 + ((pickedIndex - 1) * 36)
+    local selectedSector = disc:FindFirstChild("Sector" .. pickedIndex)
+    local selectedAngle = selectedSector and selectedSector:GetAttribute("WheelAngle") or -90
+    -- The pointer faces right from the disc's left edge (180°), so finish with the selected panel under it.
+    local targetRotation = 1080 + (180 - selectedAngle)
     local tween = TweenService:Create(disc, TweenInfo.new(2.4, Enum.EasingStyle.Quart, Enum.EasingDirection.Out), { Rotation = targetRotation })
     tween:Play()
     tween.Completed:Wait()
