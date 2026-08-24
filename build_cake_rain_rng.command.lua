@@ -115,6 +115,7 @@ local CakeConfig = {
     MinimumCakeScale = 0.28,
     MaximumCakeScale = 1.45,
     HealthForMaximumScale = 24,
+    LabelMaxDistance = 33, -- 約 10 公尺；遠處不顯示實體蛋糕文字
     StainVisibleSeconds = 2,
     Rarities = {
         Common = { NameKey = "Cake_Common", RarityText = "COMMON", OutlineColor = Color3.fromRGB(210, 210, 210), DropWeight = 500, Health = 1, RewardCakePoints = 1 },
@@ -678,7 +679,7 @@ function CakeService.Decorate(cake, rarityKey, rarity, isGlow)
     local bottom = Instance.new("Attachment"); bottom.Name = "MeteorTrailBottom"; bottom.Position = Vector3.new(0, -2.8, 0); bottom.Parent = primary
     local trail = Instance.new("Trail"); trail.Name = "RarityMeteorTrail"; trail.Attachment0, trail.Attachment1 = top, bottom; trail.Color = ColorSequence.new(rarity.OutlineColor); trail.LightEmission, trail.Lifetime = .65, CakeConfig.MeteorTrailLifetime; trail.Parent = primary
     if isGlow then local light = Instance.new("PointLight"); light.Color, light.Brightness, light.Range = Color3.fromRGB(120,255,255), 1.2, 12; light.Parent = primary end
-    local label = Instance.new("BillboardGui"); label.Name, label.AlwaysOnTop, label.Size, label.StudsOffset, label.Parent = "CakeLabel", true, UDim2.new(0,300,0,62), Vector3.new(0,4.2,0), primary
+    local label = Instance.new("BillboardGui"); label.Name, label.AlwaysOnTop, label.MaxDistance, label.Size, label.StudsOffset, label.Parent = "CakeLabel", true, CakeConfig.LabelMaxDistance, UDim2.new(0,300,0,62), Vector3.new(0,4.2,0), primary
     local labelText = Instance.new("TextLabel"); labelText.Name, labelText.BackgroundTransparency, labelText.Size, labelText.Font, labelText.TextScaled, labelText.TextColor3, labelText.TextStrokeColor3, labelText.TextStrokeTransparency, labelText.Parent = "Text", 1, UDim2.fromScale(1,1), Enum.Font.GothamBlack, true, Color3.new(1,1,1), rarity.OutlineColor, 0, label
 end
 local function stopEating(cake)
