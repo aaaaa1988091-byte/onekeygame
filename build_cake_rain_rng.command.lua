@@ -78,7 +78,7 @@ local LocalizationConfig = {
         Cake_Common = "普通蛋糕", Cake_Rare = "稀有蛋糕", Cake_Epic = "史詩蛋糕", Cake_Legendary = "傳說蛋糕", Cake_Mythic = "神話蛋糕", Cake_Special = "發光蛋糕",
         Reward_EatSpeed_Common = "+1 吞食速度 (普通)", Reward_EatSpeed_Legendary = "+5 吞食速度 (傳說)",
         Reward_GlowBoost_Rare = "+10% 發光蛋糕率 (20秒)", Reward_GlowBoost_Mythic = "+50% 發光蛋糕率 (20秒)", Reward_AutoRoll_Common = "初級自動抽獎 (普通)",
-        Card_Gluttony = "大胃王", Card_BlackHole = "黑洞蛋糕", Cosmetic_Trail = "巧克力拖尾", Theme_Candy = "糖果地圖主題",
+        Card_Hook = "勾索", Card_Tornado = "龍捲風", Card_Ant = "螞蟻運輸隊",
     },
     ["en-us"] = {
         UI_Spins_Left = "Spins Left: ", UI_WheelPoints = "Wheel Points: ", UI_CakePoints = "Cake Points: ",
@@ -88,7 +88,7 @@ local LocalizationConfig = {
         Cake_Common = "Common Cake", Cake_Rare = "Rare Cake", Cake_Epic = "Epic Cake", Cake_Legendary = "Legendary Cake", Cake_Mythic = "Mythic Cake", Cake_Special = "Glow Cake",
         Reward_EatSpeed_Common = "+1 Eat Speed (Common)", Reward_EatSpeed_Legendary = "+5 Eat Speed (Legendary)",
         Reward_GlowBoost_Rare = "+10% Glow Cake Spawn (20s)", Reward_GlowBoost_Mythic = "+50% Glow Cake Spawn (20s)", Reward_AutoRoll_Common = "Basic Auto-Roll (Common)",
-        Card_Gluttony = "Gluttony", Card_BlackHole = "Black Hole Cake", Cosmetic_Trail = "Chocolate Trail", Theme_Candy = "Candy Map Theme",
+        Card_Hook = "Grappling Hook", Card_Tornado = "Tornado", Card_Ant = "Ant Courier",
     },
 }
 return LocalizationConfig
@@ -109,40 +109,55 @@ local CakeConfig = {
     MeteorFallSpeed = 105,
     MeteorTrailLifetime = 0.45,
     SinkSeconds = 1.1,
+    EatAnimationSeconds = 0.45,
+    CakeLifetimeSeconds = 70,
+    MinimumSpawnDistance = 4, -- 約 1 公尺；禁止落在玩家腳邊
+    MinimumCakeScale = 0.28,
+    MaximumCakeScale = 1.45,
+    HealthForMaximumScale = 24,
     StainVisibleSeconds = 2,
     Rarities = {
-        Common = { NameKey = "Cake_Common", RarityText = "COMMON", OutlineColor = Color3.fromRGB(210, 210, 210), DropWeight = 500, Health = 10, RewardCakePoints = 1 },
-        Rare = { NameKey = "Cake_Rare", RarityText = "RARE", OutlineColor = Color3.fromRGB(70, 170, 255), DropWeight = 110, Health = 22, RewardCakePoints = 3 },
-        Epic = { NameKey = "Cake_Epic", RarityText = "EPIC", OutlineColor = Color3.fromRGB(185, 85, 255), DropWeight = 35, Health = 42, RewardCakePoints = 7 },
-        Legendary = { NameKey = "Cake_Legendary", RarityText = "LEGENDARY", OutlineColor = Color3.fromRGB(255, 170, 0), DropWeight = 8, Health = 80, RewardCakePoints = 15 },
-        Mythic = { NameKey = "Cake_Mythic", RarityText = "MYTHIC", OutlineColor = Color3.fromRGB(255, 60, 120), DropWeight = 2, Health = 140, RewardCakePoints = 40 },
+        Common = { NameKey = "Cake_Common", RarityText = "COMMON", OutlineColor = Color3.fromRGB(210, 210, 210), DropWeight = 500, Health = 1, RewardCakePoints = 1 },
+        Rare = { NameKey = "Cake_Rare", RarityText = "RARE", OutlineColor = Color3.fromRGB(70, 170, 255), DropWeight = 3, RewardCakePoints = 3 },
+        Epic = { NameKey = "Cake_Epic", RarityText = "EPIC", OutlineColor = Color3.fromRGB(185, 85, 255), DropWeight = 6, RewardCakePoints = 7 },
+        Legendary = { NameKey = "Cake_Legendary", RarityText = "LEGENDARY", OutlineColor = Color3.fromRGB(255, 170, 0), DropWeight = 12, RewardCakePoints = 15 },
+        Mythic = { NameKey = "Cake_Mythic", RarityText = "MYTHIC", OutlineColor = Color3.fromRGB(255, 60, 120), DropWeight = 24, RewardCakePoints = 40 },
     },
 }
 return CakeConfig
 ]=]
 
-local cardConfig = getOrCreate(configsFolder, "ModuleScript", "CardConfig")
-cardConfig.Source = [=[
-local CardConfig = {
+local skillConfig = getOrCreate(configsFolder, "ModuleScript", "SkillConfig")
+skillConfig.Source = [=[
+-- Add a card by declaring SkillId, Duration, TriggerInterval and Parameters here,
+-- then implement the matching handler in SkillService.  Purchase policy stays on the card.
+local SkillConfig = {
     Cards = {
-        Card_Base_01 = { NameKey = "Card_Gluttony", Rarity = "SSR", Weight = 10, Duration = 300, Effect = "RangeEat", Icon = "rbxassetid://6031068421", IsUnlockedDefault = true },
-        Card_Shop_01 = { NameKey = "Card_BlackHole", Rarity = "SSR", Weight = 5, Duration = 240, Effect = "BlackHole", Icon = "rbxassetid://6031068421", IsUnlockedDefault = false, UnlockCostCakePoints = 5000 },
+        Card_Hook = { NameKey = "Card_Hook", Rarity = "Rare", Weight = 20, Duration = 60, SkillId = "PullNearest", TriggerInterval = 5, Parameters = { Count = 1, Distance = 2 }, Icon = "rbxassetid://6031068421", IsUnlockedDefault = true },
+        Card_Tornado = { NameKey = "Card_Tornado", Rarity = "Epic", Weight = 10, Duration = 60, SkillId = "Tornado", TriggerInterval = 10, Parameters = { Count = 5, DamagePercent = 0.40, Distance = 5 }, Icon = "rbxassetid://6031068421", IsUnlockedDefault = false, UnlockCostCakePoints = 1500 },
+        Card_Ant = { NameKey = "Card_Ant", Rarity = "Legendary", Weight = 5, Duration = 810, SkillId = "AntCourier", TriggerInterval = 1, Parameters = { MinimumDistance = 14, DamagePercentPerSecond = 0.02, Distance = 4 }, Icon = "rbxassetid://6031068421", IsUnlockedDefault = false, UnlockCostCakePoints = 3000 },
     },
 }
-return CardConfig
+return SkillConfig
+]=]
+
+local cardConfig = getOrCreate(configsFolder, "ModuleScript", "CardConfig")
+cardConfig.Source = [=[
+-- Compatibility alias: game logic reads SkillConfig; older integrations can still require CardConfig.
+return require(script.Parent.SkillConfig)
 ]=]
 
 local shopConfig = getOrCreate(configsFolder, "ModuleScript", "ShopConfig")
 shopConfig.Source = [=[
+-- Only planned purchasable gameplay cards are listed here.  Cosmetics/themes are intentionally absent.
 local ShopConfig = {
     WheelPointShop = {
         { Id = "GlowCakeBoost_Rare", NameKey = "Reward_GlowBoost_Rare", Cost = 50, Currency = "WheelPoints", UnlockType = "WheelReward" },
         { Id = "GlowCakeBoost_Mythic", NameKey = "Reward_GlowBoost_Mythic", Cost = 200, Currency = "WheelPoints", UnlockType = "WheelReward" },
     },
     CakePointShop = {
-        { Id = "Card_Shop_01", NameKey = "Card_BlackHole", Cost = 5000, Currency = "CakePoints", UnlockType = "Card" },
-        { Id = "Cosmetic_Trail", NameKey = "Cosmetic_Trail", Cost = 750, Currency = "CakePoints", UnlockType = "Cosmetic" },
-        { Id = "Theme_Candy", NameKey = "Theme_Candy", Cost = 2500, Currency = "CakePoints", UnlockType = "Theme" },
+        { Id = "Card_Tornado", NameKey = "Card_Tornado", Cost = 1500, Currency = "CakePoints", UnlockType = "Card" },
+        { Id = "Card_Ant", NameKey = "Card_Ant", Cost = 3000, Currency = "CakePoints", UnlockType = "Card" },
     },
 }
 return ShopConfig
@@ -501,8 +516,6 @@ function StateService.Create(player, loaded)
         Buffs = {},
         UnlockedWheelRewards = loaded.UnlockedWheelRewards or {},
         UnlockedCards = loaded.UnlockedCards or {},
-        Cosmetics = loaded.Cosmetics or {},
-        Themes = loaded.Themes or {},
     }
     StateService.UpdateLeaderstats(player)
     StateService.Push(player)
@@ -521,8 +534,6 @@ function StateService.Serialize(player)
         CakePoints = state.CakePoints,
         UnlockedWheelRewards = state.UnlockedWheelRewards,
         UnlockedCards = state.UnlockedCards,
-        Cosmetics = state.Cosmetics,
-        Themes = state.Themes,
     }
 end
 
@@ -565,8 +576,11 @@ end
 function StateService.AddCardBuff(player, key, card)
     local state = StateService.Get(player)
     if not state then return end
-    state.Buffs[card.Effect] = state.Buffs[card.Effect] or {}
-    table.insert(state.Buffs[card.Effect], { Key = key, NameKey = card.NameKey, Rarity = card.Rarity, Value = 1, Icon = card.Icon, ExpiresAt = os.clock() + card.Duration })
+    local buffType = "Skill_" .. key
+    state.Buffs[buffType] = state.Buffs[buffType] or {}
+    local stack = { Key = key, NameKey = card.NameKey, Rarity = card.Rarity, Value = 1, Icon = card.Icon, SkillId = card.SkillId, Parameters = card.Parameters or {}, TriggerInterval = card.TriggerInterval or 1, ExpiresAt = os.clock() + card.Duration }
+    table.insert(state.Buffs[buffType], stack)
+    return stack
 end
 
 function StateService.ActiveBuffs(player)
@@ -583,7 +597,7 @@ function StateService.ActiveBuffs(player)
             end
         end
         if best then
-            active[buffType] = { Name = text(best.NameKey), Rarity = best.Rarity, Value = best.Value or best.Level or 0, Remaining = math.max(0, math.floor(best.ExpiresAt - now)), Icon = best.Icon or "", OutlineColor = WheelConfig.RarityColors[best.Rarity] or Color3.fromRGB(255, 255, 255), Interval = best.Interval }
+            active[buffType] = { Name = text(best.NameKey), Rarity = best.Rarity, Value = best.Value or best.Level or 0, Remaining = math.max(0, math.floor(best.ExpiresAt - now)), Icon = best.Icon or "", OutlineColor = WheelConfig.RarityColors[best.Rarity] or Color3.fromRGB(255, 255, 255), Interval = best.Interval, SkillId = best.SkillId }
         end
     end
     return active
@@ -620,254 +634,184 @@ local LocalizationConfig = require(Configs.LocalizationConfig)
 local StateService = require(script.Parent.StateService)
 local CakeModels = ReplicatedStorage.Models.cake
 
-local CakeService = { Owners = {}, Eating = {} }
+-- Public cake API used by SkillService.  Keep all cake movement/damage here so skills
+-- cannot bypass rewards, ownership, animation, or the one-cake eating rule.
+local CakeService = { Owners = {}, Eating = {}, EatingByPlayer = {} }
 local Runtime = Workspace.Map:FindFirstChild("RuntimeCakes") or Instance.new("Folder")
-Runtime.Name = "RuntimeCakes"
-Runtime.Parent = Workspace.Map
-
-local function text(nameKey)
-    return LocalizationConfig["zh-tw"][nameKey] or nameKey
-end
-
-local function weightedPick(entries, weightName)
+Runtime.Name, Runtime.Parent = "RuntimeCakes", Workspace.Map
+local function text(key) return LocalizationConfig["zh-tw"][key] or key end
+local function rootOf(player) return player.Character and player.Character:FindFirstChild("HumanoidRootPart") end
+local function weightedPick(entries, field)
     local total = 0
-    for _, entry in pairs(entries) do total += entry[weightName] or 1 end
-    local roll, cursor = math.random() * total, 0
-    for key, entry in pairs(entries) do
-        cursor += entry[weightName] or 1
-        if roll <= cursor then return key, entry end
-    end
+    for _, entry in pairs(entries) do total += entry[field] or 1 end
+    local roll, sum = math.random() * total, 0
+    for key, entry in pairs(entries) do sum += entry[field] or 1 if roll <= sum then return key, entry end end
 end
-
 local function randomTemplate()
     local choices = CakeModels:GetChildren()
-    if #choices == 0 then return nil end
-    return choices[math.random(1, #choices)]
+    return #choices > 0 and choices[math.random(1, #choices)] or nil
 end
 
-function CakeService.Decorate(cake, rarityKey, rarityData, isGlow)
+function CakeService.UpdateScale(cake)
+    local hp = math.max(0, cake:GetAttribute("Health") or 0)
+    local scale = CakeConfig.MinimumCakeScale + (CakeConfig.MaximumCakeScale - CakeConfig.MinimumCakeScale) * math.clamp(hp / CakeConfig.HealthForMaximumScale, 0, 1)
+    cake:ScaleTo(scale) -- Cakes visibly shrink continuously as their remaining HP falls.
+end
+function CakeService.RefreshLabel(cake)
+    local rarity = CakeConfig.Rarities[cake:GetAttribute("RarityKey")] or CakeConfig.Rarities.Common
+    local hp, maxHp = math.max(0, cake:GetAttribute("Health") or rarity.Health), cake:GetAttribute("MaxHealth") or rarity.Health
+    local label = cake.PrimaryPart and cake.PrimaryPart:FindFirstChild("CakeLabel")
+    local labelText = label and label:FindFirstChild("Text")
+    if labelText then labelText.Text = string.format("[%s] %s (HP: %d/%d)", cake:GetAttribute("IsGlow") and "SPECIAL" or rarity.RarityText, cake:GetAttribute("IsGlow") and text("Cake_Special") or text(rarity.NameKey), hp, maxHp) end
+    CakeService.UpdateScale(cake)
+end
+function CakeService.Decorate(cake, rarityKey, rarity, isGlow)
     local primary = cake.PrimaryPart or cake:FindFirstChildWhichIsA("BasePart", true)
     if not primary then return end
     cake.PrimaryPart = primary
-    cake:SetAttribute("RarityKey", rarityKey)
-    cake:SetAttribute("Health", rarityData.Health)
-    cake:SetAttribute("MaxHealth", rarityData.Health)
-    cake:SetAttribute("RewardCakePoints", rarityData.RewardCakePoints)
-    cake:SetAttribute("IsGlow", isGlow)
-    for _, part in ipairs(cake:GetDescendants()) do
-        if part:IsA("BasePart") then
-            part.Anchored = false
-            part.CanCollide = true
-        end
-    end
-
-    local outline = Instance.new("Highlight")
-    outline.Name = "RarityOutline"
-    outline.FillTransparency = 1
-    outline.OutlineTransparency = 0
-    outline.OutlineColor = rarityData.OutlineColor
-    outline.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
-    outline.Parent = cake
-
-    local top = Instance.new("Attachment")
-    top.Name = "MeteorTrailTop"
-    top.Position = Vector3.new(0, 2.8, 0)
-    top.Parent = primary
-    local bottom = Instance.new("Attachment")
-    bottom.Name = "MeteorTrailBottom"
-    bottom.Position = Vector3.new(0, -2.8, 0)
-    bottom.Parent = primary
-    local trail = Instance.new("Trail")
-    trail.Name = "RarityMeteorTrail"
-    trail.Attachment0 = top
-    trail.Attachment1 = bottom
-    trail.Color = ColorSequence.new(rarityData.OutlineColor)
-    trail.LightEmission = 0.65
-    trail.Lifetime = CakeConfig.MeteorTrailLifetime
-    trail.Parent = primary
-    local dust = Instance.new("ParticleEmitter")
-    dust.Name = "RarityMeteorDust"
-    dust.Color = ColorSequence.new(rarityData.OutlineColor)
-    dust.Rate = 40
-    dust.Lifetime = NumberRange.new(0.25, 0.65)
-    dust.LightEmission = 0.45
-    dust.Parent = top
-
-    if isGlow then
-        local glow = Instance.new("ParticleEmitter")
-        glow.Name = "GlowCakeSparkles"
-        glow.Color = ColorSequence.new(Color3.fromRGB(120, 255, 255))
-        glow.LightEmission = 0.8
-        glow.Rate = 24
-        glow.Lifetime = NumberRange.new(0.7, 1.4)
-        glow.Parent = top
-        local light = Instance.new("PointLight")
-        light.Name = "GlowCakeLight"
-        light.Color = Color3.fromRGB(120, 255, 255)
-        light.Brightness = 1.2
-        light.Range = 12
-        light.Parent = primary
-    end
-
-    local label = Instance.new("BillboardGui")
-    label.Name = "CakeLabel"
-    label.AlwaysOnTop = true
-    label.Size = UDim2.new(0, 300, 0, 62)
-    label.StudsOffset = Vector3.new(0, 4.2, 0)
-    label.Parent = primary
-    local labelText = Instance.new("TextLabel")
-    labelText.Name = "Text"
-    labelText.BackgroundTransparency = 1
-    labelText.Size = UDim2.fromScale(1, 1)
-    labelText.Font = Enum.Font.GothamBlack
-    labelText.TextScaled = true
-    labelText.TextColor3 = Color3.fromRGB(255, 255, 255)
-    labelText.TextStrokeColor3 = rarityData.OutlineColor
-    labelText.TextStrokeTransparency = 0
-    labelText.Parent = label
+    cake:SetAttribute("RarityKey", rarityKey); cake:SetAttribute("Health", rarity.Health); cake:SetAttribute("MaxHealth", rarity.Health)
+    cake:SetAttribute("RewardCakePoints", rarity.RewardCakePoints); cake:SetAttribute("IsGlow", isGlow)
+    for _, part in ipairs(cake:GetDescendants()) do if part:IsA("BasePart") then part.Anchored, part.CanCollide = false, true end end
+    local outline = Instance.new("Highlight"); outline.Name = "RarityOutline"; outline.FillTransparency = 1; outline.OutlineColor = rarity.OutlineColor; outline.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop; outline.Parent = cake
+    local top = Instance.new("Attachment"); top.Name = "MeteorTrailTop"; top.Position = Vector3.new(0, 2.8, 0); top.Parent = primary
+    local bottom = Instance.new("Attachment"); bottom.Name = "MeteorTrailBottom"; bottom.Position = Vector3.new(0, -2.8, 0); bottom.Parent = primary
+    local trail = Instance.new("Trail"); trail.Name = "RarityMeteorTrail"; trail.Attachment0, trail.Attachment1 = top, bottom; trail.Color = ColorSequence.new(rarity.OutlineColor); trail.LightEmission, trail.Lifetime = .65, CakeConfig.MeteorTrailLifetime; trail.Parent = primary
+    if isGlow then local light = Instance.new("PointLight"); light.Color, light.Brightness, light.Range = Color3.fromRGB(120,255,255), 1.2, 12; light.Parent = primary end
+    local label = Instance.new("BillboardGui"); label.Name, label.AlwaysOnTop, label.Size, label.StudsOffset, label.Parent = "CakeLabel", true, UDim2.new(0,300,0,62), Vector3.new(0,4.2,0), primary
+    local labelText = Instance.new("TextLabel"); labelText.Name, labelText.BackgroundTransparency, labelText.Size, labelText.Font, labelText.TextScaled, labelText.TextColor3, labelText.TextStrokeColor3, labelText.TextStrokeTransparency, labelText.Parent = "Text", 1, UDim2.fromScale(1,1), Enum.Font.GothamBlack, true, Color3.new(1,1,1), rarity.OutlineColor, 0, label
 end
-
-function CakeService.RefreshLabel(cake)
-    local rarityData = CakeConfig.Rarities[cake:GetAttribute("RarityKey")] or CakeConfig.Rarities.Common
-    local hp = math.max(0, cake:GetAttribute("Health") or rarityData.Health)
-    local maxHp = cake:GetAttribute("MaxHealth") or rarityData.Health
-    local isGlow = cake:GetAttribute("IsGlow") == true
-    local label = cake.PrimaryPart and cake.PrimaryPart:FindFirstChild("CakeLabel")
-    local labelText = label and label:FindFirstChild("Text")
-    if labelText then
-        labelText.Text = string.format("[%s] %s (HP: %d/%d)", isGlow and "SPECIAL" or rarityData.RarityText, isGlow and text("Cake_Special") or text(rarityData.NameKey), hp, maxHp)
-    end
+local function stopEating(cake)
+    local eater = CakeService.Eating[cake]
+    if eater then CakeService.EatingByPlayer[eater] = nil end
+    CakeService.Eating[cake] = nil
 end
-
 function CakeService.Finish(player, cake)
+    if not cake.Parent or cake:GetAttribute("Finishing") then return end
+    cake:SetAttribute("Finishing", true); CakeService.Owners[cake] = nil; stopEating(cake)
     local state = StateService.Get(player)
-    if not state or not cake.Parent then return end
-    CakeService.Owners[cake] = nil
-    state.CakePoints += cake:GetAttribute("RewardCakePoints") or 1
-    state.WheelSpins += 1
-    if cake:GetAttribute("IsGlow") == true then state.PendingCardDraw = true end
-    StateService.UpdateLeaderstats(player)
-    StateService.Push(player)
-
-    local pos = cake.PrimaryPart and cake.PrimaryPart.Position or Vector3.new()
-    local stain = Instance.new("Part")
-    stain.Name = "CakeStain"
-    stain.Anchored = true
-    stain.CanCollide = false
-    stain.Shape = Enum.PartType.Cylinder
-    stain.Size = Vector3.new(0.08, 5.5, 5.5)
-    stain.CFrame = CFrame.new(pos.X, 0.02, pos.Z) * CFrame.Angles(0, 0, math.rad(90))
-    stain.Color = Color3.fromRGB(92, 55, 28)
-    stain.Transparency = 0.45
-    stain.Parent = Workspace.Map
-    TweenService:Create(stain, TweenInfo.new(CakeConfig.StainVisibleSeconds), { Transparency = 1 }):Play()
-    Debris:AddItem(stain, CakeConfig.StainVisibleSeconds + 0.15)
-
+    if state then
+        state.CakePoints += cake:GetAttribute("RewardCakePoints") or 1; state.WheelSpins += 1
+        if cake:GetAttribute("IsGlow") then state.PendingCardDraw = true end
+        StateService.UpdateLeaderstats(player); StateService.Push(player)
+    end
+    local root = rootOf(player)
     for _, part in ipairs(cake:GetDescendants()) do
-        if part:IsA("BasePart") then
-            part.CanCollide = false
-            TweenService:Create(part, TweenInfo.new(CakeConfig.SinkSeconds, Enum.EasingStyle.Quad, Enum.EasingDirection.In), { Position = part.Position - Vector3.new(0, 8, 0), Transparency = 1 }):Play()
+        if part:IsA("BasePart") then part.CanCollide = false; TweenService:Create(part, TweenInfo.new(CakeConfig.EatAnimationSeconds, Enum.EasingStyle.Quad, Enum.EasingDirection.In), { CFrame = CFrame.new((root and root.Position or part.Position) + Vector3.new(0,1,0)), Transparency = 1 }):Play() end
+    end
+    cake:ScaleTo(0.05); Debris:AddItem(cake, CakeConfig.EatAnimationSeconds + .1)
+end
+function CakeService.Expire(cake)
+    if not cake.Parent or cake:GetAttribute("Finishing") then return end
+    cake:SetAttribute("Finishing", true); CakeService.Owners[cake] = nil; stopEating(cake)
+    for _, part in ipairs(cake:GetDescendants()) do if part:IsA("BasePart") then part.CanCollide = false; TweenService:Create(part, TweenInfo.new(CakeConfig.SinkSeconds, Enum.EasingStyle.Quad, Enum.EasingDirection.In), { Position = part.Position - Vector3.new(0,8,0), Transparency = 1 }):Play() end end
+    Debris:AddItem(cake, CakeConfig.SinkSeconds + .1)
+end
+function CakeService.DamageCake(player, cake, amount)
+    if CakeService.Owners[cake] ~= player or cake:GetAttribute("Finishing") then return false end
+    local hp = math.max(0, (cake:GetAttribute("Health") or 1) - amount); cake:SetAttribute("Health", hp); CakeService.RefreshLabel(cake)
+    if hp <= 0 then CakeService.Finish(player, cake) end
+    return true
+end
+function CakeService.GetCakes(player, maximum, minimumDistance)
+    local root, results = rootOf(player), {}
+    if not root then return results end
+    for cake, owner in pairs(CakeService.Owners) do
+        if owner == player and cake.Parent and cake.PrimaryPart and not cake:GetAttribute("Finishing") then
+            local distance = (cake.PrimaryPart.Position - root.Position).Magnitude
+            if not minimumDistance or distance >= minimumDistance then table.insert(results, { Cake = cake, Distance = distance }) end
         end
     end
-    Debris:AddItem(cake, CakeConfig.SinkSeconds + 0.2)
+    table.sort(results, function(a,b) return a.Distance < b.Distance end)
+    while #results > (maximum or #results) do table.remove(results) end
+    return results
 end
-
+function CakeService.MoveNearPlayer(player, cake, distance, travelSeconds)
+    local root = rootOf(player)
+    if not root or CakeService.Owners[cake] ~= player or not cake.PrimaryPart then return false end
+    local angle = math.random() * math.pi * 2
+    local destination = CFrame.new(root.Position + Vector3.new(math.cos(angle) * distance, 2, math.sin(angle) * distance))
+    cake.PrimaryPart.AssemblyLinearVelocity = Vector3.zero
+    if travelSeconds and travelSeconds > 0 then
+        TweenService:Create(cake.PrimaryPart, TweenInfo.new(travelSeconds, Enum.EasingStyle.Linear), { CFrame = destination }):Play()
+    else
+        cake:PivotTo(destination)
+    end
+    return true
+end
 function CakeService.BeginAutoEat(player, cake)
-    if CakeService.Eating[cake] then return end
-    CakeService.Eating[cake] = true
+    if CakeService.EatingByPlayer[player] or CakeService.Eating[cake] or CakeService.Owners[cake] ~= player then return end
+    CakeService.Eating[cake], CakeService.EatingByPlayer[player] = player, cake
     task.spawn(function()
-        while cake.Parent and CakeService.Owners[cake] == player do
-            local root = player.Character and player.Character:FindFirstChild("HumanoidRootPart")
+        while cake.Parent and CakeService.EatingByPlayer[player] == cake do
+            local root = rootOf(player)
             if not root or not cake.PrimaryPart or (root.Position - cake.PrimaryPart.Position).Magnitude > 9 then break end
-            local hp = (cake:GetAttribute("Health") or 1) - (CakeConfig.BaseEatDamagePerSecond + StateService.EffectiveStat(player, "EatSpeed"))
-            cake:SetAttribute("Health", hp)
-            CakeService.RefreshLabel(cake)
-            if hp <= 0 then CakeService.Finish(player, cake) break end
+            CakeService.DamageCake(player, cake, CakeConfig.BaseEatDamagePerSecond + StateService.EffectiveStat(player, "EatSpeed"))
             task.wait(CakeConfig.EatTickSeconds)
         end
-        CakeService.Eating[cake] = nil
+        if CakeService.EatingByPlayer[player] == cake then stopEating(cake) end
     end)
 end
-
 function CakeService.HookTouches(player, cake)
-    for _, part in ipairs(cake:GetDescendants()) do
-        if part:IsA("BasePart") then
-            part.Touched:Connect(function(hit)
-                local toucher = Players:GetPlayerFromCharacter(hit.Parent)
-                if toucher == player and CakeService.Owners[cake] == player then CakeService.BeginAutoEat(player, cake) end
-            end)
-        end
-    end
+    for _, part in ipairs(cake:GetDescendants()) do if part:IsA("BasePart") then part.Touched:Connect(function(hit) if Players:GetPlayerFromCharacter(hit.Parent) == player then CakeService.BeginAutoEat(player, cake) end end) end end
 end
-
-function CakeService.Count(player)
-    local count = 0
-    for cake, owner in pairs(CakeService.Owners) do
-        if owner == player and cake.Parent then count += 1 end
-    end
-    return count
-end
-
+function CakeService.Count(player) local n=0 for cake,owner in pairs(CakeService.Owners) do if owner == player and cake.Parent then n+=1 end end return n end
 function CakeService.SpawnNear(player)
-    local root = player.Character and player.Character:FindFirstChild("HumanoidRootPart")
-    if not root or CakeService.Count(player) >= CakeConfig.MaxCakesPerPlayer then return end
-    local template = randomTemplate()
-    if not template then warn("Cake Rain RNG: ReplicatedStorage.Models.cake is empty") return end
-    local rarityKey, rarityData = weightedPick(CakeConfig.Rarities, "DropWeight")
-    local isGlow = math.random() < (CakeConfig.GlowBaseChance + StateService.EffectiveStat(player, "GlowCakeRate"))
-    local angle, radius = math.random() * math.pi * 2, math.random(8, CakeConfig.SpawnRadius)
-    local spawnPos = root.Position + Vector3.new(math.cos(angle) * radius, CakeConfig.SpawnHeight, math.sin(angle) * radius)
-    local cake = template:Clone()
-    cake.Name = (isGlow and "Glow" or rarityKey) .. "_" .. template.Name
-    cake.Parent = Runtime
-    local primary = cake.PrimaryPart or cake:FindFirstChildWhichIsA("BasePart", true)
-    if not primary then cake:Destroy() return end
-    cake.PrimaryPart = primary
-    cake:PivotTo(CFrame.new(spawnPos) * CFrame.Angles(0, math.random() * math.pi * 2, 0))
-    CakeService.Decorate(cake, rarityKey, rarityData, isGlow)
-    cake.PrimaryPart.AssemblyLinearVelocity = Vector3.new(0, -CakeConfig.MeteorFallSpeed, 0)
-    CakeService.RefreshLabel(cake)
-    CakeService.Owners[cake] = player
-    CakeService.HookTouches(player, cake)
-    task.delay(70, function()
-        if cake.Parent and CakeService.Owners[cake] == player then CakeService.Owners[cake] = nil cake:Destroy() end
-    end)
+    local root = rootOf(player); if not root or CakeService.Count(player) >= CakeConfig.MaxCakesPerPlayer then return end
+    local template = randomTemplate(); if not template then warn("Cake Rain RNG: no cake template") return end
+    local rarityKey, rarity = weightedPick(CakeConfig.Rarities, "DropWeight"); local glow = math.random() < (CakeConfig.GlowBaseChance + StateService.EffectiveStat(player,"GlowCakeRate"))
+    local angle, radius = math.random()*math.pi*2, math.random(CakeConfig.MinimumSpawnDistance, CakeConfig.SpawnRadius)
+    local cake = template:Clone(); cake.Name = (glow and "Glow" or rarityKey).."_"..template.Name; cake.Parent = Runtime; cake:PivotTo(CFrame.new(root.Position + Vector3.new(math.cos(angle)*radius,CakeConfig.SpawnHeight,math.sin(angle)*radius)))
+    CakeService.Decorate(cake,rarityKey,rarity,glow); cake.PrimaryPart.AssemblyLinearVelocity=Vector3.new(0,-CakeConfig.MeteorFallSpeed,0); CakeService.RefreshLabel(cake); CakeService.Owners[cake]=player; CakeService.HookTouches(player,cake)
+    task.delay(CakeConfig.CakeLifetimeSeconds,function() if cake.Parent and CakeService.Owners[cake] == player then CakeService.Expire(cake) end end)
 end
-
 function CakeService.StartPlayer(player)
-    local function burst()
-        task.spawn(function()
-            for _ = 1, CakeConfig.InitialBurstCount do
-                if not player.Parent then return end
-                CakeService.SpawnNear(player)
-                task.wait(0.18)
-            end
-        end)
-    end
-    player.CharacterAdded:Connect(function(character)
-        character:WaitForChild("HumanoidRootPart", 10)
-        task.wait(0.35)
-        burst()
-    end)
-    if player.Character then burst() end
-    task.spawn(function()
-        while player.Parent do
-            local character = player.Character or player.CharacterAdded:Wait()
-            character:WaitForChild("HumanoidRootPart", 10)
-            CakeService.SpawnNear(player)
-            StateService.Push(player)
-            task.wait(CakeConfig.SpawnInterval)
-        end
-    end)
+    local function burst() task.spawn(function() for _=1,CakeConfig.InitialBurstCount do if not player.Parent then return end; CakeService.SpawnNear(player); task.wait(.18) end end) end
+    player.CharacterAdded:Connect(function(character) character:WaitForChild("HumanoidRootPart",10); task.wait(.35); burst() end); if player.Character then burst() end
+    task.spawn(function() while player.Parent do local character=player.Character or player.CharacterAdded:Wait(); character:WaitForChild("HumanoidRootPart",10); CakeService.SpawnNear(player); StateService.Push(player); task.wait(CakeConfig.SpawnInterval) end end)
 end
-
-function CakeService.CleanupPlayer(player)
-    for cake, owner in pairs(CakeService.Owners) do
-        if owner == player then CakeService.Owners[cake] = nil if cake.Parent then cake:Destroy() end end
-    end
-end
-
+function CakeService.CleanupPlayer(player) for cake,owner in pairs(CakeService.Owners) do if owner==player then CakeService.Owners[cake]=nil; if cake.Parent then cake:Destroy() end end end; CakeService.EatingByPlayer[player]=nil end
 return CakeService
+]=]
+
+local skillService = getOrCreate(servicesPackage, "ModuleScript", "SkillService")
+skillService.Source = [=[
+-- Skill handler registry. Add config in ReplicatedStorage.Configs.SkillConfig and a
+-- handler below with the same SkillId; duration, cadence and purchase eligibility stay data-driven.
+local CakeService = require(script.Parent.CakeService)
+local StateService = require(script.Parent.StateService)
+local SkillService = { Handlers = {} }
+
+function SkillService.Handlers.PullNearest(player, parameters)
+    local item = CakeService.GetCakes(player, parameters.Count or 1)[1]
+    if item then CakeService.MoveNearPlayer(player, item.Cake, parameters.Distance or 2) end
+end
+function SkillService.Handlers.Tornado(player, parameters)
+    for _, item in ipairs(CakeService.GetCakes(player, parameters.Count or 5)) do
+        CakeService.MoveNearPlayer(player, item.Cake, parameters.Distance or 5)
+        CakeService.DamageCake(player, item.Cake, (item.Cake:GetAttribute("Health") or 0) * (parameters.DamagePercent or .4))
+    end
+end
+function SkillService.Handlers.AntCourier(player, parameters)
+    -- One distant cake is carried each second; it is damaged only while being transported.
+    local item = CakeService.GetCakes(player, 1, parameters.MinimumDistance or 14)[1]
+    if item then
+        CakeService.DamageCake(player, item.Cake, (item.Cake:GetAttribute("Health") or 0) * (parameters.DamagePercentPerSecond or .02))
+        if item.Cake.Parent then CakeService.MoveNearPlayer(player, item.Cake, parameters.Distance or 4, 1) end
+    end
+end
+function SkillService.Activate(player, cardKey, card)
+    local stack = StateService.AddCardBuff(player, cardKey, card)
+    if not stack then return end
+    task.spawn(function()
+        local handler = SkillService.Handlers[stack.SkillId]
+        while player.Parent and os.clock() < stack.ExpiresAt do
+            if handler then handler(player, stack.Parameters) else warn("Cake Rain RNG: missing SkillId handler", stack.SkillId) break end
+            task.wait(math.max(.1, stack.TriggerInterval))
+        end
+        StateService.Push(player)
+    end)
+end
+return SkillService
 ]=]
 
 local wheelService = getOrCreate(servicesPackage, "ModuleScript", "WheelService")
@@ -880,6 +824,7 @@ local CardConfig = require(Configs.CardConfig)
 local ShopConfig = require(Configs.ShopConfig)
 local LocalizationConfig = require(Configs.LocalizationConfig)
 local StateService = require(script.Parent.StateService)
+local SkillService = require(script.Parent.SkillService)
 
 local WheelService = {}
 
@@ -942,9 +887,9 @@ function WheelService.Start()
         if not state or not state.PendingCardDraw then return { Ok = false, Error = "NO_CARD_DRAW" } end
         state.PendingCardDraw = false
         local key, card = weightedPick(unlockedCards(state))
-        if card then StateService.AddCardBuff(player, key, card) end
+        if card then SkillService.Activate(player, key, card) end
         StateService.Push(player)
-        return { Ok = true, Card = card and { Key = key, Name = text(card.NameKey), Rarity = card.Rarity, Duration = card.Duration, Effect = card.Effect } or nil }
+        return { Ok = true, Card = card and { Key = key, Name = text(card.NameKey), Rarity = card.Rarity, Duration = card.Duration, Effect = card.SkillId } or nil }
     end
 
     Events.RequestShopPurchase.OnServerInvoke = function(player, itemId)
@@ -955,8 +900,6 @@ function WheelService.Start()
         state[item.Currency] = state[item.Currency] - item.Cost
         if item.UnlockType == "WheelReward" then state.UnlockedWheelRewards[item.Id] = true end
         if item.UnlockType == "Card" then state.UnlockedCards[item.Id] = true end
-        if item.UnlockType == "Cosmetic" then state.Cosmetics[item.Id] = true end
-        if item.UnlockType == "Theme" then state.Themes[item.Id] = true end
         StateService.UpdateLeaderstats(player)
         StateService.Push(player)
         return { Ok = true }
@@ -1046,22 +989,26 @@ local function bindShopButtons()
     for index, item in ShopConfig.CakePointShop do
         local button = cakePane:FindFirstChild("Buy" .. index)
         if button then
+            button.Visible = true
             button.Text = buttonLabel(item)
             button.Activated:Connect(function()
                 RequestShopPurchase:InvokeServer(item.Id)
             end)
         end
     end
+    for index = #ShopConfig.CakePointShop + 1, 3 do cakePane:FindFirstChild("Buy" .. index).Visible = false end
     local wheelPane = shopHub:WaitForChild("WheelPointShop")
     for index, item in ShopConfig.WheelPointShop do
         local button = wheelPane:FindFirstChild("Buy" .. index)
         if button then
+            button.Visible = true
             button.Text = buttonLabel(item)
             button.Activated:Connect(function()
                 RequestShopPurchase:InvokeServer(item.Id)
             end)
         end
     end
+    for index = #ShopConfig.WheelPointShop + 1, 3 do wheelPane:FindFirstChild("Buy" .. index).Visible = false end
 end
 bindShopButtons()
 for index = 1, 8 do
@@ -1213,5 +1160,5 @@ if recording then
     ChangeHistoryService:FinishRecording(recording, Enum.FinishRecordingOperation.Commit)
 end
 
-Selection:Set({serverScript, clientScript, mainGui, wheelConfig, cakeConfig, cardConfig, shopConfig, uiConfig, localizationConfig, cakeModelsFolder, mapBase})
+Selection:Set({serverScript, clientScript, mainGui, wheelConfig, cakeConfig, skillConfig, cardConfig, shopConfig, uiConfig, localizationConfig, cakeModelsFolder, mapBase})
 print("✅ Cake Rain RNG 已重構完成：靜態 UI/HUB/轉盤分區、動畫抽獎、非錨定下落蛋糕、自動吞食、稀有度 outline、發光特效、下沉與咖啡色痕跡、DataStore 個人資料皆已配置。")
