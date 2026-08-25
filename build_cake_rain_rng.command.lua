@@ -701,7 +701,7 @@ function StateService.Push(player)
     local wheelReward = state.LastWheelReward
     if wheelReward then
         local displayFor = math.max(0, wheelReward.ShownUntil - os.clock())
-        wheelReward = displayFor > 0 and { Name = wheelReward.Name, Rarity = wheelReward.Rarity, Stacks = wheelReward.Stacks, DisplayFor = displayFor } or nil
+        wheelReward = displayFor > 0 and { Key = wheelReward.Key, Name = wheelReward.Name, Rarity = wheelReward.Rarity, Stacks = wheelReward.Stacks, EffectText = wheelReward.EffectText, DisplayFor = displayFor } or nil
     end
     UpdateClientState:FireClient(player, {
         WheelSpins = state.WheelSpins, WheelPoints = state.WheelPoints, WheelLevel = state.WheelLevel, CakePoints = state.CakePoints,
@@ -995,7 +995,7 @@ return function(player, key, reward)
     if not state then return end
     local levelGain = math.max(1, Template.RarityLevel(reward.Rarity))
     state.WheelLevel = math.max(1, (state.WheelLevel or 1) + levelGain)
-    return { Key = key, NameKey = reward.NameKey, Rarity = reward.Rarity, Level = state.WheelLevel, Stacks = state.WheelLevel }
+    return { Key = key, NameKey = reward.NameKey, Rarity = reward.Rarity, Level = state.WheelLevel, Stacks = state.WheelLevel, EffectText = "抽獎品階上限提升" }
 end
 ]=]
 
@@ -1225,7 +1225,7 @@ function WheelService.Start()
                 reward.Rarity = picked.Rarity
                 local stack = RewardService.Activate(player, picked.Key, reward)
                 table.insert(claimed, { Picked = picked, Stacks = stack and stack.Stacks or 1 })
-                state.LastWheelReward = { Name = picked.Name, Rarity = picked.Rarity, Stacks = stack and stack.Stacks or 1, ShownUntil = os.clock() + 3 }
+                state.LastWheelReward = { Key = picked.Key, Name = picked.Name, Rarity = picked.Rarity, Stacks = stack and stack.Stacks or 1, EffectText = stack and stack.EffectText, ShownUntil = os.clock() + 3 }
             end
             StateService.UpdateLeaderstats(player)
             StateService.Push(player)
@@ -1419,7 +1419,13 @@ local function refreshStats()
     cardFrame.Visible = state.PendingCardDraw
     local reward = state.LastWheelReward
     currentDrawLabel.Visible = reward ~= nil
-    if reward then currentDrawLabel.Text = string.format("轉盤抽到：%s [%s]｜層數 %d", reward.Name, reward.Rarity, reward.Stacks or 1) end
+    if reward then
+        if reward.EffectText then
+            currentDrawLabel.Text = string.format("轉盤抽到：%s [%s]｜%s", reward.Name, reward.Rarity, reward.EffectText)
+        else
+            currentDrawLabel.Text = string.format("轉盤抽到：%s [%s]｜層數 %d", reward.Name, reward.Rarity, reward.Stacks or 1)
+        end
+    end
     refreshEffectBar()
 end
 
