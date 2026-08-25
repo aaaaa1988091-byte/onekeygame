@@ -57,14 +57,14 @@ local WheelConfig = {
         SSR = Color3.fromRGB(120, 255, 255),
     },
     Rewards = {
-        EatSpeed_Common = { NameKey = "Reward_EatSpeed_Common", Rarity = "Common", Weight = 300, BaseDuration = 60, Type = "Stat", Stat = "EatSpeed", Value = 1, Icon = "rbxassetid://6031265976", IsUnlockedDefault = true },
-        EatSpeed_Rare = { NameKey = "Reward_EatSpeed_Rare", Rarity = "Rare", Weight = 110, BaseDuration = 60, Type = "Stat", Stat = "EatSpeed", Value = 2, Icon = "rbxassetid://6031265976", IsUnlockedDefault = true },
-        EatSpeed_Epic = { NameKey = "Reward_EatSpeed_Epic", Rarity = "Epic", Weight = 35, BaseDuration = 60, Type = "Stat", Stat = "EatSpeed", Value = 3, Icon = "rbxassetid://6031265976", IsUnlockedDefault = true },
-        EatSpeed_Legendary = { NameKey = "Reward_EatSpeed_Legendary", Rarity = "Legendary", Weight = 10, BaseDuration = 60, Type = "Stat", Stat = "EatSpeed", Value = 5, Icon = "rbxassetid://6031265976", IsUnlockedDefault = true },
-        EatSpeed_Mythic = { NameKey = "Reward_EatSpeed_Mythic", Rarity = "Mythic", Weight = 2, BaseDuration = 60, Type = "Stat", Stat = "EatSpeed", Value = 8, Icon = "rbxassetid://6031265976", IsUnlockedDefault = true },
-        GlowCakeBoost_Rare = { NameKey = "Reward_GlowBoost_Rare", Rarity = "Rare", Weight = 50, BaseDuration = 20, Type = "GlowCakeRate", Value = 0.10, Icon = "rbxassetid://6031075938", IsUnlockedDefault = false, UnlockCostWheelPoints = 50 },
-        GlowCakeBoost_Mythic = { NameKey = "Reward_GlowBoost_Mythic", Rarity = "Mythic", Weight = 5, BaseDuration = 20, Type = "GlowCakeRate", Value = 0.50, Icon = "rbxassetid://6031075938", IsUnlockedDefault = false, UnlockCostWheelPoints = 200 },
-        AutoRoll_Common = { NameKey = "Reward_AutoRoll_Common", Rarity = "Common", Weight = 50, BaseDuration = 180, Type = "AutoRoll", Level = 1, Interval = 1.0, Icon = "rbxassetid://6031094678", IsUnlockedDefault = true },
+        EatSpeed_Common = { ScriptName = "EatSpeedCommon", NameKey = "Reward_EatSpeed_Common", Rarity = "Common", Weight = 300, BaseDuration = 60, Type = "Stat", Stat = "EatSpeed", Value = 1, Icon = "rbxassetid://6031265976", IsUnlockedDefault = true },
+        EatSpeed_Rare = { ScriptName = "EatSpeedRare", NameKey = "Reward_EatSpeed_Rare", Rarity = "Rare", Weight = 110, BaseDuration = 60, Type = "Stat", Stat = "EatSpeed", Value = 2, Icon = "rbxassetid://6031265976", IsUnlockedDefault = true },
+        EatSpeed_Epic = { ScriptName = "EatSpeedEpic", NameKey = "Reward_EatSpeed_Epic", Rarity = "Epic", Weight = 35, BaseDuration = 60, Type = "Stat", Stat = "EatSpeed", Value = 3, Icon = "rbxassetid://6031265976", IsUnlockedDefault = true },
+        EatSpeed_Legendary = { ScriptName = "EatSpeedLegendary", NameKey = "Reward_EatSpeed_Legendary", Rarity = "Legendary", Weight = 10, BaseDuration = 60, Type = "Stat", Stat = "EatSpeed", Value = 5, Icon = "rbxassetid://6031265976", IsUnlockedDefault = true },
+        EatSpeed_Mythic = { ScriptName = "EatSpeedMythic", NameKey = "Reward_EatSpeed_Mythic", Rarity = "Mythic", Weight = 2, BaseDuration = 60, Type = "Stat", Stat = "EatSpeed", Value = 8, Icon = "rbxassetid://6031265976", IsUnlockedDefault = true },
+        GlowCakeBoost_Rare = { ScriptName = "GlowRateRare", NameKey = "Reward_GlowBoost_Rare", Rarity = "Rare", Weight = 50, BaseDuration = 20, Type = "GlowCakeRate", Value = 0.10, Icon = "rbxassetid://6031075938", IsUnlockedDefault = false, UnlockCostWheelPoints = 50 },
+        GlowCakeBoost_Mythic = { ScriptName = "GlowRateMythic", NameKey = "Reward_GlowBoost_Mythic", Rarity = "Mythic", Weight = 5, BaseDuration = 20, Type = "GlowCakeRate", Value = 0.50, Icon = "rbxassetid://6031075938", IsUnlockedDefault = false, UnlockCostWheelPoints = 200 },
+        AutoRoll_Common = { ScriptName = "AutoRollCommon", NameKey = "Reward_AutoRoll_Common", Rarity = "Common", Weight = 50, BaseDuration = 180, Type = "AutoRoll", Level = 1, Interval = 1.0, Icon = "rbxassetid://6031094678", IsUnlockedDefault = true },
     },
 }
 return WheelConfig
@@ -190,7 +190,7 @@ local function createCakeModel(name, baseColor)
     local base = Instance.new("Part")
     base.Name = "CakeBody"
     base.Shape = Enum.PartType.Cylinder
-    base.Size = Vector3.new(1.4, 4.8, 4.8)
+    base.Size = Vector3.new(2.8, 9.6, 9.6)
     base.Color = baseColor
     base.Material = Enum.Material.SmoothPlastic
     base.Anchored = false
@@ -203,14 +203,14 @@ local function createCakeModel(name, baseColor)
     local frosting = Instance.new("Part")
     frosting.Name = "Frosting"
     frosting.Shape = Enum.PartType.Cylinder
-    frosting.Size = Vector3.new(0.35, 4.9, 4.9)
+    frosting.Size = Vector3.new(0.7, 9.8, 9.8)
     frosting.Color = Color3.fromRGB(255, 245, 250)
     frosting.Material = Enum.Material.SmoothPlastic
     frosting.Anchored = false
     frosting.CanCollide = true
     frosting.TopSurface = Enum.SurfaceType.Smooth
     frosting.BottomSurface = Enum.SurfaceType.Smooth
-    frosting.CFrame = base.CFrame * CFrame.new(0.9, 0, 0)
+    frosting.CFrame = base.CFrame * CFrame.new(1.8, 0, 0)
     frosting.Parent = model
 
     local weld = Instance.new("WeldConstraint")
@@ -345,37 +345,36 @@ buffFrame.BackgroundColor3 = Color3.fromRGB(20, 35, 45)
 buffFrame.BackgroundTransparency = 0.12
 buffFrame.Visible = false
 newGui("UICorner", "Corner", buffFrame).CornerRadius = UDim.new(0, 16)
-for index = 1, 8 do
-    local slot = newGui("ImageButton", "EffectIcon" .. index, buffFrame)
-    slot.Size = UDim2.new(0, 46, 0, 46)
-    slot.Position = UDim2.new(0, 10 + (index - 1) * 47, 0, 14)
-    slot.BackgroundColor3 = Color3.fromRGB(45, 55, 70)
-    slot.AutoButtonColor = false
-    slot.Image = ""
-    slot.Visible = false
-    newGui("UICorner", "Corner", slot).CornerRadius = UDim.new(0, 10)
-    local stroke = newGui("UIStroke", "Outline", slot)
-    stroke.Thickness = 3
-    stroke.Color = Color3.fromRGB(255, 255, 255)
-    local cooldown = newGui("Frame", "CooldownFill", slot)
-    cooldown.AnchorPoint = Vector2.new(0, 1)
-    cooldown.Position = UDim2.new(0, 0, 1, 0)
-    cooldown.Size = UDim2.new(1, 0, 0, 0)
-    cooldown.BackgroundColor3 = Color3.fromRGB(20, 30, 55)
-    cooldown.BackgroundTransparency = 0.22
-    cooldown.BorderSizePixel = 0
-    cooldown.Visible = false
-    cooldown.ZIndex = 2
-    local cooldownText = newGui("TextLabel", "CooldownText", slot)
-    cooldownText.BackgroundTransparency = 1
-    cooldownText.Size = UDim2.fromScale(1, 1)
-    cooldownText.Font = Enum.Font.GothamBlack
-    cooldownText.TextScaled = true
-    cooldownText.TextColor3 = Color3.fromRGB(255, 255, 255)
-    cooldownText.TextStrokeTransparency = 0
-    cooldownText.ZIndex = 3
-    cooldownText.Visible = false
-end
+-- The client clones this only for active effects; the empty HUD has no placeholder icons.
+local effectTemplate = newGui("ImageButton", "EffectIconTemplate", buffFrame)
+effectTemplate.Size = UDim2.new(0, 46, 0, 46)
+effectTemplate.BackgroundColor3 = Color3.fromRGB(45, 55, 70)
+effectTemplate.AutoButtonColor = false
+effectTemplate.Visible = false
+effectTemplate.Image = ""
+newGui("UICorner", "Corner", effectTemplate).CornerRadius = UDim.new(0, 10)
+local templateStroke = newGui("UIStroke", "Outline", effectTemplate)
+templateStroke.Thickness = 3
+templateStroke.Color = Color3.fromRGB(255, 255, 255)
+local templateCooldown = newGui("Frame", "CooldownFill", effectTemplate)
+templateCooldown.AnchorPoint = Vector2.new(0, 1)
+templateCooldown.Position = UDim2.new(0, 0, 1, 0)
+templateCooldown.Size = UDim2.new(1, 0, 0, 0)
+templateCooldown.BackgroundColor3 = Color3.fromRGB(20, 30, 55)
+templateCooldown.BackgroundTransparency = 0.22
+templateCooldown.BorderSizePixel = 0
+templateCooldown.Visible = false
+templateCooldown.ZIndex = 2
+local templateCooldownText = newGui("TextLabel", "CooldownText", effectTemplate)
+templateCooldownText.BackgroundTransparency = 1
+templateCooldownText.Size = UDim2.fromScale(1, 1)
+templateCooldownText.Font = Enum.Font.GothamBlack
+templateCooldownText.TextScaled = true
+templateCooldownText.TextColor3 = Color3.fromRGB(255, 255, 255)
+templateCooldownText.TextStrokeTransparency = 0
+templateCooldownText.ZIndex = 3
+templateCooldownText.Visible = false
+
 local tooltip = newGui("TextLabel", "Tooltip", buffFrame)
 tooltip.Size = UDim2.new(0, 260, 0, 34)
 tooltip.Position = UDim2.new(0, 8, 0, -38)
@@ -421,6 +420,18 @@ cardResult.Font = Enum.Font.GothamBold
 cardResult.Text = ""
 cardResult.TextScaled = true
 cardResult.TextColor3 = Color3.fromRGB(255, 255, 255)
+-- Glow-cake card draw uses three visible slot-machine reels.
+for reelIndex = 1, 3 do
+    local reel = newGui("TextLabel", "Reel" .. reelIndex, cardFrame)
+    reel.Size = UDim2.new(0, 105, 0, 48)
+    reel.Position = UDim2.new(0, 42 + (reelIndex - 1) * 118, 0, 88)
+    reel.BackgroundColor3 = Color3.fromRGB(20, 15, 38)
+    reel.Font = Enum.Font.GothamBlack
+    reel.Text = "?"
+    reel.TextScaled = true
+    reel.TextColor3 = Color3.fromRGB(120, 255, 255)
+    newGui("UICorner", "Corner", reel).CornerRadius = UDim.new(0, 10)
+end
 local drawButton = newGui("TextButton", "DrawButton", cardFrame)
 drawButton.Size = UDim2.new(0, 160, 0, 48)
 drawButton.Position = UDim2.new(0.5, -80, 1, -62)
@@ -446,32 +457,39 @@ closeShop.Text = "關閉"
 closeShop.TextScaled = true
 closeShop.TextColor3 = Color3.fromRGB(255, 255, 255)
 newGui("UICorner", "Corner", closeShop).CornerRadius = UDim.new(0, 10)
-for column, frameName in { "CakePointShop", "WheelPointShop" } do
-    local pane = newGui("Frame", frameName, shopHub)
-    pane.Size = UDim2.new(0, 285, 0, 282)
-    pane.Position = UDim2.new(0, 20 + (column - 1) * 305, 0, 62)
-    pane.BackgroundColor3 = column == 1 and Color3.fromRGB(58, 38, 48) or Color3.fromRGB(38, 48, 70)
-    newGui("UICorner", "Corner", pane).CornerRadius = UDim.new(0, 14)
-    local title = newGui("TextLabel", "Title", pane)
-    title.BackgroundTransparency = 1
-    title.Size = UDim2.new(1, -16, 0, 40)
-    title.Position = UDim2.new(0, 8, 0, 8)
-    title.Font = Enum.Font.GothamBlack
-    title.Text = column == 1 and "蛋糕積分商店" or "轉盤點數商店"
-    title.TextScaled = true
-    title.TextColor3 = Color3.fromRGB(255, 255, 255)
-    for row = 1, 3 do
-        local button = newGui("TextButton", "Buy" .. row, pane)
-        button.Size = UDim2.new(1, -24, 0, 50)
-        button.Position = UDim2.new(0, 12, 0, 54 + (row - 1) * 62)
-        button.BackgroundColor3 = Color3.fromRGB(255, 230, 145)
-        button.Font = Enum.Font.GothamBold
-        button.Text = "-"
-        button.TextScaled = true
-        button.TextColor3 = Color3.fromRGB(35, 25, 20)
-        newGui("UICorner", "Corner", button).CornerRadius = UDim.new(0, 10)
-    end
-end
+local shopGrid = newGui("ScrollingFrame", "ShopGrid", shopHub)
+shopGrid.Size = UDim2.new(1, -40, 1, -82)
+shopGrid.Position = UDim2.new(0, 20, 0, 62)
+shopGrid.BackgroundColor3 = Color3.fromRGB(48, 38, 60)
+shopGrid.BorderSizePixel = 0
+shopGrid.ScrollBarThickness = 8
+shopGrid.CanvasSize = UDim2.new(0, 0, 0, 0)
+newGui("UICorner", "Corner", shopGrid).CornerRadius = UDim.new(0, 14)
+local gridLayout = newGui("UIGridLayout", "GridLayout", shopGrid)
+gridLayout.CellSize = UDim2.new(0, 128, 0, 128)
+gridLayout.CellPadding = UDim2.new(0, 12, 0, 12)
+gridLayout.HorizontalAlignment = Enum.HorizontalAlignment.Center
+local shopTemplate = newGui("ImageButton", "ItemTemplate", shopGrid)
+shopTemplate.Size = UDim2.new(0, 128, 0, 128)
+shopTemplate.BackgroundColor3 = Color3.fromRGB(255, 230, 145)
+shopTemplate.AutoButtonColor = true
+shopTemplate.Visible = false
+newGui("UICorner", "Corner", shopTemplate).CornerRadius = UDim.new(0, 12)
+local itemName = newGui("TextLabel", "ItemName", shopTemplate)
+itemName.BackgroundTransparency = 1
+itemName.Size = UDim2.new(1, -8, 0, 50)
+itemName.Position = UDim2.new(0, 4, 0, 12)
+itemName.Font = Enum.Font.GothamBold
+itemName.TextScaled = true
+itemName.TextWrapped = true
+itemName.TextColor3 = Color3.fromRGB(35, 25, 20)
+local itemCost = newGui("TextLabel", "ItemCost", shopTemplate)
+itemCost.BackgroundTransparency = 1
+itemCost.Size = UDim2.new(1, -8, 0, 32)
+itemCost.Position = UDim2.new(0, 4, 1, -40)
+itemCost.Font = Enum.Font.GothamBlack
+itemCost.TextScaled = true
+itemCost.TextColor3 = Color3.fromRGB(85, 50, 15)
 
 local serverPackage = getOrCreate(ServerScriptService, "Folder", "CakeRainRNG")
 local servicesPackage = getOrCreate(serverPackage, "Folder", "Services")
@@ -857,6 +875,35 @@ function CakeService.CleanupPlayer(player) for cake,owner in pairs(CakeService.O
 return CakeService
 ]=]
 
+-- Every wheel term chooses its own module, so its stacking and special behavior can evolve independently.
+local rewardScripts = getOrCreate(servicesPackage, "Folder", "RewardScripts")
+local rewardTemplate = getOrCreate(rewardScripts, "ModuleScript", "RewardTemplate")
+rewardTemplate.Source = [=[
+local StateService = require(script.Parent.Parent.StateService)
+return function(player, key, reward)
+    return StateService.AddBuff(player, key, reward)
+end
+]=]
+for _, scriptName in ipairs({ "EatSpeedCommon", "EatSpeedRare", "EatSpeedEpic", "EatSpeedLegendary", "EatSpeedMythic", "GlowRateRare", "GlowRateMythic", "AutoRollCommon" }) do
+    local rewardScript = getOrCreate(rewardScripts, "ModuleScript", scriptName)
+    rewardScript.Source = [=[
+-- This term is intentionally independent; customize this module without touching wheel dispatch.
+local apply = require(script.Parent.RewardTemplate)
+return function(player, key, reward) return apply(player, key, reward) end
+]=]
+end
+local rewardService = getOrCreate(servicesPackage, "ModuleScript", "RewardService")
+rewardService.Source = [=[
+local RewardScripts = script.Parent.RewardScripts
+local RewardService = {}
+function RewardService.Activate(player, key, reward)
+    local module = RewardScripts:FindFirstChild(reward.ScriptName)
+    if not module then warn("Cake Rain RNG: missing reward script", reward.ScriptName); return end
+    return require(module)(player, key, reward)
+end
+return RewardService
+]=]
+
 local skillScripts = getOrCreate(servicesPackage, "Folder", "SkillScripts")
 local skillTemplate = getOrCreate(skillScripts, "ModuleScript", "SkillTemplate")
 skillTemplate.Source = [=[
@@ -977,6 +1024,7 @@ local ShopConfig = require(Configs.ShopConfig)
 local LocalizationConfig = require(Configs.LocalizationConfig)
 local StateService = require(script.Parent.StateService)
 local SkillService = require(script.Parent.SkillService)
+local RewardService = require(script.Parent.RewardService)
 
 local WheelService = {}
 
@@ -1028,7 +1076,7 @@ function WheelService.Start()
         if #slots == 0 then return { Ok = false, Error = "EMPTY_POOL" } end
         local pickedIndex = math.random(1, #slots)
         local picked = slots[pickedIndex]
-        local stack = StateService.AddBuff(player, picked.Key, WheelConfig.Rewards[picked.Key])
+        local stack = RewardService.Activate(player, picked.Key, WheelConfig.Rewards[picked.Key])
         state.LastWheelReward = { Name = picked.Name, Rarity = picked.Rarity, Stacks = stack and stack.Stacks or 1, ShownUntil = os.clock() + 3 }
         StateService.UpdateLeaderstats(player)
         StateService.Push(player)
@@ -1140,45 +1188,21 @@ local function buttonLabel(item)
 end
 
 local function bindShopButtons()
-    local cakePane = shopHub:WaitForChild("CakePointShop")
-    for index, item in ShopConfig.CakePointShop do
-        local button = cakePane:FindFirstChild("Buy" .. index)
-        if button then
-            button.Visible = true
-            button.Text = buttonLabel(item)
-            button.Activated:Connect(function()
-                RequestShopPurchase:InvokeServer(item.Id)
-            end)
-        end
+    local grid, template = shopHub:WaitForChild("ShopGrid"), shopHub.ShopGrid:WaitForChild("ItemTemplate")
+    local items = {}
+    for _, item in ipairs(ShopConfig.WheelPointShop) do table.insert(items, item) end
+    for _, item in ipairs(ShopConfig.CakePointShop) do table.insert(items, item) end
+    for index, item in ipairs(items) do
+        local button = template:Clone()
+        button.Name, button.Visible, button.LayoutOrder = "Item" .. index, true, index
+        button.ItemName.Text = L[item.NameKey] or item.NameKey
+        button.ItemCost.Text = string.format("%s %d", item.Currency == "WheelPoints" and "轉盤點數" or "蛋糕積分", item.Cost)
+        button.Activated:Connect(function() RequestShopPurchase:InvokeServer(item.Id) end)
+        button.Parent = grid
     end
-    for index = #ShopConfig.CakePointShop + 1, 3 do cakePane:FindFirstChild("Buy" .. index).Visible = false end
-    local wheelPane = shopHub:WaitForChild("WheelPointShop")
-    for index, item in ShopConfig.WheelPointShop do
-        local button = wheelPane:FindFirstChild("Buy" .. index)
-        if button then
-            button.Visible = true
-            button.Text = buttonLabel(item)
-            button.Activated:Connect(function()
-                RequestShopPurchase:InvokeServer(item.Id)
-            end)
-        end
-    end
-    for index = #ShopConfig.WheelPointShop + 1, 3 do wheelPane:FindFirstChild("Buy" .. index).Visible = false end
+    task.defer(function() grid.CanvasSize = UDim2.new(0, 0, 0, grid.GridLayout.AbsoluteContentSize.Y + 16) end)
 end
 bindShopButtons()
-for index = 1, 8 do
-    local slot = buffFrame:WaitForChild("EffectIcon" .. index)
-    slot.MouseEnter:Connect(function()
-        local text = slot:GetAttribute("Tooltip")
-        if text and text ~= "" then
-            tooltip.Text = text
-            tooltip.Visible = true
-        end
-    end)
-    slot.MouseLeave:Connect(function()
-        tooltip.Visible = false
-    end)
-end
 
 local function hasAutoRoll()
     local buff = state.ActiveBuffs and state.ActiveBuffs.AutoRoll
@@ -1186,32 +1210,28 @@ local function hasAutoRoll()
 end
 
 local function refreshEffectBar()
-    local index = 0
+    for _, child in ipairs(buffFrame:GetChildren()) do
+        if child:IsA("ImageButton") and child.Name ~= "EffectIconTemplate" then child:Destroy() end
+    end
+    local template, index = buffFrame:WaitForChild("EffectIconTemplate"), 0
     for _, buff in pairs(state.ActiveBuffs or {}) do
         index += 1
-        local slot = buffFrame:FindFirstChild("EffectIcon" .. index)
-        if slot then
-            slot.Visible = true
-            slot.Image = buff.Icon or ""
-            slot.Outline.Color = buff.OutlineColor or Color3.fromRGB(255, 255, 255)
-            slot:SetAttribute("Tooltip", string.format("%s [%s] 層數:%s / %ss", buff.Name, buff.Rarity, tostring(buff.Stacks or 1), tostring(buff.Remaining)))
-            local cooldown = slot:FindFirstChild("CooldownFill")
-            local cooldownText = slot:FindFirstChild("CooldownText")
-            local remaining, duration = buff.CooldownRemaining or 0, buff.CooldownDuration or 0
-            if cooldown and cooldownText and duration > 0 and remaining > 0 then
-                cooldown.Visible = true
-                cooldown.Size = UDim2.new(1, 0, math.clamp(remaining / duration, 0, 1), 0)
-                cooldownText.Text = string.format("%.1f", remaining)
-                cooldownText.Visible = true
-            elseif cooldown and cooldownText then
-                cooldown.Visible = false
-                cooldownText.Visible = false
-            end
-        end
-    end
-    for slotIndex = index + 1, 8 do
-        local slot = buffFrame:FindFirstChild("EffectIcon" .. slotIndex)
-        if slot then slot.Visible = false slot.Image = "" slot:SetAttribute("Tooltip", ""); local cooldown = slot:FindFirstChild("CooldownFill"); local cooldownText = slot:FindFirstChild("CooldownText"); if cooldown then cooldown.Visible = false end; if cooldownText then cooldownText.Visible = false end end
+        local slot = template:Clone()
+        slot.Name = "EffectIcon" .. index
+        slot.Visible = true
+        slot.Position = UDim2.new(0, 10 + (index - 1) * 52, 0, 14)
+        slot.Image = buff.Icon or ""
+        slot.Outline.Color = buff.OutlineColor or Color3.fromRGB(255, 255, 255)
+        slot:SetAttribute("Tooltip", string.format("%s [%s] 層數:%s / %ss", buff.Name, buff.Rarity, tostring(buff.Stacks or 1), tostring(buff.Remaining)))
+        local cooldown, cooldownText = slot.CooldownFill, slot.CooldownText
+        local remaining, duration = buff.CooldownRemaining or 0, buff.CooldownDuration or 0
+        cooldown.Visible = duration > 0 and remaining > 0
+        cooldown.Size = UDim2.new(1, 0, duration > 0 and math.clamp(remaining / duration, 0, 1) or 0, 0)
+        cooldownText.Visible = cooldown.Visible
+        cooldownText.Text = cooldown.Visible and string.format("%.1f", remaining) or ""
+        slot.MouseEnter:Connect(function() local value = slot:GetAttribute("Tooltip"); if value and value ~= "" then tooltip.Text = value; tooltip.Visible = true end end)
+        slot.MouseLeave:Connect(function() tooltip.Visible = false end)
+        slot.Parent = buffFrame
     end
     buffFrame.Visible = index > 0
 end
@@ -1304,16 +1324,24 @@ autoRollToggle.Activated:Connect(function()
 end)
 
 drawButton.Activated:Connect(function()
+    if drawButton:GetAttribute("Spinning") then return end
+    drawButton:SetAttribute("Spinning", true)
+    for tick = 1, 14 do
+        for reelIndex = 1, 3 do cardFrame["Reel" .. reelIndex].Text = ({ "★", "◆", "✦", "?" })[math.random(1, 4)] end
+        task.wait(.07 + tick * .008)
+    end
     local result = RequestCardDraw:InvokeServer()
     if result and result.Ok and result.Card then
+        for reelIndex = 1, 3 do cardFrame["Reel" .. reelIndex].Text = result.Card.Rarity end
         cardResult.Text = result.Card.Name .. " [" .. result.Card.Rarity .. "]"
         cardResult.TextTransparency = 1
         TweenService:Create(cardResult, TweenInfo.new(0.35), { TextTransparency = 0 }):Play()
     end
+    drawButton:SetAttribute("Spinning", false)
 end)
 
 shopButton.Activated:Connect(function()
-    shopHub.Visible = true
+    shopHub.Visible = not shopHub.Visible
 end)
 closeShop.Activated:Connect(function()
     shopHub.Visible = false
@@ -1338,5 +1366,5 @@ if recording then
     ChangeHistoryService:FinishRecording(recording, Enum.FinishRecordingOperation.Commit)
 end
 
-Selection:Set({serverScript, clientScript, mainGui, wheelConfig, cakeConfig, skillConfig, cardConfig, shopConfig, skillScripts, uiConfig, localizationConfig, cakeModelsFolder, mapBase})
+Selection:Set({serverScript, clientScript, mainGui, wheelConfig, cakeConfig, skillConfig, cardConfig, shopConfig, rewardScripts, rewardService, skillScripts, uiConfig, localizationConfig, cakeModelsFolder, mapBase})
 print("✅ Cake Rain RNG 已重構完成：靜態 UI/HUB/轉盤分區、動畫抽獎、非錨定下落蛋糕、自動吞食、稀有度 outline、發光特效、下沉與咖啡色痕跡、DataStore 個人資料皆已配置。")
