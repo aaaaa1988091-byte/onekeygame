@@ -41,6 +41,7 @@ local mapFolder = getOrCreate(Workspace, "Folder", "Map")
 local requestWheelSpin = getOrCreate(eventsFolder, "RemoteFunction", "RequestWheelSpin")
 local requestCardDraw = getOrCreate(eventsFolder, "RemoteFunction", "RequestCardDraw")
 local requestShopPurchase = getOrCreate(eventsFolder, "RemoteFunction", "RequestShopPurchase")
+local requestAbilityUpgrade = getOrCreate(eventsFolder, "RemoteFunction", "RequestAbilityUpgrade")
 local updateClientState = getOrCreate(eventsFolder, "RemoteEvent", "UpdateClientState")
 
 local wheelConfig = getOrCreate(configsFolder, "ModuleScript", "WheelConfig")
@@ -48,6 +49,13 @@ wheelConfig.Source = [=[
 local WheelConfig = {
     DisplayedSlots = 5,
     RarityPriority = { Common = 1, Rare = 2, Epic = 3, Legendary = 4, Mythic = 5 },
+    RarityOrder = { "Common", "Rare", "Epic", "Legendary", "Mythic" },
+    BaseRarityWeights = { Common = 650, Rare = 250, Epic = 80, Legendary = 18, Mythic = 2 },
+    WheelLevelBonusByRarity = { Common = 1, Rare = 2, Epic = 3, Legendary = 4, Mythic = 5 },
+    WheelLevelDurationByRarity = { Common = 45, Rare = 60, Epic = 75, Legendary = 90, Mythic = 120 },
+    AbilityLevelCaps = { [1] = "Epic", [2] = "Legendary", [3] = "Mythic" },
+    AbilityUpgradeCosts = { [1] = 800, [2] = 2200 },
+    ServerMerchant = { RefreshSeconds = 240, SlotCount = 3 },
     RarityColors = {
         Common = Color3.fromRGB(210, 210, 210),
         Rare = Color3.fromRGB(70, 170, 255),
@@ -62,6 +70,7 @@ local WheelConfig = {
         AutoRoll = { ScriptName = "AutoRoll", NameKey = "Reward_AutoRoll", Weight = 50, Icon = "rbxassetid://6031091002", IsUnlockedDefault = true },
         WheelHaste = { ScriptName = "WheelHaste", NameKey = "Reward_WheelHaste", Weight = 65, Icon = "rbxassetid://6031763426", IsUnlockedDefault = true },
         WheelLevelUp = { ScriptName = "WheelLevelUp", NameKey = "Reward_WheelLevelUp", Weight = 55, Icon = "rbxassetid://6031068426", IsUnlockedDefault = true },
+        PlayerSpeed = { ScriptName = "PlayerSpeed", NameKey = "Reward_PlayerSpeed", Weight = 85, Icon = "rbxassetid://6034754445", IsUnlockedDefault = true },
     },
 }
 return WheelConfig
@@ -76,7 +85,7 @@ local LocalizationConfig = {
         UI_WheelShop_Title = "Wheel Point Shop", UI_Time_Left = "Time Left: ", UI_No_Buff = "No Active Buff", UI_Spin = "Spin",
         UI_Card_Draw = "Glow Cake Card Draw", UI_Open_Shop = "Shop", UI_Open_Bag = "Bag", UI_Close = "Close", UI_Buy = "Buy", UI_Bag_Title = "Ability Bag", UI_Bag_Wheel = "Wheel Terms", UI_Bag_Cards = "Drawable Skills", UI_Locked = "Locked", UI_Unlocked = "Owned",
         Cake_Common = "Common Cake", Cake_Rare = "Rare Cake", Cake_Epic = "Epic Cake", Cake_Legendary = "Legendary Cake", Cake_Mythic = "Mythic Cake", Cake_Special = "Glow Cake",
-        Reward_EatSpeed = "Eat Speed Up", Reward_GlowBoost = "Glow Cake Rate Up", Reward_AutoRoll = "Auto-Roll", Reward_WheelHaste = "Wheel Haste", Reward_WheelLevelUp = "Wheel Level Up",
+        Reward_EatSpeed = "Eat Speed Up", Reward_GlowBoost = "Glow Cake Rate Up", Reward_AutoRoll = "Auto-Roll", Reward_WheelHaste = "Wheel Haste", Reward_WheelLevelUp = "Wheel Level Up", Reward_PlayerSpeed = "Player Speed Up", UI_Normal_Wheel = "Reward Wheel", UI_Silver_Wheel = "Silver Wheel", UI_Merchant_Tab = "Mystery Merchant", UI_Upgrade = "Upgrade",
         Card_Hook = "Grappling Hook", Card_Tornado = "Tornado", Card_Ant = "Ant Courier", Card_Attract = "Cake Attraction",
     },
 }
@@ -128,10 +137,10 @@ skillConfig.Source = [=[
 -- Rarity-specific duration, intervals, parameters, and effect strength belong in the matching skill script.
 local SkillConfig = {
     Cards = {
-        Card_Hook = { NameKey = "Card_Hook", Weight = 20, SkillId = "PullNearest", ScriptName = "HookSkill", AbilityKey = "Card_Hook", Icon = "rbxassetid://6031068421", IsUnlockedDefault = true },
-        Card_Attract = { NameKey = "Card_Attract", Weight = 45, SkillId = "Attract", ScriptName = "AttractSkill", AbilityKey = "Card_Attract", Icon = "rbxassetid://6031068421", IsUnlockedDefault = true },
-        Card_Tornado = { NameKey = "Card_Tornado", Weight = 10, SkillId = "Tornado", ScriptName = "TornadoSkill", AbilityKey = "Card_Tornado", Icon = "rbxassetid://6031068421", IsUnlockedDefault = false, UnlockCostCakePoints = 1500 },
-        Card_Ant = { NameKey = "Card_Ant", Weight = 5, SkillId = "AntCourier", ScriptName = "AntSkill", AbilityKey = "Card_Ant", Icon = "rbxassetid://6031068421", IsUnlockedDefault = false, UnlockCostCakePoints = 3000 },
+        Card_Hook = { NameKey = "Card_Hook", Weight = 20, SkillId = "PullNearest", ScriptName = "HookSkill", AbilityKey = "Card_Hook", MaxAbilityLevel = 3, Icon = "rbxassetid://6031068421", IsUnlockedDefault = true },
+        Card_Attract = { NameKey = "Card_Attract", Weight = 45, SkillId = "Attract", ScriptName = "AttractSkill", AbilityKey = "Card_Attract", MaxAbilityLevel = 3, Icon = "rbxassetid://6031068421", IsUnlockedDefault = true },
+        Card_Tornado = { NameKey = "Card_Tornado", Weight = 10, SkillId = "Tornado", ScriptName = "TornadoSkill", AbilityKey = "Card_Tornado", MaxAbilityLevel = 3, Icon = "rbxassetid://6031068421", IsUnlockedDefault = false, UnlockCostCakePoints = 1500 },
+        Card_Ant = { NameKey = "Card_Ant", Weight = 5, SkillId = "AntCourier", ScriptName = "AntSkill", AbilityKey = "Card_Ant", MaxAbilityLevel = 3, Icon = "rbxassetid://6031068421", IsUnlockedDefault = false, UnlockCostCakePoints = 3000 },
     },
 }
 return SkillConfig
@@ -153,6 +162,11 @@ local ShopConfig = {
     CakePointShop = {
         { Id = "Card_Tornado", NameKey = "Card_Tornado", Cost = 1500, Currency = "CakePoints", UnlockType = "Card", Icon = "rbxassetid://6031068421" },
         { Id = "Card_Ant", NameKey = "Card_Ant", Cost = 3000, Currency = "CakePoints", UnlockType = "Card", Icon = "rbxassetid://6031068421" },
+    },
+    MysteryMerchantPool = {
+        { Id = "Merchant_GlowCakeBoost", Grants = "GlowCakeBoost", NameKey = "Reward_GlowBoost", Cost = 40, Currency = "WheelPoints", UnlockType = "WheelReward", Icon = "rbxassetid://6031071053", Weight = 3 },
+        { Id = "Merchant_Tornado", Grants = "Card_Tornado", NameKey = "Card_Tornado", Cost = 1200, Currency = "CakePoints", UnlockType = "Card", Icon = "rbxassetid://6031068421", Weight = 2 },
+        { Id = "Merchant_Ant", Grants = "Card_Ant", NameKey = "Card_Ant", Cost = 2400, Currency = "CakePoints", UnlockType = "Card", Icon = "rbxassetid://6031068421", Weight = 1 },
     },
 }
 return ShopConfig
@@ -256,23 +270,19 @@ for index, name in { "CakePointsLabel", "WheelPointsLabel", "SpinsLabel" } do
     label.TextColor3 = Color3.fromRGB(255, 255, 255)
     label.TextStrokeTransparency = 0.5
 end
-local shopButton = newGui("TextButton", "ShopButton", mainGui)
+local shopButton = newGui("ImageButton", "ShopButton", mainGui)
 shopButton.Size = UDim2.new(0, 120, 0, 46)
 shopButton.Position = UDim2.new(0, 18, 0, 148)
 shopButton.BackgroundColor3 = Color3.fromRGB(255, 210, 110)
 shopButton.Font = Enum.Font.GothamBlack
-shopButton.Text = "Shop"
-shopButton.TextScaled = true
-shopButton.TextColor3 = Color3.fromRGB(70, 40, 10)
+shopButton.Image = "rbxassetid://6031265976"
 newGui("UICorner", "Corner", shopButton).CornerRadius = UDim.new(0, 12)
-local bagButton = newGui("TextButton", "BagButton", mainGui)
+local bagButton = newGui("ImageButton", "BagButton", mainGui)
 bagButton.Size = UDim2.new(0, 120, 0, 46)
 bagButton.Position = UDim2.new(0, 148, 0, 148)
 bagButton.BackgroundColor3 = Color3.fromRGB(150, 220, 255)
 bagButton.Font = Enum.Font.GothamBlack
-bagButton.Text = "Bag"
-bagButton.TextScaled = true
-bagButton.TextColor3 = Color3.fromRGB(15, 45, 70)
+bagButton.Image = "rbxassetid://6031265972"
 newGui("UICorner", "Corner", bagButton).CornerRadius = UDim.new(0, 12)
 
 local wheel = newGui("Frame", "WheelPanel", mainGui)
@@ -312,10 +322,15 @@ for index = 1, 5 do
     sector.BackgroundTransparency = 0.05
     sector.BorderSizePixel = 0
     newGui("UICorner", "Corner", sector).CornerRadius = UDim.new(0, 14)
+    local icon = newGui("ImageLabel", "Icon", sector)
+    icon.BackgroundTransparency = 1
+    icon.Size = UDim2.new(0, 26, 0, 26)
+    icon.Position = UDim2.new(0.5, -13, 0, 4)
+    icon.Image = ""
     local text = newGui("TextLabel", "Text", sector)
     text.BackgroundTransparency = 1
-    text.Size = UDim2.new(1, -12, 1, -10)
-    text.Position = UDim2.new(0, 6, 0, 5)
+    text.Size = UDim2.new(1, -12, 1, -34)
+    text.Position = UDim2.new(0, 6, 0, 31)
     text.Font = Enum.Font.GothamBold
     text.Text = "?"
     text.TextScaled = true
@@ -342,6 +357,32 @@ autoRollToggle.TextScaled = true
 autoRollToggle.TextColor3 = Color3.fromRGB(255, 255, 255)
 autoRollToggle.Visible = false
 newGui("UICorner", "Corner", autoRollToggle).CornerRadius = UDim.new(0, 12)
+for index = 1, 3 do
+    local anchor = newGui("Frame", "WheelAnchor" .. index, mainGui)
+    anchor.Size = UDim2.new(0, 300, 0, 300)
+    anchor.Position = UDim2.new(1, -338 - (index * 316), 0.5, -150)
+    anchor.BackgroundTransparency = 1
+end
+local silverWheel = wheel:Clone()
+silverWheel.Name = "SilverWheelPanel"
+silverWheel.Position = UDim2.new(1, -396, 0.5, 0)
+silverWheel.WheelDisc.BackgroundColor3 = Color3.fromRGB(155, 160, 170)
+silverWheel.SpinButton.Text = "DRAW"
+silverWheel.SpinButton.BackgroundColor3 = Color3.fromRGB(225, 230, 240)
+silverWheel.Parent = mainGui
+silverWheel.Visible = false
+local wheelModeButton = newGui("ImageButton", "WheelModeButton", mainGui)
+wheelModeButton.Size = UDim2.new(0, 46, 0, 46)
+wheelModeButton.Position = UDim2.new(1, -384, 0.5, 190)
+wheelModeButton.BackgroundColor3 = Color3.fromRGB(90, 75, 130)
+wheelModeButton.Image = "rbxassetid://6031094678"
+newGui("UICorner", "Corner", wheelModeButton).CornerRadius = UDim.new(0, 12)
+local silverModeButton = newGui("ImageButton", "SilverModeButton", mainGui)
+silverModeButton.Size = UDim2.new(0, 46, 0, 46)
+silverModeButton.Position = UDim2.new(1, -330, 0.5, 190)
+silverModeButton.BackgroundColor3 = Color3.fromRGB(180, 185, 195)
+silverModeButton.Image = "rbxassetid://6031763426"
+newGui("UICorner", "Corner", silverModeButton).CornerRadius = UDim.new(0, 12)
 
 local buffFrame = newGui("Frame", "EffectBar", mainGui)
 buffFrame.Size = UDim2.new(0, 392, 0, 74)
@@ -526,7 +567,7 @@ closeBag.TextScaled = true
 closeBag.TextColor3 = Color3.fromRGB(255, 255, 255)
 newGui("UICorner", "Corner", closeBag).CornerRadius = UDim.new(0, 10)
 local bagList = newGui("ScrollingFrame", "BagList", bagPanel)
-bagList.Size = UDim2.new(1, -40, 1, -82)
+bagList.Size = UDim2.new(1, -260, 1, -82)
 bagList.Position = UDim2.new(0, 20, 0, 62)
 bagList.BackgroundColor3 = Color3.fromRGB(38, 50, 62)
 bagList.BorderSizePixel = 0
@@ -537,7 +578,7 @@ local bagLayout = newGui("UIGridLayout", "GridLayout", bagList)
 bagLayout.CellSize = UDim2.new(0, 128, 0, 128)
 bagLayout.CellPadding = UDim2.new(0, 12, 0, 12)
 bagLayout.HorizontalAlignment = Enum.HorizontalAlignment.Center
-local bagTemplate = newGui("ImageLabel", "EntryTemplate", bagList)
+local bagTemplate = newGui("ImageButton", "EntryTemplate", bagList)
 bagTemplate.Size = UDim2.new(0, 128, 0, 128)
 bagTemplate.BackgroundColor3 = Color3.fromRGB(58, 74, 88)
 bagTemplate.Image = ""
@@ -551,6 +592,29 @@ bagEntryName.Font = Enum.Font.GothamBold
 bagEntryName.TextScaled = true
 bagEntryName.TextWrapped = true
 bagEntryName.TextColor3 = Color3.fromRGB(255, 255, 255)
+local bagDetail = newGui("Frame", "DetailPanel", bagPanel)
+bagDetail.Size = UDim2.new(0, 210, 1, -82)
+bagDetail.Position = UDim2.new(1, -230, 0, 62)
+bagDetail.BackgroundColor3 = Color3.fromRGB(28, 42, 54)
+newGui("UICorner", "Corner", bagDetail).CornerRadius = UDim.new(0, 14)
+local detailText = newGui("TextLabel", "DetailText", bagDetail)
+detailText.BackgroundTransparency = 1
+detailText.Size = UDim2.new(1, -16, 1, -72)
+detailText.Position = UDim2.new(0, 8, 0, 8)
+detailText.Font = Enum.Font.GothamBold
+detailText.TextWrapped = true
+detailText.TextScaled = true
+detailText.TextColor3 = Color3.fromRGB(230, 250, 255)
+detailText.Text = "Select an ability"
+local upgradeButton = newGui("TextButton", "UpgradeButton", bagDetail)
+upgradeButton.Size = UDim2.new(1, -24, 0, 46)
+upgradeButton.Position = UDim2.new(0, 12, 1, -58)
+upgradeButton.BackgroundColor3 = Color3.fromRGB(255, 210, 110)
+upgradeButton.Font = Enum.Font.GothamBlack
+upgradeButton.TextScaled = true
+upgradeButton.TextColor3 = Color3.fromRGB(70, 40, 10)
+upgradeButton.Text = "Upgrade"
+newGui("UICorner", "Corner", upgradeButton).CornerRadius = UDim.new(0, 10)
 
 local serverPackage = getOrCreate(ServerScriptService, "Folder", "CakeRainRNG")
 local servicesPackage = getOrCreate(serverPackage, "Folder", "Services")
@@ -641,6 +705,8 @@ function StateService.Create(player, loaded)
         LastWheelReward = nil,
         Buffs = StateService.RestoreBuffs(loaded.ActiveBuffs or loaded.Buffs),
         OwnedItems = loaded.OwnedItems or {},
+        AbilityLevels = loaded.AbilityLevels or {},
+        MerchantPurchases = loaded.MerchantPurchases or {},
         Stats = loaded.Stats or {},
         UnlockedWheelRewards = loaded.UnlockedWheelRewards or {},
         UnlockedCards = loaded.UnlockedCards or {},
@@ -661,34 +727,59 @@ function StateService.GetProfile(player)
 end
 
 function StateService.RestoreBuffs(savedBuffs)
-    local restored, now = {}, os.clock()
+    local restored = {}
     for buffType, stacks in pairs(savedBuffs or {}) do
         restored[buffType] = {}
         for _, stack in ipairs(stacks) do
             local copy = table.clone(stack)
-            local remaining = copy.Remaining or math.max(0, (copy.ExpiresAt or now) - (copy.SavedAt or now))
-            if remaining > 0 then
-                copy.ExpiresAt = now + remaining
-                copy.Remaining = nil
-                copy.SavedAt = nil
-                table.insert(restored[buffType], copy)
-            end
+            copy.Remaining = math.max(0, copy.Remaining or 0)
+            copy.ExpiresAt = nil
+            copy.ActiveStartedAt = nil
+            copy.CooldownEndsAt = nil
+            if copy.Remaining > 0 then table.insert(restored[buffType], copy) end
         end
     end
     return restored
 end
 
+function StateService.TickBuffType(state, buffType)
+    local stacks, now = state.Buffs[buffType], os.clock()
+    if not stacks then return nil end
+    local activeIndex, activeStack, activePriority = nil, nil, -1
+    for index = #stacks, 1, -1 do
+        local stack = stacks[index]
+        if (stack.Remaining or 0) <= 0 then
+            table.remove(stacks, index)
+        else
+            local priority = (stack.Level or 0) + (WheelConfig.RarityPriority[stack.Rarity] or 0)
+            if priority > activePriority then activeIndex, activeStack, activePriority = index, stack, priority end
+        end
+    end
+    for _, stack in ipairs(stacks) do
+        if stack == activeStack then
+            local elapsed = math.max(0, now - (stack.ActiveStartedAt or now))
+            stack.Remaining = math.max(0, (stack.Remaining or 0) - elapsed)
+            stack.ActiveStartedAt = now
+        else
+            stack.ActiveStartedAt = nil -- lower tiers are sealed: their timers do not tick.
+        end
+    end
+    if activeStack and activeStack.Remaining <= 0 then
+        table.remove(stacks, activeIndex)
+        return StateService.TickBuffType(state, buffType)
+    end
+    return activeStack
+end
+
 function StateService.SerializeBuffs(state)
-    local saved, now = {}, os.clock()
+    local saved = {}
     for buffType, stacks in pairs(state.Buffs or {}) do
+        StateService.TickBuffType(state, buffType)
         for _, stack in ipairs(stacks) do
-            local remaining = math.max(0, (stack.ExpiresAt or now) - now)
-            if remaining > 0 then
+            if (stack.Remaining or 0) > 0 then
                 saved[buffType] = saved[buffType] or {}
                 local copy = table.clone(stack)
-                copy.Remaining = remaining
-                copy.SavedAt = now
-                copy.ExpiresAt = nil
+                copy.ActiveStartedAt = nil
                 copy.CooldownEndsAt = nil
                 table.insert(saved[buffType], copy)
             end
@@ -707,6 +798,8 @@ function StateService.Serialize(player)
         CakePoints = state.CakePoints,
         ActiveBuffs = StateService.SerializeBuffs(state),
         OwnedItems = state.OwnedItems,
+        AbilityLevels = state.AbilityLevels,
+        MerchantPurchases = state.MerchantPurchases,
         Stats = state.Stats,
         UnlockedWheelRewards = state.UnlockedWheelRewards,
         UnlockedCards = state.UnlockedCards,
@@ -728,78 +821,63 @@ end
 function StateService.EffectiveStat(player, statName)
     local state = StateService.Get(player)
     if not state then return 0 end
-    local bestValue, bestPriority, now = 0, -1, os.clock()
-    for _, stack in ipairs(state.Buffs[statName] or {}) do
-        if stack.ExpiresAt > now then
-            local priority = WheelConfig.RarityPriority[stack.Rarity] or 0
-            if priority > bestPriority then
-                bestPriority = priority
-                bestValue = stack.Value or 0
-            end
-        end
-    end
-    return bestValue
+    local stack = StateService.TickBuffType(state, statName)
+    return stack and (stack.Value or 0) or 0
 end
 
 function StateService.AddBuff(player, key, reward)
     local state = StateService.Get(player)
     if not state then return end
-    local buffType, now = reward.Type == "Stat" and reward.Stat or reward.Type, os.clock()
+    local buffType = reward.Type == "Stat" and reward.Stat or reward.Type
     state.Buffs[buffType] = state.Buffs[buffType] or {}
+    StateService.TickBuffType(state, buffType)
     local incomingPriority = WheelConfig.RarityPriority[reward.Rarity] or 0
-    local bestHigher
     for _, existing in ipairs(state.Buffs[buffType]) do
-        if existing.ExpiresAt > now then
-            local existingPriority = WheelConfig.RarityPriority[existing.Rarity] or 0
-            if existingPriority > incomingPriority then
-                bestHigher = existing
-            elseif existing.Key == key and existingPriority == incomingPriority then
-                existing.ExpiresAt += reward.BaseDuration
-                existing.Stacks = (existing.Stacks or 1) + 1
-                return existing
-            end
+        local existingPriority = WheelConfig.RarityPriority[existing.Rarity] or 0
+        if existing.Key == key and existingPriority == incomingPriority then
+            existing.Remaining = (existing.Remaining or 0) + reward.BaseDuration
+            existing.Stacks = (existing.Stacks or 1) + 1
+            return existing
         end
     end
-    if bestHigher then
-        bestHigher.SuppressedLowerStack = true
-        return bestHigher
-    end
-    for index = #state.Buffs[buffType], 1, -1 do
-        local existing = state.Buffs[buffType][index]
-        if (WheelConfig.RarityPriority[existing.Rarity] or 0) < incomingPriority then table.remove(state.Buffs[buffType], index) end
-    end
-    local stack = { Key = key, NameKey = reward.NameKey, Rarity = reward.Rarity, Value = reward.Value, Level = reward.Level, Icon = reward.Icon, Interval = reward.Interval, MultiRolls = reward.MultiRolls, Stacks = 1, ExpiresAt = now + reward.BaseDuration }
+    local stack = { Key = key, NameKey = reward.NameKey, Rarity = reward.Rarity, Value = reward.Value, Level = reward.Level, Icon = reward.Icon, Interval = reward.Interval, MultiRolls = reward.MultiRolls, Stacks = 1, Remaining = reward.BaseDuration }
     table.insert(state.Buffs[buffType], stack)
+    StateService.TickBuffType(state, buffType)
     return stack
+end
+
+function StateService.AbilityLevel(player, abilityKey)
+    local state = StateService.Get(player)
+    if not state then return 1 end
+    return math.max(1, state.AbilityLevels[abilityKey] or 1)
+end
+
+function StateService.RarityCapForAbility(player, abilityKey)
+    local level = StateService.AbilityLevel(player, abilityKey)
+    local cap = WheelConfig.AbilityLevelCaps[level] or "Mythic"
+    return WheelConfig.RarityPriority[cap] or 5, cap
 end
 
 function StateService.AddCardBuff(player, key, card)
     local state = StateService.Get(player)
     if not state then return end
-    local abilityKey, now = card.AbilityKey or key, os.clock()
+    local abilityKey = card.AbilityKey or key
     local buffType = "Skill_" .. abilityKey
     state.Buffs[buffType] = state.Buffs[buffType] or {}
+    StateService.TickBuffType(state, buffType)
     local level = card.Level or (WheelConfig.RarityPriority[card.Rarity] or 1)
     local duration = card.Duration or 60
     for _, existing in ipairs(state.Buffs[buffType]) do
-        if existing.ExpiresAt > now then
-            local existingLevel = existing.Level or (WheelConfig.RarityPriority[existing.Rarity] or 1)
-            if existingLevel > level then
-                existing.SuppressedLowerStack = true
-                return existing, false
-            elseif existing.Key == key and existingLevel == level then
-                existing.ExpiresAt += duration
-                existing.Stacks = (existing.Stacks or 1) + 1
-                return existing, false
-            end
+        local existingLevel = existing.Level or (WheelConfig.RarityPriority[existing.Rarity] or 1)
+        if existing.Key == key and existingLevel == level then
+            existing.Remaining = (existing.Remaining or 0) + duration
+            existing.Stacks = (existing.Stacks or 1) + 1
+            return existing, false
         end
     end
-    for index = #state.Buffs[buffType], 1, -1 do
-        local existing = state.Buffs[buffType][index]
-        if (existing.Level or (WheelConfig.RarityPriority[existing.Rarity] or 1)) < level then table.remove(state.Buffs[buffType], index) end
-    end
-    local stack = { Key = key, AbilityKey = abilityKey, NameKey = card.NameKey, Rarity = card.Rarity, Value = 1, Level = level, Icon = card.Icon, SkillId = card.SkillId, ScriptName = card.ScriptName, Parameters = card.Parameters or {}, TriggerInterval = card.TriggerInterval or 1, Stacks = 1, ExpiresAt = now + duration }
+    local stack = { Key = key, AbilityKey = abilityKey, NameKey = card.NameKey, Rarity = card.Rarity, Value = 1, Level = level, Icon = card.Icon, SkillId = card.SkillId, ScriptName = card.ScriptName, Parameters = card.Parameters or {}, TriggerInterval = card.TriggerInterval or 1, Stacks = 1, Remaining = duration }
     table.insert(state.Buffs[buffType], stack)
+    StateService.TickBuffType(state, buffType)
     return stack, true
 end
 
@@ -807,20 +885,22 @@ function StateService.ActiveBuffs(player)
     local state = StateService.Get(player)
     local active, now = {}, os.clock()
     if not state then return active end
-    for buffType, stacks in pairs(state.Buffs) do
-        local best
-        for _, stack in ipairs(stacks) do
-            if stack.ExpiresAt > now then
-                local priority = WheelConfig.RarityPriority[stack.Rarity] or 0
-                local bestPriority = best and (WheelConfig.RarityPriority[best.Rarity] or 0) or -1
-                if priority > bestPriority or (priority == bestPriority and (stack.Level or 0) > (best.Level or 0)) then best = stack end
-            end
-        end
+    for buffType in pairs(state.Buffs) do
+        local best = StateService.TickBuffType(state, buffType)
         if best then
-            active[buffType] = { Name = text(best.NameKey), Rarity = best.Rarity, Value = best.Value or best.Level or 0, Remaining = math.max(0, math.floor(best.ExpiresAt - now)), Icon = best.Icon or "", OutlineColor = WheelConfig.RarityColors[best.Rarity] or Color3.fromRGB(255, 255, 255), Interval = best.Interval, MultiRolls = best.MultiRolls, Level = best.Level or 1, SkillId = best.SkillId, Stacks = best.Stacks or 1, CooldownRemaining = math.max(0, (best.CooldownEndsAt or 0) - now), CooldownDuration = best.TriggerInterval or 0 }
+            active[buffType] = { Name = text(best.NameKey), Rarity = best.Rarity, Value = best.Value or best.Level or 0, Remaining = math.max(0, math.floor(best.Remaining or 0)), Icon = best.Icon or "", OutlineColor = WheelConfig.RarityColors[best.Rarity] or Color3.fromRGB(255, 255, 255), Interval = best.Interval, MultiRolls = best.MultiRolls, Level = best.Level or 1, SkillId = best.SkillId, Stacks = best.Stacks or 1, CooldownRemaining = math.max(0, (best.CooldownEndsAt or 0) - now), CooldownDuration = best.TriggerInterval or 0 }
         end
     end
     return active
+end
+
+function StateService.GetLeaderboardSnapshot()
+    local rows = {}
+    for player, state in pairs(StateService.States) do
+        table.insert(rows, { UserId = player.UserId, Name = player.Name, CakePoints = state.CakePoints or 0, WheelPoints = state.WheelPoints or 0, WheelSpins = state.WheelSpins or 0 })
+    end
+    table.sort(rows, function(a, b) return a.CakePoints > b.CakePoints end)
+    return rows
 end
 
 function StateService.BuildInventory(player)
@@ -828,11 +908,17 @@ function StateService.BuildInventory(player)
     local inventory = { WheelRewards = {}, Cards = {} }
     if not state then return inventory end
     for key, reward in pairs(WheelConfig.Rewards) do
-        if reward.IsUnlockedDefault or state.UnlockedWheelRewards[key] == true then table.insert(inventory.WheelRewards, { Key = key, Name = text(reward.NameKey), Owned = true, Icon = reward.Icon or "" }) end
+        if reward.IsUnlockedDefault or state.UnlockedWheelRewards[key] == true then
+            local level = state.AbilityLevels[key] or 1
+            table.insert(inventory.WheelRewards, { Key = key, Name = text(reward.NameKey), Owned = true, Icon = reward.Icon or "", AbilityLevel = level, RarityCap = WheelConfig.AbilityLevelCaps[level] or "Mythic", UpgradeCost = WheelConfig.AbilityUpgradeCosts[level] })
+        end
     end
     local SkillConfig = require(Configs.SkillConfig)
     for key, card in pairs(SkillConfig.Cards) do
-        if card.IsUnlockedDefault or state.UnlockedCards[key] == true then table.insert(inventory.Cards, { Key = key, Name = text(card.NameKey), Owned = true, Icon = card.Icon or "" }) end
+        if card.IsUnlockedDefault or state.UnlockedCards[key] == true then
+            local level = state.AbilityLevels[key] or 1
+            table.insert(inventory.Cards, { Key = key, Name = text(card.NameKey), Owned = true, Icon = card.Icon or "", AbilityLevel = level, RarityCap = WheelConfig.AbilityLevelCaps[level] or "Mythic", UpgradeCost = WheelConfig.AbilityUpgradeCosts[level] })
+        end
     end
     return inventory
 end
@@ -850,6 +936,7 @@ function StateService.Push(player)
         PendingCardDraw = state.PendingCardDraw, LastWheelReward = wheelReward,
         ActiveBuffs = StateService.ActiveBuffs(player), UnlockedWheelRewards = state.UnlockedWheelRewards, UnlockedCards = state.UnlockedCards,
         Inventory = StateService.BuildInventory(player),
+        ShopItems = StateService.BuildShop and StateService.BuildShop(state) or nil,
     })
 end
 return StateService
@@ -1194,6 +1281,8 @@ function CakeService.StartPlayer(player)
         while player.Parent do
             local character = player.Character or player.CharacterAdded:Wait()
             character:WaitForChild("HumanoidRootPart", 10)
+            local humanoid = character:FindFirstChildOfClass("Humanoid")
+            if humanoid then humanoid.WalkSpeed = 16 + StateService.EffectiveStat(player, "PlayerSpeed") end
             local ok, err = pcall(CakeService.SpawnNear, player)
             if not ok then
                 warn("Cake Rain RNG: spawn failed; rain will continue", err)
@@ -1243,10 +1332,11 @@ return RewardTemplate
 ]=]
 
 local rewardDefinitions = {
-    EatSpeed = { BuffType = "EatSpeed", Overrides = "{ Type = \"Stat\", Stat = \"EatSpeed\" }", ByRarity = "{ Common = { Value = 1 }, Rare = { Value = 2 }, Epic = { Value = 3 }, Legendary = { Value = 5 }, Mythic = { Value = 8 } }" },
-    GlowRate = { BuffType = "GlowCakeRate", ByRarity = "{ Common = { Value = 0.05, Duration = 20 }, Rare = { Value = 0.10, Duration = 20 }, Epic = { Value = 0.18, Duration = 22 }, Legendary = { Value = 0.30, Duration = 24 }, Mythic = { Value = 0.50, Duration = 26 } }" },
-    AutoRoll = { BuffType = "AutoRoll", ByRarity = "{ Common = { Interval = 1.0, MultiRolls = 1, Duration = 180 }, Rare = { Interval = 0.9, MultiRolls = 2, Duration = 180 }, Epic = { Interval = 0.8, MultiRolls = 3, Duration = 190 }, Legendary = { Interval = 0.7, MultiRolls = 4, Duration = 200 }, Mythic = { Interval = 0.6, MultiRolls = 5, Duration = 210 } }" },
-    WheelHaste = { BuffType = "WheelHaste", ByRarity = "{ Common = { Value = 0.10, Duration = 120 }, Rare = { Value = 0.22, Duration = 120 }, Epic = { Value = 0.36, Duration = 130 }, Legendary = { Value = 0.52, Duration = 140 }, Mythic = { Value = 0.75, Duration = 150 } }" },
+    EatSpeed = { BuffType = "EatSpeed", Overrides = "{ Type = \"Stat\", Stat = \"EatSpeed\" }", ByRarity = "{ Common = { Value = 1, Duration = 60, MaxAbilityLevel = 3 }, Rare = { Value = 2, Duration = 70, MaxAbilityLevel = 3 }, Epic = { Value = 3, Duration = 80, MaxAbilityLevel = 3 }, Legendary = { Value = 5, Duration = 90, MaxAbilityLevel = 3 }, Mythic = { Value = 8, Duration = 105, MaxAbilityLevel = 3 } }" },
+    GlowRate = { BuffType = "GlowCakeRate", ByRarity = "{ Common = { Value = 0.05, Duration = 20, MaxAbilityLevel = 3 }, Rare = { Value = 0.10, Duration = 20, MaxAbilityLevel = 3 }, Epic = { Value = 0.18, Duration = 22, MaxAbilityLevel = 3 }, Legendary = { Value = 0.30, Duration = 24, MaxAbilityLevel = 3 }, Mythic = { Value = 0.50, Duration = 26, MaxAbilityLevel = 3 } }" },
+    AutoRoll = { BuffType = "AutoRoll", ByRarity = "{ Common = { Interval = 1.0, MultiRolls = 1, Duration = 180, MaxAbilityLevel = 3 }, Rare = { Interval = 0.9, MultiRolls = 2, Duration = 180, MaxAbilityLevel = 3 }, Epic = { Interval = 0.8, MultiRolls = 3, Duration = 190, MaxAbilityLevel = 3 }, Legendary = { Interval = 0.7, MultiRolls = 4, Duration = 200, MaxAbilityLevel = 3 }, Mythic = { Interval = 0.6, MultiRolls = 5, Duration = 210, MaxAbilityLevel = 3 } }" },
+    WheelHaste = { BuffType = "WheelHaste", ByRarity = "{ Common = { Value = 0.10, Duration = 120, MaxAbilityLevel = 3 }, Rare = { Value = 0.22, Duration = 120, MaxAbilityLevel = 3 }, Epic = { Value = 0.36, Duration = 130, MaxAbilityLevel = 3 }, Legendary = { Value = 0.52, Duration = 140, MaxAbilityLevel = 3 }, Mythic = { Value = 0.75, Duration = 150, MaxAbilityLevel = 3 } }" },
+    PlayerSpeed = { BuffType = "PlayerSpeed", Overrides = "{ Type = \"Stat\", Stat = \"PlayerSpeed\" }", ByRarity = "{ Common = { Value = 2, Duration = 90, MaxAbilityLevel = 3 }, Rare = { Value = 4, Duration = 100, MaxAbilityLevel = 3 }, Epic = { Value = 6, Duration = 110, MaxAbilityLevel = 3 }, Legendary = { Value = 8, Duration = 120, MaxAbilityLevel = 3 }, Mythic = { Value = 12, Duration = 140, MaxAbilityLevel = 3 } }" },
 }
 for scriptName, definition in pairs(rewardDefinitions) do
     local rewardScript = getOrCreate(rewardScripts, "ModuleScript", scriptName)
@@ -1262,13 +1352,14 @@ end
 local wheelLevelUpScript = getOrCreate(rewardScripts, "ModuleScript", "WheelLevelUp")
 wheelLevelUpScript.Source = [=[
 local StateService = require(script.Parent.Parent.StateService)
+local WheelConfig = require(game:GetService("ReplicatedStorage").Configs.WheelConfig)
 local Template = require(script.Parent.RewardTemplate)
 return function(player, key, reward)
-    local state = StateService.Get(player)
-    if not state then return end
-    local levelGain = math.max(1, Template.RarityLevel(reward.Rarity))
-    state.WheelLevel = math.max(1, (state.WheelLevel or 1) + levelGain)
-    return { Key = key, NameKey = reward.NameKey, Rarity = reward.Rarity, Level = state.WheelLevel, Stacks = state.WheelLevel, EffectText = "Wheel rarity cap upgraded" }
+    local levelGain = WheelConfig.WheelLevelBonusByRarity[reward.Rarity] or Template.RarityLevel(reward.Rarity)
+    local duration = WheelConfig.WheelLevelDurationByRarity[reward.Rarity] or 60
+    local stack = StateService.AddBuff(player, key, { NameKey = reward.NameKey, Rarity = reward.Rarity, Type = "WheelLevel", Value = levelGain, Level = levelGain, Icon = reward.Icon, BaseDuration = duration })
+    if stack then stack.EffectText = "+" .. tostring(levelGain) .. " wheel level for " .. tostring(duration) .. "s" end
+    return stack
 end
 ]=]
 
@@ -1311,9 +1402,8 @@ function Template.New(player, parameters)
         GetAbilityLevel = function(_, abilityKey)
             local state, best, now = StateService.Get(player), 0, os.clock()
             if not state then return best end
-            for _, stack in ipairs(state.Buffs["Skill_" .. abilityKey] or {}) do
-                if stack.ExpiresAt > now then best = math.max(best, stack.Level or 1) end
-            end
+            local stack = StateService.TickBuffType(state, "Skill_" .. abilityKey)
+            if stack then best = math.max(best, stack.Level or 1) end
             return best
         end,
     }
@@ -1413,11 +1503,13 @@ local SkillService = {}
 
 local function runStack(player, module, stack)
     task.spawn(function()
-        while player.Parent and os.clock() < stack.ExpiresAt do
+        while player.Parent and (stack.Remaining or 0) > 0 do
             local cooldown = math.max(.1, stack.TriggerInterval)
             stack.CooldownEndsAt = os.clock() + cooldown
             StateService.Push(player)
-            module.Run(player, stack.Parameters)
+            local state = StateService.Get(player)
+            local active = (state and stack.AbilityKey) and StateService.TickBuffType(state, "Skill_" .. stack.AbilityKey) or stack
+            if active == stack then module.Run(player, stack.Parameters) end
             task.wait(cooldown)
             StateService.Push(player)
         end
@@ -1442,7 +1534,7 @@ function SkillService.ResumePlayer(player)
     for buffType, stacks in pairs(state.Buffs or {}) do
         if string.sub(buffType, 1, 6) == "Skill_" then
             for _, stack in ipairs(stacks) do
-                if stack.ExpiresAt > os.clock() then
+                if (stack.Remaining or 0) > 0 then
                     local skill = SkillScripts:FindFirstChild(stack.ScriptName or stack.SkillId or "") or SkillScripts:FindFirstChild(({ PullNearest = "HookSkill", Attract = "AttractSkill", Tornado = "TornadoSkill", AntCourier = "AntSkill" })[stack.SkillId] or "")
                     if skill then runStack(player, require(skill), stack) end
                 end
@@ -1476,8 +1568,10 @@ local function weightedPick(entries)
     for key, entry in pairs(entries) do cursor += entry.Weight or 1 if roll <= cursor then return key, entry end end
 end
 local WheelLevelRarityCap = { [1] = "Rare", [2] = "Epic", [3] = "Legendary", [4] = "Mythic" }
-local function maxRarityPriority(state)
-    local cap = WheelLevelRarityCap[math.clamp(state.WheelLevel or 1, 1, 4)] or "Mythic"
+local merchantCycleStarted, merchantItems = 0, {}
+local function maxRarityPriority(player, state)
+    local timedLevel = StateService.EffectiveStat(player, "WheelLevel")
+    local cap = WheelLevelRarityCap[math.clamp(1 + timedLevel, 1, 4)] or "Mythic"
     return WheelConfig.RarityPriority[cap] or 2
 end
 local function unlockedRewards(state)
@@ -1487,12 +1581,12 @@ local function unlockedRewards(state)
     end
     return entries
 end
-local function randomRarity(state)
-    local cap, total = maxRarityPriority(state), 0
-    local weights = { Common = 650, Rare = 250, Epic = 80, Legendary = 18, Mythic = 2 }
+local function randomRarity(player, state, capOverride)
+    local cap, total = math.min(maxRarityPriority(player, state), capOverride or 999), 0
+    local weights = WheelConfig.BaseRarityWeights
     for rarity, weight in pairs(weights) do if (WheelConfig.RarityPriority[rarity] or 1) <= cap then total += weight end end
     local roll, cursor = math.random() * total, 0
-    for _, rarity in ipairs({ "Common", "Rare", "Epic", "Legendary", "Mythic" }) do
+    for _, rarity in ipairs(WheelConfig.RarityOrder) do
         local weight = weights[rarity] or 0
         if (WheelConfig.RarityPriority[rarity] or 1) <= cap then
             cursor += weight
@@ -1501,7 +1595,7 @@ local function randomRarity(state)
     end
     return "Common"
 end
-local function buildSlots(state)
+local function buildSlots(player, state)
     local pool, slots, used, count = unlockedRewards(state), {}, {}, 0
     for _ in pairs(pool) do count += 1 end
     local attempts = 0
@@ -1511,8 +1605,9 @@ local function buildSlots(state)
         if not key then break end
         if count < WheelConfig.DisplayedSlots or not used[key] then
             used[key] = true
-            local rarity = randomRarity(state)
-            table.insert(slots, { Key = key, Name = text(reward.NameKey), Rarity = rarity, Color = WheelConfig.RarityColors[rarity] })
+            local _, abilityCap = StateService.RarityCapForAbility(player, key)
+            local rarity = randomRarity(player, state, WheelConfig.RarityPriority[abilityCap])
+            table.insert(slots, { Key = key, Name = text(reward.NameKey), Rarity = rarity, Color = WheelConfig.RarityColors[rarity], Icon = reward.Icon or "" })
         end
     end
     return slots
@@ -1522,9 +1617,61 @@ local function unlockedCards(state)
     for key, card in pairs(CardConfig.Cards) do if card.IsUnlockedDefault or state.UnlockedCards[key] then entries[key] = card end end
     return entries
 end
-local function shopItem(itemId)
+local function buildCardSlots(player, state)
+    local pool, slots, used, count = unlockedCards(state), {}, {}, 0
+    for _ in pairs(pool) do count += 1 end
+    local attempts = 0
+    while #slots < WheelConfig.DisplayedSlots and attempts < 100 do
+        attempts += 1
+        local key, card = weightedPick(pool)
+        if key and (count < WheelConfig.DisplayedSlots or not used[key]) then
+            used[key] = true
+            local cap = StateService.RarityCapForAbility(player, card.AbilityKey or key)
+            local rarity = randomRarity(player, state, cap)
+            table.insert(slots, { Key = key, Name = text(card.NameKey), Rarity = rarity, Color = Color3.fromRGB(190, 195, 205), Icon = card.Icon or "" })
+        end
+    end
+    return slots
+end
+local function refreshMerchant()
+    local refreshSeconds = WheelConfig.ServerMerchant.RefreshSeconds or 240
+    if os.clock() - merchantCycleStarted < refreshSeconds and #merchantItems > 0 then return end
+    merchantCycleStarted, merchantItems = os.clock(), {}
+    local pool, used = ShopConfig.MysteryMerchantPool or {}, {}
+    while #merchantItems < (WheelConfig.ServerMerchant.SlotCount or 3) and #merchantItems < #pool do
+        local key, item = weightedPick(pool)
+        if item and not used[item.Id] then
+            used[item.Id] = true
+            table.insert(merchantItems, table.clone(item))
+        end
+    end
+end
+local function visibleShopItems(state)
+    refreshMerchant()
+    local items = { Normal = {}, Merchant = {}, MerchantRefreshRemaining = math.max(0, math.floor((WheelConfig.ServerMerchant.RefreshSeconds or 240) - (os.clock() - merchantCycleStarted))) }
     for _, section in ipairs({ ShopConfig.WheelPointShop, ShopConfig.CakePointShop }) do
-        for _, item in ipairs(section) do if item.Id == itemId then return item end end
+        for _, item in ipairs(section) do
+            local grants = item.Grants or item.Id
+            local alreadyUnlocked = (item.UnlockType == "WheelReward" and state.UnlockedWheelRewards[grants]) or (item.UnlockType == "Card" and state.UnlockedCards[grants])
+            if not state.OwnedItems[item.Id] and not state.OwnedItems[grants] and not alreadyUnlocked then table.insert(items.Normal, item) end
+        end
+    end
+    local cycleKey = "MerchantCycle_" .. tostring(math.floor(merchantCycleStarted))
+    state.MerchantPurchases = state.MerchantPurchases or {}
+    state.MerchantPurchases[cycleKey] = state.MerchantPurchases[cycleKey] or {}
+    for _, item in ipairs(merchantItems) do if not state.MerchantPurchases[cycleKey][item.Id] then table.insert(items.Merchant, item) end end
+    return items
+end
+StateService.BuildShop = visibleShopItems
+
+local function shopItem(state, itemId)
+    refreshMerchant()
+    for _, section in ipairs({ ShopConfig.WheelPointShop, ShopConfig.CakePointShop, merchantItems }) do
+        for _, item in ipairs(section) do
+            local grants = item.Grants or item.Id
+            local alreadyUnlocked = not string.find(item.Id, "^Merchant_") and ((item.UnlockType == "WheelReward" and state.UnlockedWheelRewards[grants]) or (item.UnlockType == "Card" and state.UnlockedCards[grants]))
+            if item.Id == itemId and not state.OwnedItems[item.Id] and not state.OwnedItems[grants] and not alreadyUnlocked then return item end
+        end
     end
 end
 
@@ -1556,7 +1703,7 @@ function WheelService.Start()
         for _ = 1, count do
             state.WheelSpins -= 1
             state.WheelPoints += 1
-            local slots = buildSlots(state)
+            local slots = buildSlots(player, state)
             if #slots == 0 then break end
             local pickedIndex = math.random(1, #slots)
             local picked = slots[pickedIndex]
@@ -1573,27 +1720,51 @@ function WheelService.Start()
         local state = StateService.Get(player)
         if not state or not state.PendingCardDraw then return { Ok = false, Error = "NO_CARD_DRAW" } end
         state.PendingCardDraw = false
-        local cards = unlockedCards(state)
-        local key, card = weightedPick(cards)
-        if card then card = table.clone(card); card.Rarity = randomRarity(state) end
+        local slots = buildCardSlots(player, state)
+        local pickedIndex = #slots > 0 and math.random(1, #slots) or 0
+        local picked = slots[pickedIndex]
+        local key, card = picked and picked.Key, picked and CardConfig.Cards[picked.Key]
+        if card then card = table.clone(card); card.Rarity = picked.Rarity end
         local stack = card and SkillService.Activate(player, key, card)
         StateService.Push(player)
-        return { Ok = true, Card = card and { Key = key, Name = text(card.NameKey), Rarity = card.Rarity, Duration = card.Duration, Effect = card.SkillId, Level = card.Level or 1, Stacks = stack and stack.Stacks or 1 } or nil }
+        return { Ok = true, Slots = slots, PickedIndex = pickedIndex, Card = card and { Key = key, Name = text(card.NameKey), Rarity = card.Rarity, Duration = card.Duration, Effect = card.SkillId, Level = card.Level or 1, Stacks = stack and stack.Stacks or 1 } or nil }
     end
 
     Events.RequestShopPurchase.OnServerInvoke = function(player, itemId)
-        local state, item = StateService.Get(player), shopItem(itemId)
+        local state = StateService.Get(player)
+        local item = state and shopItem(state, itemId)
         if not state or not item then return { Ok = false, Error = "INVALID_ITEM" } end
         if item.Currency == "WheelPoints" and state.WheelPoints < item.Cost then return { Ok = false, Error = "NO_WHEEL_POINTS" } end
         if item.Currency == "CakePoints" and state.CakePoints < item.Cost then return { Ok = false, Error = "NO_CAKE_POINTS" } end
         state[item.Currency] = state[item.Currency] - item.Cost
-        state.OwnedItems[item.Id] = true
-        if item.UnlockType == "WheelReward" then state.UnlockedWheelRewards[item.Id] = true end
-        if item.UnlockType == "Card" then state.UnlockedCards[item.Id] = true end
+        local grants = item.Grants or item.Id
+        if not string.find(item.Id, "^Merchant_") then state.OwnedItems[item.Id] = true end
+        if item.UnlockType == "WheelReward" then state.UnlockedWheelRewards[grants] = true end
+        if item.UnlockType == "Card" then state.UnlockedCards[grants] = true end
+        if string.find(item.Id, "^Merchant_") then
+            local cycleKey = "MerchantCycle_" .. tostring(math.floor(merchantCycleStarted))
+            state.MerchantPurchases = state.MerchantPurchases or {}
+            state.MerchantPurchases[cycleKey] = state.MerchantPurchases[cycleKey] or {}
+            state.MerchantPurchases[cycleKey][item.Id] = true
+        end
         StateService.UpdateLeaderstats(player)
         StateService.Push(player)
         return { Ok = true }
     end
+    Events.RequestAbilityUpgrade.OnServerInvoke = function(player, abilityKey)
+        local state = StateService.Get(player)
+        if not state then return { Ok = false, Error = "NO_STATE" } end
+        local nextLevel = math.max(1, state.AbilityLevels[abilityKey] or 1)
+        local cost = WheelConfig.AbilityUpgradeCosts[nextLevel]
+        if not cost then return { Ok = false, Error = "MAX_LEVEL" } end
+        if state.CakePoints < cost then return { Ok = false, Error = "NO_CAKE_POINTS" } end
+        state.CakePoints -= cost
+        state.AbilityLevels[abilityKey] = nextLevel + 1
+        StateService.UpdateLeaderstats(player)
+        StateService.Push(player)
+        return { Ok = true, Level = state.AbilityLevels[abilityKey] }
+    end
+
 end
 
 return WheelService
@@ -1655,6 +1826,7 @@ local Configs = ReplicatedStorage:WaitForChild("Configs")
 local RequestWheelSpin = Events:WaitForChild("RequestWheelSpin")
 local RequestCardDraw = Events:WaitForChild("RequestCardDraw")
 local RequestShopPurchase = Events:WaitForChild("RequestShopPurchase")
+local RequestAbilityUpgrade = Events:WaitForChild("RequestAbilityUpgrade")
 local UpdateClientState = Events:WaitForChild("UpdateClientState")
 local LocalizationConfig = require(Configs:WaitForChild("LocalizationConfig"))
 local ShopConfig = require(Configs:WaitForChild("ShopConfig"))
@@ -1665,8 +1837,12 @@ local L = LocalizationConfig["en-us"]
 local gui = player:WaitForChild("PlayerGui"):WaitForChild("CakeRainRNGHUD")
 local stats = gui:WaitForChild("StatsFrame")
 local wheel = gui:WaitForChild("WheelPanel")
+local silverWheel = gui:WaitForChild("SilverWheelPanel")
+local wheelModeButton = gui:WaitForChild("WheelModeButton")
+local silverModeButton = gui:WaitForChild("SilverModeButton")
 local disc = wheel:WaitForChild("WheelDisc")
 local spinButton = wheel:WaitForChild("SpinButton")
+local silverSpinButton = silverWheel:WaitForChild("SpinButton")
 local autoRollToggle = wheel:WaitForChild("AutoRollToggle")
 local buffFrame = gui:WaitForChild("EffectBar")
 local tooltip = buffFrame:WaitForChild("Tooltip")
@@ -1686,6 +1862,8 @@ local spinning = false
 local autoRollEnabled = false
 local autoRollThread = nil
 local wheelRewardGeneration = 0
+local activeWheelMode = "Normal"
+local silverSpinning = false
 
 local function buttonLabel(item)
     local name = L[item.NameKey] or item.NameKey
@@ -1694,13 +1872,20 @@ end
 
 local function bindShopButtons()
     local grid, template = shopHub:WaitForChild("ShopGrid"), shopHub.ShopGrid:WaitForChild("ItemTemplate")
+    for _, child in ipairs(grid:GetChildren()) do
+        if child:IsA("ImageButton") and child.Name ~= "ItemTemplate" then child:Destroy() end
+    end
     local items = {}
-    for _, item in ipairs(ShopConfig.WheelPointShop) do table.insert(items, item) end
-    for _, item in ipairs(ShopConfig.CakePointShop) do table.insert(items, item) end
+    for _, item in ipairs((state.ShopItems and state.ShopItems.Normal) or {}) do table.insert(items, item) end
+    for _, item in ipairs((state.ShopItems and state.ShopItems.Merchant) or {}) do table.insert(items, item) end
+    if #items == 0 then
+        for _, item in ipairs(ShopConfig.WheelPointShop) do table.insert(items, item) end
+        for _, item in ipairs(ShopConfig.CakePointShop) do table.insert(items, item) end
+    end
     for index, item in ipairs(items) do
         local button = template:Clone()
         button.Name, button.Visible, button.LayoutOrder = "Item" .. index, true, index
-        button.ItemName.Text = L[item.NameKey] or item.NameKey
+        button.ItemName.Text = (L[item.NameKey] or item.NameKey) .. (string.find(item.Id, "^Merchant_") and " ★" or "")
         button.Icon.Image = item.Icon or ""
         button.ItemCost.Text = string.format("%s %d", item.Currency == "WheelPoints" and "Wheel Points" or "Cake Points", item.Cost)
         button.Activated:Connect(function() RequestShopPurchase:InvokeServer(item.Id) end)
@@ -1750,6 +1935,15 @@ local function refreshEffectBar()
     buffFrame.Visible = index > 0
 end
 
+local selectedAbilityKey
+local function showAbilityDetail(item)
+    selectedAbilityKey = item.Key
+    local detail = bagPanel:WaitForChild("DetailPanel")
+    detail.DetailText.Text = string.format("%s\nLevel: %d\nMax draw rarity now: %s", item.Name, item.AbilityLevel or 1, item.RarityCap or "Mythic")
+    detail.UpgradeButton.Visible = item.UpgradeCost ~= nil
+    detail.UpgradeButton.Text = item.UpgradeCost and string.format("Upgrade - %d Cake", item.UpgradeCost) or "Max Level"
+end
+
 local function addBagTile(template, item, order)
     if not item.Owned then return end
     local tile = template:Clone()
@@ -1760,12 +1954,17 @@ local function addBagTile(template, item, order)
     tile.ItemName.Text = item.Name
     tile.BackgroundColor3 = Color3.fromRGB(58, 96, 78)
     tile.Parent = template.Parent
+    tile.InputBegan:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+            showAbilityDetail(item)
+        end
+    end)
 end
 
 local function refreshBag()
     local list = bagPanel:WaitForChild("BagList")
     local template = list:WaitForChild("EntryTemplate")
-    for _, child in ipairs(list:GetChildren()) do if child:IsA("ImageLabel") and child.Name ~= "EntryTemplate" then child:Destroy() end end
+    for _, child in ipairs(list:GetChildren()) do if child:IsA("ImageButton") and child.Name ~= "EntryTemplate" then child:Destroy() end end
     local order = 0
     for _, item in ipairs((state.Inventory and state.Inventory.WheelRewards) or {}) do
         order += 1
@@ -1787,8 +1986,9 @@ local function refreshStats()
     autoRollToggle.Visible = autoAvailable
     autoRollToggle.Text = autoRollEnabled and "Auto-Roll: ON" or "Auto-Roll: OFF"
     autoRollToggle.BackgroundColor3 = autoRollEnabled and Color3.fromRGB(95, 190, 120) or Color3.fromRGB(80, 95, 120)
-    wheel.Visible = state.WheelSpins > 0 or spinning or autoAvailable
-    cardFrame.Visible = state.PendingCardDraw
+    wheel.Visible = activeWheelMode == "Normal" and (state.WheelSpins > 0 or spinning or autoAvailable)
+    silverWheel.Visible = activeWheelMode == "Silver" and (state.PendingCardDraw or silverSpinning)
+    cardFrame.Visible = false
     local reward = state.LastWheelReward
     currentDrawLabel.Visible = reward ~= nil
     if reward then
@@ -1800,6 +2000,7 @@ local function refreshStats()
     end
     refreshEffectBar()
     refreshBag()
+    bindShopButtons()
 end
 
 local function paintSlots(slots, pickedIndex)
@@ -1809,6 +2010,10 @@ local function paintSlots(slots, pickedIndex)
         local slot = slots and slots[index]
         if sector and label and slot then
             label.Text = slot.Name
+            if sector:FindFirstChild("Icon") then sector.Icon.Image = slot.Icon or "" end
+            sector.Rotation = sector:GetAttribute("WheelAngle") or 0
+            label.Rotation = -(sector:GetAttribute("WheelAngle") or 0)
+            if sector:FindFirstChild("Icon") then sector.Icon.Rotation = -(sector:GetAttribute("WheelAngle") or 0) end
             sector.BackgroundColor3 = slot.Color or Color3.fromRGB(95, 63, 145)
             sector.BackgroundTransparency = index == pickedIndex and 0 or 0.12
         elseif label then
@@ -1849,6 +2054,10 @@ local function paintPanelSlots(panel, slots, pickedIndex)
         local slot = slots and slots[index]
         if sector and label and slot then
             label.Text = slot.Name
+            if sector:FindFirstChild("Icon") then sector.Icon.Image = slot.Icon or "" end
+            sector.Rotation = sector:GetAttribute("WheelAngle") or 0
+            label.Rotation = -(sector:GetAttribute("WheelAngle") or 0)
+            if sector:FindFirstChild("Icon") then sector.Icon.Rotation = -(sector:GetAttribute("WheelAngle") or 0) end
             sector.BackgroundColor3 = slot.Color or Color3.fromRGB(95, 63, 145)
             sector.BackgroundTransparency = index == pickedIndex and 0 or 0.12
         elseif label then
@@ -1936,6 +2145,25 @@ local function ensureAutoRollLoop()
     end)
 end
 
+local function performSilverDraw()
+    if silverSpinning or not state.PendingCardDraw then return end
+    silverSpinning = true
+    refreshStats()
+    local result = RequestCardDraw:InvokeServer()
+    if result and result.Ok then
+        playWheelAnimation(silverWheel, result.Slots or {}, result.PickedIndex or 1, 1)
+        if result.Card then
+            cardResult.Text = result.Card.Name .. " Lv." .. tostring(result.Card.Level or 1) .. " [" .. result.Card.Rarity .. "]"
+        end
+    end
+    silverSpinning = false
+    refreshStats()
+end
+
+wheelModeButton.Activated:Connect(function() activeWheelMode = "Normal"; refreshStats() end)
+silverModeButton.Activated:Connect(function() activeWheelMode = "Silver"; refreshStats() end)
+silverSpinButton.Activated:Connect(performSilverDraw)
+
 spinButton.Activated:Connect(function()
     performSpin()
 end)
@@ -1948,6 +2176,8 @@ autoRollToggle.Activated:Connect(function()
 end)
 
 drawButton.Activated:Connect(function()
+    performSilverDraw()
+    if true then return end
     if drawButton:GetAttribute("Spinning") then return end
     drawButton:SetAttribute("Spinning", true)
     for tick = 1, 14 do
@@ -1978,6 +2208,10 @@ end)
 closeShop.Activated:Connect(function()
     shopHub.Visible = false
 end)
+bagPanel.DetailPanel.UpgradeButton.Activated:Connect(function()
+    if selectedAbilityKey then RequestAbilityUpgrade:InvokeServer(selectedAbilityKey) end
+end)
+
 closeBag.Activated:Connect(function()
     bagPanel.Visible = false
 end)
