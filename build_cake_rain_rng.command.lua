@@ -57,18 +57,11 @@ local WheelConfig = {
         SSR = Color3.fromRGB(120, 255, 255),
     },
     Rewards = {
-        EatSpeed_Common = { ScriptName = "EatSpeedCommon", NameKey = "Reward_EatSpeed_Common", Rarity = "Common", Weight = 300, BaseDuration = 60, Type = "Stat", Stat = "EatSpeed", Value = 1, Icon = "rbxassetid://6031265976", IsUnlockedDefault = true },
-        EatSpeed_Rare = { ScriptName = "EatSpeedRare", NameKey = "Reward_EatSpeed_Rare", Rarity = "Rare", Weight = 110, BaseDuration = 60, Type = "Stat", Stat = "EatSpeed", Value = 2, Icon = "rbxassetid://6031265976", IsUnlockedDefault = true },
-        EatSpeed_Epic = { ScriptName = "EatSpeedEpic", NameKey = "Reward_EatSpeed_Epic", Rarity = "Epic", Weight = 35, BaseDuration = 60, Type = "Stat", Stat = "EatSpeed", Value = 3, Icon = "rbxassetid://6031265976", IsUnlockedDefault = true },
-        EatSpeed_Legendary = { ScriptName = "EatSpeedLegendary", NameKey = "Reward_EatSpeed_Legendary", Rarity = "Legendary", Weight = 10, BaseDuration = 60, Type = "Stat", Stat = "EatSpeed", Value = 5, Icon = "rbxassetid://6031265976", IsUnlockedDefault = true },
-        EatSpeed_Mythic = { ScriptName = "EatSpeedMythic", NameKey = "Reward_EatSpeed_Mythic", Rarity = "Mythic", Weight = 2, BaseDuration = 60, Type = "Stat", Stat = "EatSpeed", Value = 8, Icon = "rbxassetid://6031265976", IsUnlockedDefault = true },
-        GlowCakeBoost_Rare = { ScriptName = "GlowRate", NameKey = "Reward_GlowBoost_Rare", Rarity = "Rare", Weight = 50, BaseDuration = 20, Type = "GlowCakeRate", Value = 0.10, Level = 1, Icon = "rbxassetid://6031075938", IsUnlockedDefault = false, UnlockCostWheelPoints = 50 },
-        GlowCakeBoost_Mythic = { ScriptName = "GlowRate", NameKey = "Reward_GlowBoost_Mythic", Rarity = "Mythic", Weight = 5, BaseDuration = 20, Type = "GlowCakeRate", Value = 0.50, Level = 3, Icon = "rbxassetid://6031075938", IsUnlockedDefault = false, UnlockCostWheelPoints = 200 },
-        AutoRoll_Common = { ScriptName = "AutoRoll", NameKey = "Reward_AutoRoll_Common", Rarity = "Common", Weight = 50, BaseDuration = 180, Type = "AutoRoll", Level = 1, Interval = 1.0, MultiRolls = 1, Icon = "rbxassetid://6031094678", IsUnlockedDefault = true },
-        AutoRoll_Rare = { ScriptName = "AutoRoll", NameKey = "Reward_AutoRoll_Rare", Rarity = "Rare", Weight = 28, BaseDuration = 180, Type = "AutoRoll", Level = 2, Interval = 0.9, MultiRolls = 2, Icon = "rbxassetid://6031094678", IsUnlockedDefault = true },
-        WheelHaste_Common = { ScriptName = "WheelHaste", NameKey = "Reward_WheelHaste_Common", Rarity = "Common", Weight = 65, BaseDuration = 120, Type = "WheelHaste", Level = 1, Value = 0.10, Icon = "rbxassetid://6031094678", IsUnlockedDefault = true },
-        WheelHaste_Rare = { ScriptName = "WheelHaste", NameKey = "Reward_WheelHaste_Rare", Rarity = "Rare", Weight = 26, BaseDuration = 120, Type = "WheelHaste", Level = 2, Value = 0.22, Icon = "rbxassetid://6031094678", IsUnlockedDefault = true },
-        WheelLevelUp_Common = { ScriptName = "WheelLevelUp", NameKey = "Reward_WheelLevelUp_Common", Rarity = "Common", Weight = 55, Type = "WheelLevelUp", LevelGain = 1, Icon = "rbxassetid://6031075938", IsUnlockedDefault = true },
+        EatSpeed = { ScriptName = "EatSpeed", NameKey = "Reward_EatSpeed", Weight = 300, IsUnlockedDefault = true },
+        GlowCakeBoost = { ScriptName = "GlowRate", NameKey = "Reward_GlowBoost", Weight = 50, IsUnlockedDefault = false, UnlockCostWheelPoints = 50 },
+        AutoRoll = { ScriptName = "AutoRoll", NameKey = "Reward_AutoRoll", Weight = 50, IsUnlockedDefault = true },
+        WheelHaste = { ScriptName = "WheelHaste", NameKey = "Reward_WheelHaste", Weight = 65, IsUnlockedDefault = true },
+        WheelLevelUp = { ScriptName = "WheelLevelUp", NameKey = "Reward_WheelLevelUp", Weight = 55, IsUnlockedDefault = true },
     },
 }
 return WheelConfig
@@ -83,8 +76,7 @@ local LocalizationConfig = {
         UI_WheelShop_Title = "轉盤點數商店", UI_Time_Left = "剩餘時間: ", UI_No_Buff = "目前沒有 Buff", UI_Spin = "旋轉",
         UI_Card_Draw = "發光蛋糕抽卡", UI_Open_Shop = "商店", UI_Close = "關閉", UI_Buy = "購買",
         Cake_Common = "普通蛋糕", Cake_Rare = "稀有蛋糕", Cake_Epic = "史詩蛋糕", Cake_Legendary = "傳說蛋糕", Cake_Mythic = "神話蛋糕", Cake_Special = "發光蛋糕",
-        Reward_EatSpeed_Common = "+1 吞食速度 (普通)", Reward_EatSpeed_Rare = "+2 吞食速度 (稀有)", Reward_EatSpeed_Epic = "+3 吞食速度 (史詩)", Reward_EatSpeed_Legendary = "+5 吞食速度 (傳說)", Reward_EatSpeed_Mythic = "+8 吞食速度 (神話)",
-        Reward_GlowBoost_Rare = "+10% 發光蛋糕率 (20秒)", Reward_GlowBoost_Mythic = "+50% 發光蛋糕率 (20秒)", Reward_AutoRoll_Common = "初級自動抽獎 (普通)", Reward_AutoRoll_Rare = "進階自動抽獎 x2 (稀有)", Reward_WheelHaste_Common = "轉盤加速 I", Reward_WheelHaste_Rare = "轉盤加速 II", Reward_WheelLevelUp_Common = "轉盤等級 +1",
+        Reward_EatSpeed = "吞食速度提升", Reward_GlowBoost = "發光蛋糕率提升", Reward_AutoRoll = "自動抽獎", Reward_WheelHaste = "轉盤加速", Reward_WheelLevelUp = "轉盤等級提升",
         Card_Hook = "勾索", Card_Tornado = "龍捲風", Card_Ant = "螞蟻運輸隊", Card_Attract = "蛋糕吸引",
     },
     ["en-us"] = {
@@ -93,8 +85,7 @@ local LocalizationConfig = {
         UI_WheelShop_Title = "Wheel Point Shop", UI_Time_Left = "Time Left: ", UI_No_Buff = "No Active Buff", UI_Spin = "Spin",
         UI_Card_Draw = "Glow Cake Card Draw", UI_Open_Shop = "Shop", UI_Close = "Close", UI_Buy = "Buy",
         Cake_Common = "Common Cake", Cake_Rare = "Rare Cake", Cake_Epic = "Epic Cake", Cake_Legendary = "Legendary Cake", Cake_Mythic = "Mythic Cake", Cake_Special = "Glow Cake",
-        Reward_EatSpeed_Common = "+1 Eat Speed (Common)", Reward_EatSpeed_Rare = "+2 Eat Speed (Rare)", Reward_EatSpeed_Epic = "+3 Eat Speed (Epic)", Reward_EatSpeed_Legendary = "+5 Eat Speed (Legendary)", Reward_EatSpeed_Mythic = "+8 Eat Speed (Mythic)",
-        Reward_GlowBoost_Rare = "+10% Glow Cake Spawn (20s)", Reward_GlowBoost_Mythic = "+50% Glow Cake Spawn (20s)", Reward_AutoRoll_Common = "Basic Auto-Roll (Common)", Reward_AutoRoll_Rare = "Advanced Auto-Roll x2 (Rare)", Reward_WheelHaste_Common = "Wheel Haste I", Reward_WheelHaste_Rare = "Wheel Haste II", Reward_WheelLevelUp_Common = "Wheel Level +1",
+        Reward_EatSpeed = "Eat Speed Up", Reward_GlowBoost = "Glow Cake Rate Up", Reward_AutoRoll = "Auto-Roll", Reward_WheelHaste = "Wheel Haste", Reward_WheelLevelUp = "Wheel Level Up",
         Card_Hook = "Grappling Hook", Card_Tornado = "Tornado", Card_Ant = "Ant Courier", Card_Attract = "Cake Attraction",
     },
 }
@@ -110,7 +101,7 @@ local CakeConfig = {
     SpawnInterval = 1.25,
     SpawnRadius = 55,
     SpawnHeight = 85,
-    MaxCakesPerPlayer = 18,
+    -- Cake count is intentionally unbounded; CakeLifetimeSeconds is the cleanup limiter.
     GlowBaseChance = 0.03,
     InitialBurstCount = 6,
     MeteorFallSpeed = 105,
@@ -142,16 +133,14 @@ return CakeConfig
 
 local skillConfig = getOrCreate(configsFolder, "ModuleScript", "SkillConfig")
 skillConfig.Source = [=[
--- Add a card by declaring SkillId, Duration, TriggerInterval and Parameters here,
--- then implement the matching handler in SkillService.  Purchase policy stays on the card.
+-- Card config stays lightweight: each card declares only identity, weight, unlock policy, and script routing.
+-- Rarity-specific duration, intervals, parameters, and effect strength belong in the matching skill script.
 local SkillConfig = {
     Cards = {
-        Card_Hook_Rare = { NameKey = "Card_Hook", Rarity = "Rare", Weight = 20, Duration = 60, SkillId = "PullNearest", ScriptName = "HookSkill", AbilityKey = "Card_Hook", Level = 1, TriggerInterval = 5, Parameters = { Count = 1, Distance = 2 }, Icon = "rbxassetid://6031068421", IsUnlockedDefault = true },
-        Card_Hook_Epic = { NameKey = "Card_Hook", Rarity = "Epic", Weight = 8, Duration = 75, SkillId = "PullNearest", ScriptName = "HookSkill", AbilityKey = "Card_Hook", Level = 2, TriggerInterval = 4, Parameters = { Count = 2, Distance = 2 }, Icon = "rbxassetid://6031068421", IsUnlockedDefault = true },
-        Card_Attract_Common = { NameKey = "Card_Attract", Rarity = "Common", Weight = 45, Duration = 40, SkillId = "Attract", ScriptName = "AttractSkill", AbilityKey = "Card_Attract", Level = 1, TriggerInterval = 1, Parameters = { DamagePercentPerSecond = 0.01, Distance = 3 }, Icon = "rbxassetid://6031068421", IsUnlockedDefault = true },
-        Card_Attract_Rare = { NameKey = "Card_Attract", Rarity = "Rare", Weight = 22, Duration = 55, SkillId = "Attract", ScriptName = "AttractSkill", AbilityKey = "Card_Attract", Level = 2, TriggerInterval = 1, Parameters = { DamagePercentPerSecond = 0.018, Distance = 3 }, Icon = "rbxassetid://6031068421", IsUnlockedDefault = true },
-        Card_Tornado_Epic = { NameKey = "Card_Tornado", Rarity = "Epic", Weight = 10, Duration = 60, SkillId = "Tornado", ScriptName = "TornadoSkill", AbilityKey = "Card_Tornado", Level = 1, TriggerInterval = 10, Parameters = { Count = 5, DamagePercent = 0.40, Distance = 5 }, Icon = "rbxassetid://6031068421", IsUnlockedDefault = false, UnlockCostCakePoints = 1500 },
-        Card_Ant_Legendary = { NameKey = "Card_Ant", Rarity = "Legendary", Weight = 5, Duration = 810, SkillId = "AntCourier", ScriptName = "AntSkill", AbilityKey = "Card_Ant", Level = 1, TriggerInterval = 1, Parameters = { MinimumDistance = 14, DamagePercentPerSecond = 0.02, Distance = 4 }, Icon = "rbxassetid://6031068421", IsUnlockedDefault = false, UnlockCostCakePoints = 3000 },
+        Card_Hook = { NameKey = "Card_Hook", Weight = 20, SkillId = "PullNearest", ScriptName = "HookSkill", AbilityKey = "Card_Hook", Icon = "rbxassetid://6031068421", IsUnlockedDefault = true },
+        Card_Attract = { NameKey = "Card_Attract", Weight = 45, SkillId = "Attract", ScriptName = "AttractSkill", AbilityKey = "Card_Attract", Icon = "rbxassetid://6031068421", IsUnlockedDefault = true },
+        Card_Tornado = { NameKey = "Card_Tornado", Weight = 10, SkillId = "Tornado", ScriptName = "TornadoSkill", AbilityKey = "Card_Tornado", Icon = "rbxassetid://6031068421", IsUnlockedDefault = false, UnlockCostCakePoints = 1500 },
+        Card_Ant = { NameKey = "Card_Ant", Weight = 5, SkillId = "AntCourier", ScriptName = "AntSkill", AbilityKey = "Card_Ant", Icon = "rbxassetid://6031068421", IsUnlockedDefault = false, UnlockCostCakePoints = 3000 },
     },
 }
 return SkillConfig
@@ -168,12 +157,11 @@ shopConfig.Source = [=[
 -- Only planned purchasable gameplay cards are listed here.  Cosmetics/themes are intentionally absent.
 local ShopConfig = {
     WheelPointShop = {
-        { Id = "GlowCakeBoost_Rare", NameKey = "Reward_GlowBoost_Rare", Cost = 50, Currency = "WheelPoints", UnlockType = "WheelReward" },
-        { Id = "GlowCakeBoost_Mythic", NameKey = "Reward_GlowBoost_Mythic", Cost = 200, Currency = "WheelPoints", UnlockType = "WheelReward" },
+        { Id = "GlowCakeBoost", NameKey = "Reward_GlowBoost", Cost = 50, Currency = "WheelPoints", UnlockType = "WheelReward" },
     },
     CakePointShop = {
-        { Id = "Card_Tornado_Epic", NameKey = "Card_Tornado", Cost = 1500, Currency = "CakePoints", UnlockType = "Card" },
-        { Id = "Card_Ant_Legendary", NameKey = "Card_Ant", Cost = 3000, Currency = "CakePoints", UnlockType = "Card" },
+        { Id = "Card_Tornado", NameKey = "Card_Tornado", Cost = 1500, Currency = "CakePoints", UnlockType = "Card" },
+        { Id = "Card_Ant", NameKey = "Card_Ant", Cost = 3000, Currency = "CakePoints", UnlockType = "Card" },
     },
 }
 return ShopConfig
@@ -672,13 +660,17 @@ function StateService.AddCardBuff(player, key, card)
     state.Buffs[buffType] = state.Buffs[buffType] or {}
     -- Same ability and same level extends duration; different levels coexist and best rarity/level overrides the HUD/effect.
     for _, existing in ipairs(state.Buffs[buffType]) do
-        if existing.Key == key and existing.Level == card.Level and existing.ExpiresAt > now then
-            existing.ExpiresAt += card.Duration
+        local level = card.Level or (WheelConfig.RarityPriority[card.Rarity] or 1)
+        local duration = card.Duration or 60
+        if existing.Key == key and existing.Level == level and existing.ExpiresAt > now then
+            existing.ExpiresAt += duration
             existing.Stacks = (existing.Stacks or 1) + 1
             return existing, false
         end
     end
-    local stack = { Key = key, AbilityKey = abilityKey, NameKey = card.NameKey, Rarity = card.Rarity, Value = 1, Level = card.Level or 1, Icon = card.Icon, SkillId = card.SkillId, Parameters = card.Parameters or {}, TriggerInterval = card.TriggerInterval or 1, Stacks = 1, ExpiresAt = now + card.Duration }
+    local level = card.Level or (WheelConfig.RarityPriority[card.Rarity] or 1)
+    local duration = card.Duration or 60
+    local stack = { Key = key, AbilityKey = abilityKey, NameKey = card.NameKey, Rarity = card.Rarity, Value = 1, Level = level, Icon = card.Icon, SkillId = card.SkillId, Parameters = card.Parameters or {}, TriggerInterval = card.TriggerInterval or 1, Stacks = 1, ExpiresAt = now + duration }
     table.insert(state.Buffs[buffType], stack)
     return stack, true
 end
@@ -854,8 +846,18 @@ end
 function CakeService.Expire(cake)
     if not cake.Parent or cake:GetAttribute("Finishing") then return end
     cake:SetAttribute("Finishing", true); CakeService.Owners[cake] = nil; stopEating(cake)
-    for _, part in ipairs(cake:GetDescendants()) do if part:IsA("BasePart") then part.CanCollide = false; TweenService:Create(part, TweenInfo.new(CakeConfig.SinkSeconds, Enum.EasingStyle.Quad, Enum.EasingDirection.In), { Position = part.Position - Vector3.new(0,8,0), Transparency = 1 }):Play() end end
-    Debris:AddItem(cake, CakeConfig.SinkSeconds + .1)
+    local startPivot, targetPivot, started = cake:GetPivot(), cake:GetPivot() - Vector3.new(0, 8, 0), os.clock()
+    for _, part in ipairs(cake:GetDescendants()) do if part:IsA("BasePart") then part.CanCollide, part.Anchored = false, true end end
+    task.spawn(function()
+        while cake.Parent do
+            local alpha = math.clamp((os.clock() - started) / CakeConfig.SinkSeconds, 0, 1)
+            local eased = alpha * alpha
+            cake:PivotTo(startPivot:Lerp(targetPivot, eased))
+            for _, part in ipairs(cake:GetDescendants()) do if part:IsA("BasePart") then part.Transparency = alpha end end
+            if alpha >= 1 then cake:Destroy(); break end
+            RunService.Heartbeat:Wait()
+        end
+    end)
 end
 function CakeService.DamageCake(player, cake, amount)
     if CakeService.Owners[cake] ~= player or cake:GetAttribute("Finishing") then return false end
@@ -908,7 +910,7 @@ function CakeService.HookTouches(player, cake)
 end
 function CakeService.Count(player) local n=0 for cake,owner in pairs(CakeService.Owners) do if owner == player and cake.Parent then n+=1 end end return n end
 function CakeService.SpawnNear(player)
-    local root = rootOf(player); if not root or CakeService.Count(player) >= CakeConfig.MaxCakesPerPlayer then return end
+    local root = rootOf(player); if not root then return end
     local template = randomTemplate(); if not template then warn("Cake Rain RNG: no cake template") return end
     local glow = math.random() < (CakeConfig.GlowBaseChance + StateService.EffectiveStat(player,"GlowCakeRate"))
     local angle, radius = math.random()*math.pi*2, math.random(CakeConfig.MinimumSpawnDistance, CakeConfig.SpawnRadius)
@@ -950,26 +952,49 @@ local rewardScripts = getOrCreate(servicesPackage, "Folder", "RewardScripts")
 local rewardTemplate = getOrCreate(rewardScripts, "ModuleScript", "RewardTemplate")
 rewardTemplate.Source = [=[
 local StateService = require(script.Parent.Parent.StateService)
-return function(player, key, reward)
-    return StateService.AddBuff(player, key, reward)
+local WheelConfig = require(game:GetService("ReplicatedStorage").Configs.WheelConfig)
+local RewardTemplate = {}
+RewardTemplate.ByRarity = {
+    EatSpeed = { Common = { Value = 1 }, Rare = { Value = 2 }, Epic = { Value = 3 }, Legendary = { Value = 5 }, Mythic = { Value = 8 } },
+    GlowCakeRate = { Common = { Value = 0.05, Duration = 20 }, Rare = { Value = 0.10, Duration = 20 }, Epic = { Value = 0.18, Duration = 22 }, Legendary = { Value = 0.30, Duration = 24 }, Mythic = { Value = 0.50, Duration = 26 } },
+    AutoRoll = { Common = { Interval = 1.0, MultiRolls = 1, Duration = 180 }, Rare = { Interval = 0.9, MultiRolls = 2, Duration = 180 }, Epic = { Interval = 0.8, MultiRolls = 3, Duration = 190 }, Legendary = { Interval = 0.7, MultiRolls = 4, Duration = 200 }, Mythic = { Interval = 0.6, MultiRolls = 5, Duration = 210 } },
+    WheelHaste = { Common = { Value = 0.10, Duration = 120 }, Rare = { Value = 0.22, Duration = 120 }, Epic = { Value = 0.36, Duration = 130 }, Legendary = { Value = 0.52, Duration = 140 }, Mythic = { Value = 0.75, Duration = 150 } },
+}
+function RewardTemplate.RarityLevel(rarity)
+    return WheelConfig.RarityPriority[rarity] or 1
 end
+function RewardTemplate.ApplyBuff(player, key, reward, buffType, overrides)
+    local values = RewardTemplate.ByRarity[buffType] and RewardTemplate.ByRarity[buffType][reward.Rarity] or {}
+    local resolved = table.clone(reward)
+    for valueKey, value in pairs(values) do resolved[valueKey] = value end
+    for valueKey, value in pairs(overrides or {}) do resolved[valueKey] = value end
+    resolved.Type = resolved.Type or buffType
+    resolved.Level = resolved.Level or RewardTemplate.RarityLevel(resolved.Rarity)
+    resolved.BaseDuration = resolved.BaseDuration or resolved.Duration or 60
+    return StateService.AddBuff(player, key, resolved)
+end
+return RewardTemplate
 ]=]
-for _, scriptName in ipairs({ "EatSpeedCommon", "EatSpeedRare", "EatSpeedEpic", "EatSpeedLegendary", "EatSpeedMythic", "GlowRate", "AutoRoll", "WheelHaste" }) do
+
+for scriptName, buffType in pairs({ EatSpeed = "EatSpeed", GlowRate = "GlowCakeRate", AutoRoll = "AutoRoll", WheelHaste = "WheelHaste" }) do
     local rewardScript = getOrCreate(rewardScripts, "ModuleScript", scriptName)
-    rewardScript.Source = [=[
--- This term is intentionally independent; customize this module without touching wheel dispatch.
-local apply = require(script.Parent.RewardTemplate)
-return function(player, key, reward) return apply(player, key, reward) end
-]=]
+    rewardScript.Source = string.format([=[
+local Template = require(script.Parent.RewardTemplate)
+return function(player, key, reward)
+    return Template.ApplyBuff(player, key, reward, %q, %s)
+end
+]=], buffType, buffType == "EatSpeed" and "{ Type = "Stat", Stat = "EatSpeed" }" or "nil")
 end
 
 local wheelLevelUpScript = getOrCreate(rewardScripts, "ModuleScript", "WheelLevelUp")
 wheelLevelUpScript.Source = [=[
 local StateService = require(script.Parent.Parent.StateService)
+local Template = require(script.Parent.RewardTemplate)
 return function(player, key, reward)
     local state = StateService.Get(player)
     if not state then return end
-    state.WheelLevel = math.max(1, (state.WheelLevel or 1) + (reward.LevelGain or 1))
+    local levelGain = math.max(1, Template.RarityLevel(reward.Rarity))
+    state.WheelLevel = math.max(1, (state.WheelLevel or 1) + levelGain)
     return { Key = key, NameKey = reward.NameKey, Rarity = reward.Rarity, Level = state.WheelLevel, Stacks = state.WheelLevel }
 end
 ]=]
@@ -1138,12 +1163,25 @@ local function maxRarityPriority(state)
     return WheelConfig.RarityPriority[cap] or 2
 end
 local function unlockedRewards(state)
-    local entries, cap = {}, maxRarityPriority(state)
+    local entries = {}
     for key, reward in pairs(WheelConfig.Rewards) do
-        local priority = WheelConfig.RarityPriority[reward.Rarity] or 1
-        if (reward.IsUnlockedDefault or state.UnlockedWheelRewards[key]) and priority <= cap then entries[key] = reward end
+        if reward.IsUnlockedDefault or state.UnlockedWheelRewards[key] then entries[key] = reward end
     end
     return entries
+end
+local function randomRarity(state)
+    local cap, total = maxRarityPriority(state), 0
+    local weights = { Common = 650, Rare = 250, Epic = 80, Legendary = 18, Mythic = 2 }
+    for rarity, weight in pairs(weights) do if (WheelConfig.RarityPriority[rarity] or 1) <= cap then total += weight end end
+    local roll, cursor = math.random() * total, 0
+    for _, rarity in ipairs({ "Common", "Rare", "Epic", "Legendary", "Mythic" }) do
+        local weight = weights[rarity] or 0
+        if (WheelConfig.RarityPriority[rarity] or 1) <= cap then
+            cursor += weight
+            if roll <= cursor then return rarity end
+        end
+    end
+    return "Common"
 end
 local function buildSlots(state)
     local pool, slots, used, count = unlockedRewards(state), {}, {}, 0
@@ -1155,7 +1193,8 @@ local function buildSlots(state)
         if not key then break end
         if count < WheelConfig.DisplayedSlots or not used[key] then
             used[key] = true
-            table.insert(slots, { Key = key, Name = text(reward.NameKey), Rarity = reward.Rarity, Type = reward.Type, Value = reward.Value or reward.Level, Duration = reward.BaseDuration, Color = WheelConfig.RarityColors[reward.Rarity] })
+            local rarity = randomRarity(state)
+            table.insert(slots, { Key = key, Name = text(reward.NameKey), Rarity = rarity, Color = WheelConfig.RarityColors[rarity] })
         end
     end
     return slots
@@ -1182,7 +1221,9 @@ function WheelService.Start()
             local claimed = {}
             for _, spin in ipairs(pending) do
                 local picked = spin.Picked
-                local stack = RewardService.Activate(player, picked.Key, WheelConfig.Rewards[picked.Key])
+                local reward = table.clone(WheelConfig.Rewards[picked.Key])
+                reward.Rarity = picked.Rarity
+                local stack = RewardService.Activate(player, picked.Key, reward)
                 table.insert(claimed, { Picked = picked, Stacks = stack and stack.Stacks or 1 })
                 state.LastWheelReward = { Name = picked.Name, Rarity = picked.Rarity, Stacks = stack and stack.Stacks or 1, ShownUntil = os.clock() + 3 }
             end
@@ -1215,9 +1256,8 @@ function WheelService.Start()
         if not state or not state.PendingCardDraw then return { Ok = false, Error = "NO_CARD_DRAW" } end
         state.PendingCardDraw = false
         local cards = unlockedCards(state)
-        local cap = maxRarityPriority(state)
-        for cardKey, card in pairs(cards) do if (WheelConfig.RarityPriority[card.Rarity] or 1) > cap then cards[cardKey] = nil end end
         local key, card = weightedPick(cards)
+        if card then card = table.clone(card); card.Rarity = randomRarity(state) end
         local stack = card and SkillService.Activate(player, key, card)
         StateService.Push(player)
         return { Ok = true, Card = card and { Key = key, Name = text(card.NameKey), Rarity = card.Rarity, Duration = card.Duration, Effect = card.SkillId, Level = card.Level or 1, Stacks = stack and stack.Stacks or 1 } or nil }
