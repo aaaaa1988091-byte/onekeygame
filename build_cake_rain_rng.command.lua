@@ -125,12 +125,16 @@ local CakeConfig = {
     HealthForMaximumScale = 24,
     LabelMaxDistance = 33, -- 約 10 公尺；遠處不顯示實體蛋糕文字
     StainVisibleSeconds = 2,
+    ValueScalePerLevel = 2.5,
+    UpgradeDecisionSeconds = 0.5,
+    UpgradeDecisionWindowSeconds = 3,
+    RarityOrder = { "Common", "Rare", "Epic", "Legendary", "Mythic" },
     Rarities = {
-        Common = { NameKey = "Cake_Common", RarityText = "COMMON", OutlineColor = Color3.fromRGB(210, 210, 210), DropWeight = 500, Health = 1, RewardCakePoints = 1 },
-        Rare = { NameKey = "Cake_Rare", RarityText = "RARE", OutlineColor = Color3.fromRGB(70, 170, 255), DropWeight = 110, Health = 3, RewardCakePoints = 3 },
-        Epic = { NameKey = "Cake_Epic", RarityText = "EPIC", OutlineColor = Color3.fromRGB(185, 85, 255), DropWeight = 35, Health = 6, RewardCakePoints = 7 },
-        Legendary = { NameKey = "Cake_Legendary", RarityText = "LEGENDARY", OutlineColor = Color3.fromRGB(255, 170, 0), DropWeight = 8, Health = 12, RewardCakePoints = 15 },
-        Mythic = { NameKey = "Cake_Mythic", RarityText = "MYTHIC", OutlineColor = Color3.fromRGB(255, 60, 120), DropWeight = 2, Health = 24, RewardCakePoints = 40 },
+        Common = { NameKey = "Cake_Common", RarityText = "COMMON", OutlineColor = Color3.fromRGB(210, 210, 210) },
+        Rare = { NameKey = "Cake_Rare", RarityText = "RARE", OutlineColor = Color3.fromRGB(70, 170, 255) },
+        Epic = { NameKey = "Cake_Epic", RarityText = "EPIC", OutlineColor = Color3.fromRGB(185, 85, 255) },
+        Legendary = { NameKey = "Cake_Legendary", RarityText = "LEGENDARY", OutlineColor = Color3.fromRGB(255, 170, 0) },
+        Mythic = { NameKey = "Cake_Mythic", RarityText = "MYTHIC", OutlineColor = Color3.fromRGB(255, 60, 120) },
     },
 }
 return CakeConfig
@@ -188,9 +192,14 @@ return UIConfig
 ]=]
 
 clearChildren(cakeModelsFolder)
-local function createCakeModel(name, baseColor)
+local function createCakeModel(name, baseColor, initialCakeLevel, initialHealth, initialReward, initialWheelTickets, initialUpgradeChance)
     local model = Instance.new("Model")
     model.Name = name
+    model:SetAttribute("InitialCakeLevel", initialCakeLevel or 1)
+    model:SetAttribute("InitialHealth", initialHealth or 1)
+    model:SetAttribute("InitialReward", initialReward or 1)
+    model:SetAttribute("InitialWheelTickets", initialWheelTickets or 1)
+    model:SetAttribute("InitialUpgradeChance", initialUpgradeChance or 0.25)
     model.Parent = cakeModelsFolder
 
     local base = Instance.new("Part")
@@ -227,9 +236,9 @@ local function createCakeModel(name, baseColor)
     model.PrimaryPart = base
     return model
 end
-createCakeModel("RoundCake", Color3.fromRGB(255, 190, 205))
-createCakeModel("ChocolateCake", Color3.fromRGB(130, 75, 45))
-createCakeModel("VanillaCake", Color3.fromRGB(255, 225, 160))
+createCakeModel("RoundCake", Color3.fromRGB(255, 190, 205), 1, 1, 1, 1, 0.34)
+createCakeModel("VanillaCake", Color3.fromRGB(255, 225, 160), 2, 2, 2, 2, 0.24)
+createCakeModel("ChocolateCake", Color3.fromRGB(130, 75, 45), 3, 4, 4, 3, 0.16)
 
 local mapBase = getOrCreate(mapFolder, "Part", "CakeArenaBase")
 mapBase.Anchored = true
@@ -252,12 +261,12 @@ local function newGui(className, name, parent)
 end
 
 local stats = newGui("Frame", "StatsFrame", mainGui)
-stats.Size = UDim2.new(0, 285, 0, 152)
+stats.Size = UDim2.new(0, 285, 0, 118)
 stats.Position = UDim2.new(0, 18, 0, 18)
 stats.BackgroundColor3 = Color3.fromRGB(25, 20, 32)
 stats.BackgroundTransparency = 0.12
 newGui("UICorner", "Corner", stats).CornerRadius = UDim.new(0, 14)
-for index, name in { "CakePointsLabel", "WheelPointsLabel", "WheelLevelLabel", "SpinsLabel" } do
+for index, name in { "CakePointsLabel", "WheelPointsLabel", "SpinsLabel" } do
     local label = newGui("TextLabel", name, stats)
     label.BackgroundTransparency = 1
     label.Size = UDim2.new(1, -20, 0, 32)
@@ -739,9 +748,46 @@ local function weightedPick(entries, field)
     local roll, sum = math.random() * total, 0
     for key, entry in pairs(entries) do sum += entry[field] or 1 if roll <= sum then return key, entry end end
 end
+local function templateSpawnWeight(template)
+    local level = math.max(1, template:GetAttribute("InitialCakeLevel") or 1)
+    return 1 / (CakeConfig.ValueScalePerLevel ^ (level - 1))
+end
 local function randomTemplate()
-    local choices = CakeModels:GetChildren()
-    return #choices > 0 and choices[math.random(1, #choices)] or nil
+    local choices, total = CakeModels:GetChildren(), 0
+    for _, template in ipairs(choices) do total += templateSpawnWeight(template) end
+    if total <= 0 then return nil end
+    local roll, cursor = math.random() * total, 0
+    for _, template in ipairs(choices) do
+        cursor += templateSpawnWeight(template)
+        if roll <= cursor then return template end
+    end
+    return choices[#choices]
+end
+local function rarityKeyForLevel(level)
+    return CakeConfig.RarityOrder[math.clamp(level, 1, #CakeConfig.RarityOrder)] or "Common"
+end
+local function scaledValue(baseValue, level, initialLevel)
+    return math.max(1, math.floor((baseValue or 1) * (CakeConfig.ValueScalePerLevel ^ math.max(0, level - initialLevel)) + 0.5))
+end
+function CakeService.ApplyCakeLevel(cake, level)
+    local initialLevel = cake:GetAttribute("InitialCakeLevel") or 1
+    local rarityKey = rarityKeyForLevel(level)
+    local rarity = CakeConfig.Rarities[rarityKey] or CakeConfig.Rarities.Common
+    cake:SetAttribute("CakeLevel", level)
+    cake:SetAttribute("RarityKey", rarityKey)
+    cake:SetAttribute("MaxHealth", scaledValue(cake:GetAttribute("InitialHealth"), level, initialLevel))
+    cake:SetAttribute("Health", cake:GetAttribute("MaxHealth"))
+    cake:SetAttribute("RewardCakePoints", scaledValue(cake:GetAttribute("InitialReward"), level, initialLevel))
+    cake:SetAttribute("RewardWheelTickets", scaledValue(cake:GetAttribute("InitialWheelTickets"), level, initialLevel))
+    local outline = cake:FindFirstChild("RarityOutline")
+    if outline then outline.OutlineColor = rarity.OutlineColor end
+    local primary = cake.PrimaryPart
+    local trail = primary and primary:FindFirstChild("RarityMeteorTrail")
+    if trail then trail.Color = ColorSequence.new(rarity.OutlineColor) end
+    local label = primary and primary:FindFirstChild("CakeLabel")
+    local labelText = label and label:FindFirstChild("Text")
+    if labelText then labelText.TextStrokeColor3 = rarity.OutlineColor end
+    CakeService.RefreshLabel(cake)
 end
 
 function CakeService.UpdateScale(cake)
@@ -751,18 +797,20 @@ function CakeService.UpdateScale(cake)
 end
 function CakeService.RefreshLabel(cake)
     local rarity = CakeConfig.Rarities[cake:GetAttribute("RarityKey")] or CakeConfig.Rarities.Common
-    local hp, maxHp = math.max(0, cake:GetAttribute("Health") or rarity.Health), cake:GetAttribute("MaxHealth") or rarity.Health
+    local hp, maxHp = math.max(0, cake:GetAttribute("Health") or 1), cake:GetAttribute("MaxHealth") or 1
     local label = cake.PrimaryPart and cake.PrimaryPart:FindFirstChild("CakeLabel")
     local labelText = label and label:FindFirstChild("Text")
     if labelText then labelText.Text = string.format("[%s] %s (HP: %d/%d)", cake:GetAttribute("IsGlow") and "SPECIAL" or rarity.RarityText, cake:GetAttribute("IsGlow") and text("Cake_Special") or text(rarity.NameKey), hp, maxHp) end
     CakeService.UpdateScale(cake)
 end
-function CakeService.Decorate(cake, rarityKey, rarity, isGlow)
+function CakeService.Decorate(cake, isGlow)
     local primary = cake.PrimaryPart or cake:FindFirstChildWhichIsA("BasePart", true)
     if not primary then return end
     cake.PrimaryPart = primary
-    cake:SetAttribute("RarityKey", rarityKey); cake:SetAttribute("Health", rarity.Health); cake:SetAttribute("MaxHealth", rarity.Health)
-    cake:SetAttribute("RewardCakePoints", rarity.RewardCakePoints); cake:SetAttribute("IsGlow", isGlow)
+    local initialLevel = math.max(1, cake:GetAttribute("InitialCakeLevel") or 1)
+    local rarityKey = rarityKeyForLevel(initialLevel)
+    local rarity = CakeConfig.Rarities[rarityKey] or CakeConfig.Rarities.Common
+    cake:SetAttribute("IsGlow", isGlow)
     for _, part in ipairs(cake:GetDescendants()) do if part:IsA("BasePart") then part.Anchored, part.CanCollide = false, true; part.CustomPhysicalProperties = PhysicalProperties.new(1, .7, CakeConfig.CakeBounciness) end end
     local outline = Instance.new("Highlight"); outline.Name = "RarityOutline"; outline.FillTransparency = 1; outline.OutlineColor = rarity.OutlineColor; outline.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop; outline.Parent = cake
     local top = Instance.new("Attachment"); top.Name = "MeteorTrailTop"; top.Position = Vector3.new(0, 2.8, 0); top.Parent = primary
@@ -771,6 +819,7 @@ function CakeService.Decorate(cake, rarityKey, rarity, isGlow)
     if isGlow then local light = Instance.new("PointLight"); light.Color, light.Brightness, light.Range = Color3.fromRGB(120,255,255), 1.2, 12; light.Parent = primary end
     local label = Instance.new("BillboardGui"); label.Name, label.AlwaysOnTop, label.MaxDistance, label.Size, label.StudsOffset, label.Parent = "CakeLabel", true, CakeConfig.LabelMaxDistance, UDim2.new(0,300,0,62), Vector3.new(0,4.2,0), primary
     local labelText = Instance.new("TextLabel"); labelText.Name, labelText.BackgroundTransparency, labelText.Size, labelText.Font, labelText.TextScaled, labelText.TextColor3, labelText.TextStrokeColor3, labelText.TextStrokeTransparency, labelText.Parent = "Text", 1, UDim2.fromScale(1,1), Enum.Font.GothamBlack, true, Color3.new(1,1,1), rarity.OutlineColor, 0, label
+    CakeService.ApplyCakeLevel(cake, initialLevel)
 end
 local function stopEating(cake)
     local eater = CakeService.Eating[cake]
@@ -782,11 +831,9 @@ function CakeService.Finish(player, cake)
     cake:SetAttribute("Finishing", true); CakeService.Owners[cake] = nil; stopEating(cake)
     local state = StateService.Get(player)
     if state then
-        state.CakePoints += cake:GetAttribute("RewardCakePoints") or 1; state.WheelSpins += 1
-        if cake:GetAttribute("IsGlow") then
-            state.PendingCardDraw = true
-            state.WheelSpins += math.max(1, math.floor((cake:GetAttribute("MaxHealth") or 1) / 3))
-        end
+        state.CakePoints += cake:GetAttribute("RewardCakePoints") or 1
+        state.WheelSpins += cake:GetAttribute("RewardWheelTickets") or 1
+        if cake:GetAttribute("IsGlow") then state.PendingCardDraw = true end
         StateService.UpdateLeaderstats(player); StateService.Push(player)
     end
     -- Eating is deliberately distinct from expiry: disable physics, then shrink/fade into the player.
@@ -863,10 +910,20 @@ function CakeService.Count(player) local n=0 for cake,owner in pairs(CakeService
 function CakeService.SpawnNear(player)
     local root = rootOf(player); if not root or CakeService.Count(player) >= CakeConfig.MaxCakesPerPlayer then return end
     local template = randomTemplate(); if not template then warn("Cake Rain RNG: no cake template") return end
-    local rarityKey, rarity = weightedPick(CakeConfig.Rarities, "DropWeight"); local glow = math.random() < (CakeConfig.GlowBaseChance + StateService.EffectiveStat(player,"GlowCakeRate"))
+    local glow = math.random() < (CakeConfig.GlowBaseChance + StateService.EffectiveStat(player,"GlowCakeRate"))
     local angle, radius = math.random()*math.pi*2, math.random(CakeConfig.MinimumSpawnDistance, CakeConfig.SpawnRadius)
-    local cake = template:Clone(); cake.Name = (glow and "Glow" or rarityKey).."_"..template.Name; cake.Parent = Runtime; cake:PivotTo(CFrame.new(root.Position + Vector3.new(math.cos(angle)*radius,CakeConfig.SpawnHeight,math.sin(angle)*radius)))
-    CakeService.Decorate(cake,rarityKey,rarity,glow); cake.PrimaryPart.AssemblyLinearVelocity=Vector3.new(0,-CakeConfig.MeteorFallSpeed,0); CakeService.RefreshLabel(cake); CakeService.Owners[cake]=player; CakeService.HookTouches(player,cake)
+    local cake = template:Clone(); cake.Name = (glow and "Glow" or "Cake").."_"..template.Name; cake.Parent = Runtime; cake:PivotTo(CFrame.new(root.Position + Vector3.new(math.cos(angle)*radius,CakeConfig.SpawnHeight,math.sin(angle)*radius)))
+    CakeService.Decorate(cake,glow); cake.PrimaryPart.AssemblyLinearVelocity=Vector3.new(0,-CakeConfig.MeteorFallSpeed,0); CakeService.Owners[cake]=player; CakeService.HookTouches(player,cake)
+    task.spawn(function()
+        local decisions = math.floor(CakeConfig.UpgradeDecisionWindowSeconds / CakeConfig.UpgradeDecisionSeconds)
+        for _ = 1, decisions do
+            task.wait(CakeConfig.UpgradeDecisionSeconds)
+            if not cake.Parent or cake:GetAttribute("Finishing") then return end
+            local level = cake:GetAttribute("CakeLevel") or cake:GetAttribute("InitialCakeLevel") or 1
+            if level >= #CakeConfig.RarityOrder or math.random() >= (cake:GetAttribute("InitialUpgradeChance") or 0) then return end
+            CakeService.ApplyCakeLevel(cake, level + 1)
+        end
+    end)
     task.delay(CakeConfig.CakeLifetimeSeconds,function() if cake.Parent and CakeService.Owners[cake] == player then CakeService.Expire(cake) end end)
 end
 function CakeService.StartPlayer(player)
@@ -1115,31 +1172,42 @@ local function shopItem(itemId)
 end
 
 function WheelService.Start()
-    Events.RequestWheelSpin.OnServerInvoke = function(player, action)
+    Events.RequestWheelSpin.OnServerInvoke = function(player, action, requestedCount)
         local state = StateService.Get(player)
         if not state then return { Ok = false, Error = "NO_STATE" } end
         if action == "Claim" then
             local pending = state.PendingWheelSpin
-            if not pending then return { Ok = false, Error = "NO_PENDING_SPIN" } end
+            if not pending or #pending == 0 then return { Ok = false, Error = "NO_PENDING_SPIN" } end
             state.PendingWheelSpin = nil
-            local picked = pending.Picked
-            local stack = RewardService.Activate(player, picked.Key, WheelConfig.Rewards[picked.Key])
-            state.LastWheelReward = { Name = picked.Name, Rarity = picked.Rarity, Stacks = stack and stack.Stacks or 1, ShownUntil = os.clock() + 3 }
+            local claimed = {}
+            for _, spin in ipairs(pending) do
+                local picked = spin.Picked
+                local stack = RewardService.Activate(player, picked.Key, WheelConfig.Rewards[picked.Key])
+                table.insert(claimed, { Picked = picked, Stacks = stack and stack.Stacks or 1 })
+                state.LastWheelReward = { Name = picked.Name, Rarity = picked.Rarity, Stacks = stack and stack.Stacks or 1, ShownUntil = os.clock() + 3 }
+            end
             StateService.UpdateLeaderstats(player)
             StateService.Push(player)
-            return { Ok = true, Picked = picked }
+            return { Ok = true, Claimed = claimed }
         end
-        if state.WheelSpins <= 0 or state.PendingWheelSpin then return { Ok = false, Error = "NO_SPINS" } end
-        state.WheelSpins -= 1
-        state.WheelPoints += 1
-        local slots = buildSlots(state)
-        if #slots == 0 then return { Ok = false, Error = "EMPTY_POOL" } end
-        local pickedIndex = math.random(1, #slots)
-        local picked = slots[pickedIndex]
-        state.PendingWheelSpin = { Slots = slots, Picked = picked, PickedIndex = pickedIndex }
+        local count = math.clamp(math.floor(tonumber(requestedCount) or 1), 1, 6)
+        count = math.min(count, state.WheelSpins)
+        if count <= 0 or state.PendingWheelSpin then return { Ok = false, Error = "NO_SPINS" } end
+        local pending = {}
+        for _ = 1, count do
+            state.WheelSpins -= 1
+            state.WheelPoints += 1
+            local slots = buildSlots(state)
+            if #slots == 0 then break end
+            local pickedIndex = math.random(1, #slots)
+            local picked = slots[pickedIndex]
+            table.insert(pending, { Slots = slots, Picked = picked, PickedIndex = pickedIndex })
+        end
+        if #pending == 0 then return { Ok = false, Error = "EMPTY_POOL" } end
+        state.PendingWheelSpin = pending
         StateService.UpdateLeaderstats(player)
         StateService.Push(player)
-        return { Ok = true, Slots = slots, Picked = picked, PickedIndex = pickedIndex, WheelLevel = state.WheelLevel }
+        return { Ok = true, Spins = pending }
     end
 
     Events.RequestCardDraw.OnServerInvoke = function(player)
@@ -1301,7 +1369,6 @@ end
 local function refreshStats()
     stats.CakePointsLabel.Text = L.UI_CakePoints .. tostring(state.CakePoints)
     stats.WheelPointsLabel.Text = L.UI_WheelPoints .. tostring(state.WheelPoints)
-    stats.WheelLevelLabel.Text = "轉盤等級: " .. tostring(state.WheelLevel or 1)
     stats.SpinsLabel.Text = L.UI_Spins_Left .. tostring(state.WheelSpins)
     local autoAvailable = hasAutoRoll()
     if not autoAvailable then autoRollEnabled = false end
@@ -1331,30 +1398,95 @@ local function paintSlots(slots, pickedIndex)
     end
 end
 
-local function playWheelAnimation(slots, pickedIndex, speedMultiplier)
-    paintSlots(slots, nil)
-    disc.Rotation = 0
-    local selectedSector = disc:FindFirstChild("Sector" .. pickedIndex)
+local function layoutSpinPanel(panel, index, total)
+    if total <= 1 then return end
+    local width, gap = 300, 14
+    panel.Size = UDim2.new(0, width, 0, width)
+    panel.AnchorPoint = Vector2.new(0.5, 0.5)
+    panel.Position = UDim2.new(0.5, (index - (total + 1) / 2) * (width + gap), 0.5, 0)
+    local panelDisc = panel:WaitForChild("WheelDisc")
+    panelDisc.Size = UDim2.new(0, width, 0, width)
+    for sectorIndex = 1, 5 do
+        local sector = panelDisc:FindFirstChild("Sector" .. sectorIndex)
+        if sector then sector.Size = UDim2.new(0, 110, 0, 145) end
+    end
+end
+
+local function panelDisc(panel)
+    return panel:WaitForChild("WheelDisc")
+end
+
+local function paintPanelSlots(panel, slots, pickedIndex)
+    local panelDiscInstance = panelDisc(panel)
+    for index = 1, 5 do
+        local sector = panelDiscInstance:FindFirstChild("Sector" .. index)
+        local label = sector and sector:FindFirstChild("Text")
+        local slot = slots and slots[index]
+        if sector and label and slot then
+            label.Text = slot.Name
+            sector.BackgroundColor3 = slot.Color or Color3.fromRGB(95, 63, 145)
+            sector.BackgroundTransparency = index == pickedIndex and 0 or 0.12
+        elseif label then
+            label.Text = "?"
+        end
+    end
+end
+
+local function playWheelAnimation(panel, slots, pickedIndex, speedMultiplier)
+    local panelDiscInstance = panelDisc(panel)
+    paintPanelSlots(panel, slots, nil)
+    panelDiscInstance.Rotation = 0
+    local selectedSector = panelDiscInstance:FindFirstChild("Sector" .. pickedIndex)
     local selectedAngle = selectedSector and selectedSector:GetAttribute("WheelAngle") or -90
     -- The pointer faces right from the disc's left edge (180°), so finish with the selected panel under it.
     local targetRotation = 1080 + (180 - selectedAngle)
     local duration = 2.4 / math.max(0.35, speedMultiplier or 1)
-    local tween = TweenService:Create(disc, TweenInfo.new(duration, Enum.EasingStyle.Quart, Enum.EasingDirection.Out), { Rotation = targetRotation })
+    local tween = TweenService:Create(panelDiscInstance, TweenInfo.new(duration, Enum.EasingStyle.Quart, Enum.EasingDirection.Out), { Rotation = targetRotation })
     tween:Play()
     tween.Completed:Wait()
-    paintSlots(slots, pickedIndex)
-    local pulse = TweenService:Create(disc, TweenInfo.new(0.16, Enum.EasingStyle.Back, Enum.EasingDirection.Out, 1, true), { Size = UDim2.new(0, 374, 0, 374), Position = UDim2.new(0, -7, 0, -7) })
+    paintPanelSlots(panel, slots, pickedIndex)
+    local pulseSize = UDim2.new(panelDiscInstance.Size.X.Scale, panelDiscInstance.Size.X.Offset + 14, panelDiscInstance.Size.Y.Scale, panelDiscInstance.Size.Y.Offset + 14)
+    local pulsePosition = UDim2.new(panelDiscInstance.Position.X.Scale, panelDiscInstance.Position.X.Offset - 7, panelDiscInstance.Position.Y.Scale, panelDiscInstance.Position.Y.Offset - 7)
+    local pulse = TweenService:Create(panelDiscInstance, TweenInfo.new(0.16, Enum.EasingStyle.Back, Enum.EasingDirection.Out, 1, true), { Size = pulseSize, Position = pulsePosition })
     pulse:Play()
 end
 
-local function performSpin()
+local function playWheelAnimations(spins, speedMultiplier)
+    local original = { Size = wheel.Size, Position = wheel.Position, AnchorPoint = wheel.AnchorPoint, DiscSize = disc.Size }
+    local originalSectorSizes = {}
+    for sectorIndex = 1, 5 do
+        local sector = disc:FindFirstChild("Sector" .. sectorIndex)
+        originalSectorSizes[sectorIndex] = sector and sector.Size
+    end
+    local panels = {}
+    for index, spin in ipairs(spins) do
+        local panel = index == 1 and wheel or wheel:Clone()
+        panel.Name = index == 1 and "WheelPanel" or "WheelPanelClone" .. index
+        panel.Visible = true
+        panel.SpinButton.Visible = index == 1
+        panel.AutoRollToggle.Visible = false
+        if index > 1 then panel.Parent = gui end
+        layoutSpinPanel(panel, index, #spins)
+        panels[index] = panel
+        task.spawn(function() playWheelAnimation(panel, spin.Slots, spin.PickedIndex, speedMultiplier) end)
+    end
+    task.wait(2.45 / math.max(0.35, speedMultiplier or 1) + 0.25)
+    for index, panel in ipairs(panels) do if index > 1 then panel:Destroy() end end
+    wheel.Size, wheel.Position, wheel.AnchorPoint, disc.Size = original.Size, original.Position, original.AnchorPoint, original.DiscSize
+    for sectorIndex, size in pairs(originalSectorSizes) do
+        local sector = disc:FindFirstChild("Sector" .. sectorIndex)
+        if sector and size then sector.Size = size end
+    end
+end
+
+local function performSpin(count)
     if spinning or state.WheelSpins <= 0 then return false end
     spinning = true
     refreshStats()
-    local result = RequestWheelSpin:InvokeServer("Begin")
+    local result = RequestWheelSpin:InvokeServer("Begin", count or 1)
     if result and result.Ok then
         local haste = state.ActiveBuffs.WheelHaste
-        playWheelAnimation(result.Slots, result.PickedIndex, 1 + ((haste and haste.Value) or 0))
+        playWheelAnimations(result.Spins or {}, 1 + ((haste and haste.Value) or 0))
         result = RequestWheelSpin:InvokeServer("Claim")
     end
     spinning = false
@@ -1368,10 +1500,7 @@ local function ensureAutoRollLoop()
         while autoRollEnabled and hasAutoRoll() do
             if state.WheelSpins > 0 then
                 local rolls = (state.ActiveBuffs.AutoRoll and state.ActiveBuffs.AutoRoll.MultiRolls) or 1
-                for _ = 1, math.max(1, rolls) do
-                    if state.WheelSpins <= 0 or not autoRollEnabled then break end
-                    performSpin()
-                end
+                performSpin(math.min(rolls, state.WheelSpins))
             end
             local interval = (state.ActiveBuffs.AutoRoll and state.ActiveBuffs.AutoRoll.Interval) or 1
             task.wait(math.max(0.5, interval))
