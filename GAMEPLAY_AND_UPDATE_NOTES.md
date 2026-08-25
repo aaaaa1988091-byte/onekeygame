@@ -1,44 +1,52 @@
-# Cake Rain RNG 玩法與更新說明
+# Cake Rain RNG Gameplay and Update Notes
 
-## MD 維護規則
+## Markdown Maintenance Rules
 
-1. **不得覆蓋整份文件**：更新時只能追加或修改相關段落，避免刪除既有玩法、架構與更新紀錄。
-2. **更新必須保留三個區塊**：`玩法總覽`、`架構說明`、`更新與修復紀錄` 不可移除或改名。
-3. **新增系統要同步記錄**：每次新增技能、轉盤詞條、UI、商店項目或資料欄位，都要在本文件補上用途與維護位置。
-4. **腳本歸屬要寫清楚**：技能數值應在自己的 SkillScript，轉盤詞條數值應在自己的 RewardScript；管理服務只做派發與流程控制。
-5. **更新紀錄只追加最新項目**：新版本請在 `更新與修復紀錄` 頂部新增日期與摘要，不要重寫舊紀錄。
+1. **Do not overwrite the whole document**: update only the relevant sections so existing gameplay, architecture, and release history remain intact.
+2. **Keep the three required sections**: `Gameplay Overview`, `Architecture Notes`, and `Update and Fix History` must not be removed or renamed.
+3. **Document every new system**: when adding a skill, wheel term, UI, shop item, or player-data field, record its purpose and maintenance location here.
+4. **Keep script ownership explicit**: skill tuning belongs in its own SkillScript, wheel-term tuning belongs in its own RewardScript, and services should only dispatch/control flow.
+5. **Append release notes**: add the newest entry at the top of `Update and Fix History`; do not rewrite older entries.
+6. **Game-facing text stays English-only**: do not add built-in non-English UI strings. Let Roblox localization/translation handle other languages.
 
-## 玩法總覽
+## Gameplay Overview
 
-Cake Rain RNG 是一個以「天降蛋糕、吞食蛋糕、累積抽獎資源」為核心循環的 Roblox 小遊戲。
+Cake Rain RNG is a Roblox game built around falling cakes, eating cakes, and turning earned resources into RNG upgrades.
 
-1. 蛋糕會持續從空中掉落到玩家附近。
-2. 玩家碰到自己擁有的蛋糕後會開始自動吞食。
-3. 蛋糕血量歸零後會給予蛋糕積分與轉盤次數。
-4. 稀有蛋糕有更高血量與獎勵，發光蛋糕會開啟技能抽卡。
-5. 玩家使用轉盤次數抽取轉盤詞條，例如吞食速度、自動抽獎、轉盤加速與品階上限提升。
-6. 玩家可用商店解鎖更多可抽內容。
-7. 玩家可打開背包查看自己目前擁有與尚未解鎖的可抽技能與轉盤詞條。
+1. Cakes continuously fall near each player.
+2. A player starts automatically eating an owned cake after touching it.
+3. When a cake reaches zero health, it grants Cake Points and wheel spins.
+4. Higher-rarity cakes have stronger rewards, and Glow Cakes unlock a card draw.
+5. Players spend wheel spins to draw wheel terms such as Eat Speed Up, Auto-Roll, Wheel Haste, and Wheel Level Up.
+6. The shop unlocks additional drawable content.
+7. The bag lets players review owned and locked drawable skills and wheel terms.
 
-## 架構說明
+## Architecture Notes
 
-- `WheelConfig`：只存轉盤詞條的身份、權重、解鎖條件與對應腳本名稱。
-- `SkillConfig`：只存技能卡的身份、權重、解鎖條件與對應腳本名稱。
-- `RewardScripts`：每個轉盤詞條各自管理自己的稀有度數值、持續時間與效果套用。
-- `SkillScripts`：每個技能各自管理自己的稀有度數值、冷卻、持續時間、參數與實際效果。
-- `RewardService`：只負責依照 `ScriptName` 派發轉盤詞條，不存放大量詞條數值。
-- `SkillService`：只負責依照 `ScriptName` 派發技能、建立狀態與週期執行，不存放大量技能數值。
-- `StateService.GetProfile(player)`：統一取得玩家狀態資料，其他服務可用它讀寫玩家資料，避免散落多套取得資料的方法。
-- `StateService.BuildInventory(player)`：建立背包顯示資料，將可抽轉盤詞條與技能依解鎖狀態整理給客戶端。
+- `WheelConfig`: stores only wheel-term identity, weight, unlock policy, and script routing.
+- `SkillConfig`: stores only card identity, weight, unlock policy, and script routing.
+- `RewardScripts`: each wheel term owns its rarity tuning, duration, and effect application.
+- `SkillScripts`: each skill owns its rarity tuning, cooldown, duration, parameters, visuals, and effect logic.
+- `RewardService`: dispatches wheel terms by `ScriptName`; it should not store large term-tuning tables.
+- `SkillService`: dispatches skills by `ScriptName`, creates state, and runs cooldown loops; it should not store large skill-tuning tables.
+- `StateService.GetProfile(player)`: the unified accessor for player state so services read/write one consistent profile object.
+- `StateService.BuildInventory(player)`: builds the server-owned bag payload for drawable wheel terms and skills.
+- `LocalizationConfig`: English-only source strings; non-English player-facing text should be provided by Roblox localization/translation, not hard-coded here.
 
-## 更新與修復紀錄
+## Update and Fix History
 
-### 2026-08-25：修復狀態欄未顯示完整以及修復錯誤的腳本架構，讓遊戲明了亦維護
+### 2026-08-25: English-only game text and Roblox-managed translation
 
-- 修復底部狀態欄用途，轉盤抽到的詞條名稱、品階與效果/層數會顯示在底部讀條。
-- 新增背包按鈕與能力背包面板，玩家可以查看自己擁有或尚未解鎖的可抽技能與轉盤詞條。
-- 新增 `StateService.GetProfile(player)` 統一玩家資料取得函數，方便其他系統調用玩家資料。
-- 新增 `StateService.BuildInventory(player)`，讓背包資料由伺服器統一整理後推送給玩家。
-- 重構轉盤詞條腳本架構：吞食速度、發光蛋糕率、自動抽獎、轉盤加速等數值移回各自 RewardScript。
-- 重構技能腳本架構：勾索、龍捲風、螞蟻運輸隊、蛋糕吸引的稀有度數值、持續時間、冷卻與參數移回各自 SkillScript。
-- 保留服務腳本的管理責任：`RewardService` 與 `SkillService` 只做派發、啟動與流程控制，降低日後更新互相覆蓋或混亂的風險。
+- Removed the built-in Traditional Chinese localization table and switched runtime text lookups to the English source table.
+- Converted hard-coded HUD, tooltip, status-bar, button, print, and effect text to English.
+- Added a documentation rule that game-facing text must stay English-only so Roblox can handle translation.
+
+### 2026-08-25: Fix incomplete status bar and incorrect script architecture
+
+- Fixed the bottom status readout so wheel reward name, rarity, effect text, and stack count are shown after a spin.
+- Added the Bag button and Ability Bag panel so players can review owned and locked drawable skills and wheel terms.
+- Added `StateService.GetProfile(player)` as a unified player-data accessor for other systems.
+- Added `StateService.BuildInventory(player)` so the server prepares the inventory payload sent to clients.
+- Refactored wheel-term architecture so Eat Speed Up, Glow Cake Rate Up, Auto-Roll, and Wheel Haste tuning live in their own RewardScripts.
+- Refactored skill architecture so Grappling Hook, Tornado, Ant Courier, and Cake Attraction rarity tuning, duration, cooldown, and parameters live in their own SkillScripts.
+- Kept service responsibilities clear: `RewardService` and `SkillService` dispatch and manage flow only, reducing future update conflicts.

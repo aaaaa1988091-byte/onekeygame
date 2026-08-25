@@ -70,15 +70,6 @@ return WheelConfig
 local localizationConfig = getOrCreate(configsFolder, "ModuleScript", "LocalizationConfig")
 localizationConfig.Source = [=[
 local LocalizationConfig = {
-    ["zh-tw"] = {
-        UI_Spins_Left = "剩餘轉盤次數: ", UI_WheelPoints = "轉盤點數: ", UI_CakePoints = "蛋糕積分: ",
-        UI_AutoRoll_Active = "自動抽獎運行中...", UI_Shop_Title = "商店 HUB", UI_CakeShop_Title = "蛋糕積分商店",
-        UI_WheelShop_Title = "轉盤點數商店", UI_Time_Left = "剩餘時間: ", UI_No_Buff = "目前沒有 Buff", UI_Spin = "旋轉",
-        UI_Card_Draw = "發光蛋糕抽卡", UI_Open_Shop = "商店", UI_Open_Bag = "背包", UI_Close = "關閉", UI_Buy = "購買", UI_Bag_Title = "能力背包", UI_Bag_Wheel = "轉盤詞條", UI_Bag_Cards = "可抽技能", UI_Locked = "未解鎖", UI_Unlocked = "已擁有",
-        Cake_Common = "普通蛋糕", Cake_Rare = "稀有蛋糕", Cake_Epic = "史詩蛋糕", Cake_Legendary = "傳說蛋糕", Cake_Mythic = "神話蛋糕", Cake_Special = "發光蛋糕",
-        Reward_EatSpeed = "吞食速度提升", Reward_GlowBoost = "發光蛋糕率提升", Reward_AutoRoll = "自動抽獎", Reward_WheelHaste = "轉盤加速", Reward_WheelLevelUp = "轉盤等級提升",
-        Card_Hook = "勾索", Card_Tornado = "龍捲風", Card_Ant = "螞蟻運輸隊", Card_Attract = "蛋糕吸引",
-    },
     ["en-us"] = {
         UI_Spins_Left = "Spins Left: ", UI_WheelPoints = "Wheel Points: ", UI_CakePoints = "Cake Points: ",
         UI_AutoRoll_Active = "Auto-Roll Active...", UI_Shop_Title = "Shop Hub", UI_CakeShop_Title = "Cake Point Shop",
@@ -110,11 +101,11 @@ local CakeConfig = {
     SinkSeconds = 1.1,
     EatAnimationSeconds = 0.45,
     CakeLifetimeSeconds = 70,
-    MinimumSpawnDistance = 4, -- 約 1 公尺；禁止落在玩家腳邊
+    MinimumSpawnDistance = 4, -- About 1 meter; prevent drops right at the player's feet
     MinimumCakeScale = 0.28,
     MaximumCakeScale = 1.45,
     HealthForMaximumScale = 24,
-    LabelMaxDistance = 33, -- 約 10 公尺；遠處不顯示實體蛋糕文字
+    LabelMaxDistance = 33, -- About 10 meters; hide world cake text at long distance
     StainVisibleSeconds = 2,
     ValueScalePerLevel = 2.5,
     UpgradeDecisionSeconds = 0.5,
@@ -270,7 +261,7 @@ shopButton.Size = UDim2.new(0, 120, 0, 46)
 shopButton.Position = UDim2.new(0, 18, 0, 148)
 shopButton.BackgroundColor3 = Color3.fromRGB(255, 210, 110)
 shopButton.Font = Enum.Font.GothamBlack
-shopButton.Text = "商店"
+shopButton.Text = "Shop"
 shopButton.TextScaled = true
 shopButton.TextColor3 = Color3.fromRGB(70, 40, 10)
 newGui("UICorner", "Corner", shopButton).CornerRadius = UDim.new(0, 12)
@@ -279,7 +270,7 @@ bagButton.Size = UDim2.new(0, 120, 0, 46)
 bagButton.Position = UDim2.new(0, 148, 0, 148)
 bagButton.BackgroundColor3 = Color3.fromRGB(150, 220, 255)
 bagButton.Font = Enum.Font.GothamBlack
-bagButton.Text = "背包"
+bagButton.Text = "Bag"
 bagButton.TextScaled = true
 bagButton.TextColor3 = Color3.fromRGB(15, 45, 70)
 newGui("UICorner", "Corner", bagButton).CornerRadius = UDim.new(0, 12)
@@ -344,7 +335,7 @@ autoRollToggle.Size = UDim2.new(0, 150, 0, 38)
 autoRollToggle.Position = UDim2.new(0, 18, 1, -48)
 autoRollToggle.BackgroundColor3 = Color3.fromRGB(80, 95, 120)
 autoRollToggle.Font = Enum.Font.GothamBlack
-autoRollToggle.Text = "自動抽獎: OFF"
+autoRollToggle.Text = "Auto-Roll: OFF"
 autoRollToggle.TextScaled = true
 autoRollToggle.TextColor3 = Color3.fromRGB(255, 255, 255)
 autoRollToggle.Visible = false
@@ -421,7 +412,7 @@ cardTitle.BackgroundTransparency = 1
 cardTitle.Size = UDim2.new(1, -20, 0, 52)
 cardTitle.Position = UDim2.new(0, 10, 0, 16)
 cardTitle.Font = Enum.Font.GothamBlack
-cardTitle.Text = "發光蛋糕抽卡"
+cardTitle.Text = "Glow Cake Card Draw"
 cardTitle.TextScaled = true
 cardTitle.TextColor3 = Color3.fromRGB(120, 255, 255)
 local cardResult = newGui("TextLabel", "Result", cardFrame)
@@ -465,7 +456,7 @@ closeShop.Size = UDim2.new(0, 90, 0, 38)
 closeShop.Position = UDim2.new(1, -104, 0, 12)
 closeShop.BackgroundColor3 = Color3.fromRGB(255, 100, 100)
 closeShop.Font = Enum.Font.GothamBlack
-closeShop.Text = "關閉"
+closeShop.Text = "Close"
 closeShop.TextScaled = true
 closeShop.TextColor3 = Color3.fromRGB(255, 255, 255)
 newGui("UICorner", "Corner", closeShop).CornerRadius = UDim.new(0, 10)
@@ -515,7 +506,7 @@ bagTitle.BackgroundTransparency = 1
 bagTitle.Size = UDim2.new(1, -130, 0, 44)
 bagTitle.Position = UDim2.new(0, 20, 0, 12)
 bagTitle.Font = Enum.Font.GothamBlack
-bagTitle.Text = "能力背包"
+bagTitle.Text = "Ability Bag"
 bagTitle.TextScaled = true
 bagTitle.TextColor3 = Color3.fromRGB(210, 245, 255)
 local closeBag = newGui("TextButton", "CloseButton", bagPanel)
@@ -523,7 +514,7 @@ closeBag.Size = UDim2.new(0, 90, 0, 38)
 closeBag.Position = UDim2.new(1, -104, 0, 12)
 closeBag.BackgroundColor3 = Color3.fromRGB(255, 100, 100)
 closeBag.Font = Enum.Font.GothamBlack
-closeBag.Text = "關閉"
+closeBag.Text = "Close"
 closeBag.TextScaled = true
 closeBag.TextColor3 = Color3.fromRGB(255, 255, 255)
 newGui("UICorner", "Corner", closeBag).CornerRadius = UDim.new(0, 10)
@@ -612,7 +603,7 @@ local UpdateClientState = Events.UpdateClientState
 local StateService = { States = {} }
 
 local function text(nameKey)
-    return LocalizationConfig["zh-tw"][nameKey] or nameKey
+    return LocalizationConfig["en-us"][nameKey] or nameKey
 end
 
 function StateService.Create(player, loaded)
@@ -807,7 +798,7 @@ local CakeModels = ReplicatedStorage.Models.cake
 local CakeService = { Owners = {}, Eating = {}, EatingByPlayer = {} }
 local Runtime = Workspace.Map:FindFirstChild("RuntimeCakes") or Instance.new("Folder")
 Runtime.Name, Runtime.Parent = "RuntimeCakes", Workspace.Map
-local function text(key) return LocalizationConfig["zh-tw"][key] or key end
+local function text(key) return LocalizationConfig["en-us"][key] or key end
 local function rootOf(player) return player.Character and player.Character:FindFirstChild("HumanoidRootPart") end
 local function weightedPick(entries, field)
     local total = 0
@@ -1071,7 +1062,7 @@ return function(player, key, reward)
     if not state then return end
     local levelGain = math.max(1, Template.RarityLevel(reward.Rarity))
     state.WheelLevel = math.max(1, (state.WheelLevel or 1) + levelGain)
-    return { Key = key, NameKey = reward.NameKey, Rarity = reward.Rarity, Level = state.WheelLevel, Stacks = state.WheelLevel, EffectText = "抽獎品階上限提升" }
+    return { Key = key, NameKey = reward.NameKey, Rarity = reward.Rarity, Level = state.WheelLevel, Stacks = state.WheelLevel, EffectText = "Wheel rarity cap upgraded" }
 end
 ]=]
 
@@ -1251,7 +1242,7 @@ local RewardService = require(script.Parent.RewardService)
 
 local WheelService = {}
 
-local function text(nameKey) return LocalizationConfig["zh-tw"][nameKey] or nameKey end
+local function text(nameKey) return LocalizationConfig["en-us"][nameKey] or nameKey end
 local function weightedPick(entries)
     local total = 0
     for _, entry in pairs(entries) do total += entry.Weight or 1 end
@@ -1431,7 +1422,7 @@ local LocalizationConfig = require(Configs:WaitForChild("LocalizationConfig"))
 local ShopConfig = require(Configs:WaitForChild("ShopConfig"))
 local WheelConfig = require(Configs:WaitForChild("WheelConfig"))
 local SkillConfig = require(Configs:WaitForChild("SkillConfig"))
-local L = LocalizationConfig["zh-tw"]
+local L = LocalizationConfig["en-us"]
 
 local gui = player:WaitForChild("PlayerGui"):WaitForChild("CakeRainRNGHUD")
 local stats = gui:WaitForChild("StatsFrame")
@@ -1460,7 +1451,7 @@ local wheelRewardGeneration = 0
 
 local function buttonLabel(item)
     local name = L[item.NameKey] or item.NameKey
-    return string.format("%s\n%s %d", name, item.Currency == "WheelPoints" and "轉盤點數" or "蛋糕積分", item.Cost)
+    return string.format("%s\n%s %d", name, item.Currency == "WheelPoints" and "Wheel Points" or "Cake Points", item.Cost)
 end
 
 local function bindShopButtons()
@@ -1472,7 +1463,7 @@ local function bindShopButtons()
         local button = template:Clone()
         button.Name, button.Visible, button.LayoutOrder = "Item" .. index, true, index
         button.ItemName.Text = L[item.NameKey] or item.NameKey
-        button.ItemCost.Text = string.format("%s %d", item.Currency == "WheelPoints" and "轉盤點數" or "蛋糕積分", item.Cost)
+        button.ItemCost.Text = string.format("%s %d", item.Currency == "WheelPoints" and "Wheel Points" or "Cake Points", item.Cost)
         button.Activated:Connect(function() RequestShopPurchase:InvokeServer(item.Id) end)
         button.Parent = grid
     end
@@ -1498,7 +1489,7 @@ local function refreshEffectBar()
         slot.Position = UDim2.new(0, 10 + (index - 1) * 52, 0, 14)
         slot.Image = buff.Icon or ""
         slot.Outline.Color = buff.OutlineColor or Color3.fromRGB(255, 255, 255)
-        slot:SetAttribute("Tooltip", string.format("%s [%s] 層數:%s / %ss", buff.Name, buff.Rarity, tostring(buff.Stacks or 1), tostring(buff.Remaining)))
+        slot:SetAttribute("Tooltip", string.format("%s [%s] Stacks:%s / %ss", buff.Name, buff.Rarity, tostring(buff.Stacks or 1), tostring(buff.Remaining)))
         local cooldown, cooldownText = slot.CooldownFill, slot.CooldownText
         local remaining, duration = buff.CooldownRemaining or 0, buff.CooldownDuration or 0
         cooldown.Visible = duration > 0 and remaining > 0
@@ -1541,7 +1532,7 @@ local function refreshStats()
     local autoAvailable = hasAutoRoll()
     if not autoAvailable then autoRollEnabled = false end
     autoRollToggle.Visible = autoAvailable
-    autoRollToggle.Text = autoRollEnabled and "自動抽獎: ON" or "自動抽獎: OFF"
+    autoRollToggle.Text = autoRollEnabled and "Auto-Roll: ON" or "Auto-Roll: OFF"
     autoRollToggle.BackgroundColor3 = autoRollEnabled and Color3.fromRGB(95, 190, 120) or Color3.fromRGB(80, 95, 120)
     wheel.Visible = state.WheelSpins > 0 or spinning or autoAvailable
     cardFrame.Visible = state.PendingCardDraw
@@ -1549,9 +1540,9 @@ local function refreshStats()
     currentDrawLabel.Visible = reward ~= nil
     if reward then
         if reward.EffectText then
-            currentDrawLabel.Text = string.format("轉盤抽到：%s [%s]｜%s", reward.Name, reward.Rarity, reward.EffectText)
+            currentDrawLabel.Text = string.format("Wheel reward: %s [%s] | %s", reward.Name, reward.Rarity, reward.EffectText)
         else
-            currentDrawLabel.Text = string.format("轉盤抽到：%s [%s]｜層數 %d", reward.Name, reward.Rarity, reward.Stacks or 1)
+            currentDrawLabel.Text = string.format("Wheel reward: %s [%s] | Stacks %d", reward.Name, reward.Rarity, reward.Stacks or 1)
         end
     end
     refreshEffectBar()
@@ -1749,4 +1740,4 @@ if recording then
 end
 
 Selection:Set({serverScript, clientScript, mainGui, wheelConfig, cakeConfig, skillConfig, cardConfig, shopConfig, rewardScripts, rewardService, skillScripts, uiConfig, localizationConfig, cakeModelsFolder, mapBase})
-print("✅ Cake Rain RNG 已重構完成：靜態 UI/HUB/轉盤分區、動畫抽獎、非錨定下落蛋糕、自動吞食、稀有度 outline、發光特效、下沉與咖啡色痕跡、DataStore 個人資料皆已配置。")
+print("✅ Cake Rain RNG rebuild complete: static UI/HUB/wheel sectors, animated draws, unanchored falling cakes, auto-eating, rarity outlines, glow effects, sinking cleanup, and player DataStore are configured.")
