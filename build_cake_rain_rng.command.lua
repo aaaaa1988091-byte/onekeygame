@@ -57,11 +57,11 @@ local WheelConfig = {
         SSR = Color3.fromRGB(120, 255, 255),
     },
     Rewards = {
-        EatSpeed = { ScriptName = "EatSpeed", NameKey = "Reward_EatSpeed", Weight = 300, IsUnlockedDefault = true },
-        GlowCakeBoost = { ScriptName = "GlowRate", NameKey = "Reward_GlowBoost", Weight = 50, IsUnlockedDefault = false, UnlockCostWheelPoints = 50 },
-        AutoRoll = { ScriptName = "AutoRoll", NameKey = "Reward_AutoRoll", Weight = 50, IsUnlockedDefault = true },
-        WheelHaste = { ScriptName = "WheelHaste", NameKey = "Reward_WheelHaste", Weight = 65, IsUnlockedDefault = true },
-        WheelLevelUp = { ScriptName = "WheelLevelUp", NameKey = "Reward_WheelLevelUp", Weight = 55, IsUnlockedDefault = true },
+        EatSpeed = { ScriptName = "EatSpeed", NameKey = "Reward_EatSpeed", Weight = 300, Icon = "rbxassetid://6031075938", IsUnlockedDefault = true },
+        GlowCakeBoost = { ScriptName = "GlowRate", NameKey = "Reward_GlowBoost", Weight = 50, Icon = "rbxassetid://6031071053", IsUnlockedDefault = false, UnlockCostWheelPoints = 50 },
+        AutoRoll = { ScriptName = "AutoRoll", NameKey = "Reward_AutoRoll", Weight = 50, Icon = "rbxassetid://6031091002", IsUnlockedDefault = true },
+        WheelHaste = { ScriptName = "WheelHaste", NameKey = "Reward_WheelHaste", Weight = 65, Icon = "rbxassetid://6031763426", IsUnlockedDefault = true },
+        WheelLevelUp = { ScriptName = "WheelLevelUp", NameKey = "Reward_WheelLevelUp", Weight = 55, Icon = "rbxassetid://6031068426", IsUnlockedDefault = true },
     },
 }
 return WheelConfig
@@ -148,11 +148,11 @@ shopConfig.Source = [=[
 -- Only planned purchasable gameplay cards are listed here.  Cosmetics/themes are intentionally absent.
 local ShopConfig = {
     WheelPointShop = {
-        { Id = "GlowCakeBoost", NameKey = "Reward_GlowBoost", Cost = 50, Currency = "WheelPoints", UnlockType = "WheelReward" },
+        { Id = "GlowCakeBoost", NameKey = "Reward_GlowBoost", Cost = 50, Currency = "WheelPoints", UnlockType = "WheelReward", Icon = "rbxassetid://6031071053" },
     },
     CakePointShop = {
-        { Id = "Card_Tornado", NameKey = "Card_Tornado", Cost = 1500, Currency = "CakePoints", UnlockType = "Card" },
-        { Id = "Card_Ant", NameKey = "Card_Ant", Cost = 3000, Currency = "CakePoints", UnlockType = "Card" },
+        { Id = "Card_Tornado", NameKey = "Card_Tornado", Cost = 1500, Currency = "CakePoints", UnlockType = "Card", Icon = "rbxassetid://6031068421" },
+        { Id = "Card_Ant", NameKey = "Card_Ant", Cost = 3000, Currency = "CakePoints", UnlockType = "Card", Icon = "rbxassetid://6031068421" },
     },
 }
 return ShopConfig
@@ -298,26 +298,28 @@ pointer.Text = "▶"
 pointer.TextScaled = true
 pointer.TextColor3 = Color3.fromRGB(255, 240, 110)
 for index = 1, 5 do
-    -- A radial slice starts at the centre and is clipped by the circular disc, producing a pie-chart wheel.
+    -- Slot labels are positioned by polar coordinates so the wheel stays evenly spaced.
     local angle = -90 + (index - 1) * 72
+    local radians = math.rad(angle)
     local sector = newGui("Frame", "Sector" .. index, disc)
-    sector.AnchorPoint = Vector2.new(0.5, 1)
-    sector.Size = UDim2.new(0, 132, 0, 174)
-    sector.Position = UDim2.new(0.5, 0, 0.5, 0)
-    sector.Rotation = angle + 90
+    sector.AnchorPoint = Vector2.new(0.5, 0.5)
+    sector.Size = UDim2.new(0, 116, 0, 74)
+    sector.Position = UDim2.new(0.5, math.cos(radians) * 118, 0.5, math.sin(radians) * 118)
+    sector.Rotation = 0
     sector:SetAttribute("WheelAngle", angle)
+    sector:SetAttribute("WheelRadius", 118)
     sector.BackgroundColor3 = index % 2 == 0 and Color3.fromRGB(76, 54, 120) or Color3.fromRGB(95, 63, 145)
     sector.BackgroundTransparency = 0.05
     sector.BorderSizePixel = 0
+    newGui("UICorner", "Corner", sector).CornerRadius = UDim.new(0, 14)
     local text = newGui("TextLabel", "Text", sector)
     text.BackgroundTransparency = 1
-    text.Size = UDim2.new(1, -14, 0, 46)
-    text.Position = UDim2.new(0, 7, 0, 102)
-    -- Keep text readable while its slice rotates around the centre.
-    text.Rotation = -sector.Rotation
+    text.Size = UDim2.new(1, -12, 1, -10)
+    text.Position = UDim2.new(0, 6, 0, 5)
     text.Font = Enum.Font.GothamBold
     text.Text = "?"
     text.TextScaled = true
+    text.TextWrapped = true
     text.TextColor3 = Color3.fromRGB(255, 255, 255)
     text.TextStrokeTransparency = 0.45
 end
@@ -477,6 +479,11 @@ shopTemplate.Size = UDim2.new(0, 128, 0, 128)
 shopTemplate.BackgroundColor3 = Color3.fromRGB(255, 230, 145)
 shopTemplate.AutoButtonColor = true
 shopTemplate.Visible = false
+local shopIcon = newGui("ImageLabel", "Icon", shopTemplate)
+shopIcon.BackgroundTransparency = 1
+shopIcon.Size = UDim2.new(0, 46, 0, 46)
+shopIcon.Position = UDim2.new(0.5, -23, 0, 54)
+shopIcon.Image = ""
 newGui("UICorner", "Corner", shopTemplate).CornerRadius = UDim.new(0, 12)
 local itemName = newGui("TextLabel", "ItemName", shopTemplate)
 itemName.BackgroundTransparency = 1
@@ -526,17 +533,24 @@ bagList.BorderSizePixel = 0
 bagList.ScrollBarThickness = 8
 bagList.CanvasSize = UDim2.new(0, 0, 0, 0)
 newGui("UICorner", "Corner", bagList).CornerRadius = UDim.new(0, 14)
-local bagLayout = newGui("UIListLayout", "ListLayout", bagList)
-bagLayout.Padding = UDim.new(0, 8)
-local bagTemplate = newGui("TextLabel", "EntryTemplate", bagList)
-bagTemplate.Size = UDim2.new(1, -16, 0, 42)
+local bagLayout = newGui("UIGridLayout", "GridLayout", bagList)
+bagLayout.CellSize = UDim2.new(0, 128, 0, 128)
+bagLayout.CellPadding = UDim2.new(0, 12, 0, 12)
+bagLayout.HorizontalAlignment = Enum.HorizontalAlignment.Center
+local bagTemplate = newGui("ImageLabel", "EntryTemplate", bagList)
+bagTemplate.Size = UDim2.new(0, 128, 0, 128)
 bagTemplate.BackgroundColor3 = Color3.fromRGB(58, 74, 88)
-bagTemplate.Font = Enum.Font.GothamBold
-bagTemplate.TextScaled = true
-bagTemplate.TextXAlignment = Enum.TextXAlignment.Left
-bagTemplate.TextColor3 = Color3.fromRGB(255, 255, 255)
+bagTemplate.Image = ""
 bagTemplate.Visible = false
 newGui("UICorner", "Corner", bagTemplate).CornerRadius = UDim.new(0, 10)
+local bagEntryName = newGui("TextLabel", "ItemName", bagTemplate)
+bagEntryName.BackgroundTransparency = 1
+bagEntryName.Size = UDim2.new(1, -10, 0, 42)
+bagEntryName.Position = UDim2.new(0, 5, 1, -46)
+bagEntryName.Font = Enum.Font.GothamBold
+bagEntryName.TextScaled = true
+bagEntryName.TextWrapped = true
+bagEntryName.TextColor3 = Color3.fromRGB(255, 255, 255)
 
 local serverPackage = getOrCreate(ServerScriptService, "Folder", "CakeRainRNG")
 local servicesPackage = getOrCreate(serverPackage, "Folder", "Services")
@@ -625,7 +639,9 @@ function StateService.Create(player, loaded)
         CakePoints = loaded.CakePoints or 0,
         PendingCardDraw = false,
         LastWheelReward = nil,
-        Buffs = {},
+        Buffs = StateService.RestoreBuffs(loaded.ActiveBuffs or loaded.Buffs),
+        OwnedItems = loaded.OwnedItems or {},
+        Stats = loaded.Stats or {},
         UnlockedWheelRewards = loaded.UnlockedWheelRewards or {},
         UnlockedCards = loaded.UnlockedCards or {},
     }
@@ -644,6 +660,43 @@ function StateService.GetProfile(player)
     return state
 end
 
+function StateService.RestoreBuffs(savedBuffs)
+    local restored, now = {}, os.clock()
+    for buffType, stacks in pairs(savedBuffs or {}) do
+        restored[buffType] = {}
+        for _, stack in ipairs(stacks) do
+            local copy = table.clone(stack)
+            local remaining = copy.Remaining or math.max(0, (copy.ExpiresAt or now) - (copy.SavedAt or now))
+            if remaining > 0 then
+                copy.ExpiresAt = now + remaining
+                copy.Remaining = nil
+                copy.SavedAt = nil
+                table.insert(restored[buffType], copy)
+            end
+        end
+    end
+    return restored
+end
+
+function StateService.SerializeBuffs(state)
+    local saved, now = {}, os.clock()
+    for buffType, stacks in pairs(state.Buffs or {}) do
+        for _, stack in ipairs(stacks) do
+            local remaining = math.max(0, (stack.ExpiresAt or now) - now)
+            if remaining > 0 then
+                saved[buffType] = saved[buffType] or {}
+                local copy = table.clone(stack)
+                copy.Remaining = remaining
+                copy.SavedAt = now
+                copy.ExpiresAt = nil
+                copy.CooldownEndsAt = nil
+                table.insert(saved[buffType], copy)
+            end
+        end
+    end
+    return saved
+end
+
 function StateService.Serialize(player)
     local state = StateService.Get(player)
     if not state then return {} end
@@ -652,6 +705,9 @@ function StateService.Serialize(player)
         WheelPoints = state.WheelPoints,
         WheelLevel = state.WheelLevel,
         CakePoints = state.CakePoints,
+        ActiveBuffs = StateService.SerializeBuffs(state),
+        OwnedItems = state.OwnedItems,
+        Stats = state.Stats,
         UnlockedWheelRewards = state.UnlockedWheelRewards,
         UnlockedCards = state.UnlockedCards,
     }
@@ -690,13 +746,27 @@ function StateService.AddBuff(player, key, reward)
     if not state then return end
     local buffType, now = reward.Type == "Stat" and reward.Stat or reward.Type, os.clock()
     state.Buffs[buffType] = state.Buffs[buffType] or {}
-    -- Matching wheel rewards stack their duration and share one effective buff.
+    local incomingPriority = WheelConfig.RarityPriority[reward.Rarity] or 0
+    local bestHigher
     for _, existing in ipairs(state.Buffs[buffType]) do
-        if existing.Key == key and existing.ExpiresAt > now then
-            existing.ExpiresAt += reward.BaseDuration
-            existing.Stacks = (existing.Stacks or 1) + 1
-            return existing
+        if existing.ExpiresAt > now then
+            local existingPriority = WheelConfig.RarityPriority[existing.Rarity] or 0
+            if existingPriority > incomingPriority then
+                bestHigher = existing
+            elseif existing.Key == key and existingPriority == incomingPriority then
+                existing.ExpiresAt += reward.BaseDuration
+                existing.Stacks = (existing.Stacks or 1) + 1
+                return existing
+            end
         end
+    end
+    if bestHigher then
+        bestHigher.SuppressedLowerStack = true
+        return bestHigher
+    end
+    for index = #state.Buffs[buffType], 1, -1 do
+        local existing = state.Buffs[buffType][index]
+        if (WheelConfig.RarityPriority[existing.Rarity] or 0) < incomingPriority then table.remove(state.Buffs[buffType], index) end
     end
     local stack = { Key = key, NameKey = reward.NameKey, Rarity = reward.Rarity, Value = reward.Value, Level = reward.Level, Icon = reward.Icon, Interval = reward.Interval, MultiRolls = reward.MultiRolls, Stacks = 1, ExpiresAt = now + reward.BaseDuration }
     table.insert(state.Buffs[buffType], stack)
@@ -709,19 +779,26 @@ function StateService.AddCardBuff(player, key, card)
     local abilityKey, now = card.AbilityKey or key, os.clock()
     local buffType = "Skill_" .. abilityKey
     state.Buffs[buffType] = state.Buffs[buffType] or {}
-    -- Same ability and same level extends duration; different levels coexist and best rarity/level overrides the HUD/effect.
-    for _, existing in ipairs(state.Buffs[buffType]) do
-        local level = card.Level or (WheelConfig.RarityPriority[card.Rarity] or 1)
-        local duration = card.Duration or 60
-        if existing.Key == key and existing.Level == level and existing.ExpiresAt > now then
-            existing.ExpiresAt += duration
-            existing.Stacks = (existing.Stacks or 1) + 1
-            return existing, false
-        end
-    end
     local level = card.Level or (WheelConfig.RarityPriority[card.Rarity] or 1)
     local duration = card.Duration or 60
-    local stack = { Key = key, AbilityKey = abilityKey, NameKey = card.NameKey, Rarity = card.Rarity, Value = 1, Level = level, Icon = card.Icon, SkillId = card.SkillId, Parameters = card.Parameters or {}, TriggerInterval = card.TriggerInterval or 1, Stacks = 1, ExpiresAt = now + duration }
+    for _, existing in ipairs(state.Buffs[buffType]) do
+        if existing.ExpiresAt > now then
+            local existingLevel = existing.Level or (WheelConfig.RarityPriority[existing.Rarity] or 1)
+            if existingLevel > level then
+                existing.SuppressedLowerStack = true
+                return existing, false
+            elseif existing.Key == key and existingLevel == level then
+                existing.ExpiresAt += duration
+                existing.Stacks = (existing.Stacks or 1) + 1
+                return existing, false
+            end
+        end
+    end
+    for index = #state.Buffs[buffType], 1, -1 do
+        local existing = state.Buffs[buffType][index]
+        if (existing.Level or (WheelConfig.RarityPriority[existing.Rarity] or 1)) < level then table.remove(state.Buffs[buffType], index) end
+    end
+    local stack = { Key = key, AbilityKey = abilityKey, NameKey = card.NameKey, Rarity = card.Rarity, Value = 1, Level = level, Icon = card.Icon, SkillId = card.SkillId, ScriptName = card.ScriptName, Parameters = card.Parameters or {}, TriggerInterval = card.TriggerInterval or 1, Stacks = 1, ExpiresAt = now + duration }
     table.insert(state.Buffs[buffType], stack)
     return stack, true
 end
@@ -751,11 +828,11 @@ function StateService.BuildInventory(player)
     local inventory = { WheelRewards = {}, Cards = {} }
     if not state then return inventory end
     for key, reward in pairs(WheelConfig.Rewards) do
-        table.insert(inventory.WheelRewards, { Key = key, Name = text(reward.NameKey), Owned = reward.IsUnlockedDefault or state.UnlockedWheelRewards[key] == true })
+        if reward.IsUnlockedDefault or state.UnlockedWheelRewards[key] == true then table.insert(inventory.WheelRewards, { Key = key, Name = text(reward.NameKey), Owned = true, Icon = reward.Icon or "" }) end
     end
     local SkillConfig = require(Configs.SkillConfig)
     for key, card in pairs(SkillConfig.Cards) do
-        table.insert(inventory.Cards, { Key = key, Name = text(card.NameKey), Owned = card.IsUnlockedDefault or state.UnlockedCards[key] == true })
+        if card.IsUnlockedDefault or state.UnlockedCards[key] == true then table.insert(inventory.Cards, { Key = key, Name = text(card.NameKey), Owned = true, Icon = card.Icon or "" }) end
     end
     return inventory
 end
@@ -851,7 +928,39 @@ end
 function CakeService.UpdateScale(cake)
     local hp = math.max(0, cake:GetAttribute("Health") or 0)
     local scale = CakeConfig.MinimumCakeScale + (CakeConfig.MaximumCakeScale - CakeConfig.MinimumCakeScale) * math.clamp(hp / CakeConfig.HealthForMaximumScale, 0, 1)
-    cake:ScaleTo(scale) -- Cakes visibly shrink continuously as their remaining HP falls.
+    local currentScale = cake:GetScale()
+    local previousTarget = cake:GetAttribute("TargetScale") or currentScale
+    cake:SetAttribute("TargetScale", scale)
+    if math.abs(scale - currentScale) < 0.01 then
+        cake:ScaleTo(scale)
+        return
+    end
+    local token = (cake:GetAttribute("ScaleTweenToken") or 0) + 1
+    cake:SetAttribute("ScaleTweenToken", token)
+    local primary = cake.PrimaryPart
+    if primary and math.abs(scale - previousTarget) > 0.025 then
+        local burst = Instance.new("ParticleEmitter")
+        burst.Name = scale > previousTarget and "CakeGrowSparkles" or "CakeShrinkCrumbs"
+        burst.Texture = "rbxassetid://241876023"
+        burst.Color = ColorSequence.new(scale > previousTarget and Color3.fromRGB(255, 245, 140) or Color3.fromRGB(255, 210, 170))
+        burst.Lifetime = NumberRange.new(0.22, 0.42)
+        burst.Rate = 0
+        burst.Speed = NumberRange.new(2, 5)
+        burst.SpreadAngle = Vector2.new(180, 180)
+        burst.Parent = primary
+        burst:Emit(18)
+        game:GetService("Debris"):AddItem(burst, 0.6)
+    end
+    task.spawn(function()
+        local started, duration = os.clock(), 0.28
+        while cake.Parent and cake:GetAttribute("ScaleTweenToken") == token do
+            local alpha = math.clamp((os.clock() - started) / duration, 0, 1)
+            local eased = 1 - ((1 - alpha) * (1 - alpha))
+            cake:ScaleTo(currentScale + (scale - currentScale) * eased)
+            if alpha >= 1 then break end
+            RunService.Heartbeat:Wait()
+        end
+    end)
 end
 function CakeService.RefreshLabel(cake)
     local rarity = CakeConfig.Rarities[cake:GetAttribute("RarityKey")] or CakeConfig.Rarities.Common
@@ -1301,14 +1410,9 @@ skillService.Source = [=[
 local StateService = require(script.Parent.StateService)
 local SkillScripts = script.Parent.SkillScripts
 local SkillService = {}
-function SkillService.Activate(player, cardKey, card)
-    local skill = SkillScripts:FindFirstChild(card.ScriptName)
-    if not skill then warn("Cake Rain RNG: missing skill script", card.ScriptName); return end
-    local module = require(skill)
-    local resolvedCard = module.Resolve and module.Resolve(card) or card
-    local stack, isNew = StateService.AddCardBuff(player, cardKey, resolvedCard)
-    if not stack then return end
-    if isNew then task.spawn(function()
+
+local function runStack(player, module, stack)
+    task.spawn(function()
         while player.Parent and os.clock() < stack.ExpiresAt do
             local cooldown = math.max(.1, stack.TriggerInterval)
             stack.CooldownEndsAt = os.clock() + cooldown
@@ -1318,8 +1422,33 @@ function SkillService.Activate(player, cardKey, card)
             StateService.Push(player)
         end
         StateService.Push(player)
-    end) end
+    end)
+end
+
+function SkillService.Activate(player, cardKey, card)
+    local skill = SkillScripts:FindFirstChild(card.ScriptName)
+    if not skill then warn("Cake Rain RNG: missing skill script", card.ScriptName); return end
+    local module = require(skill)
+    local resolvedCard = module.Resolve and module.Resolve(card) or card
+    local stack, isNew = StateService.AddCardBuff(player, cardKey, resolvedCard)
+    if not stack then return end
+    if isNew then runStack(player, module, stack) end
     return stack
+end
+
+function SkillService.ResumePlayer(player)
+    local state = StateService.Get(player)
+    if not state then return end
+    for buffType, stacks in pairs(state.Buffs or {}) do
+        if string.sub(buffType, 1, 6) == "Skill_" then
+            for _, stack in ipairs(stacks) do
+                if stack.ExpiresAt > os.clock() then
+                    local skill = SkillScripts:FindFirstChild(stack.ScriptName or stack.SkillId or "") or SkillScripts:FindFirstChild(({ PullNearest = "HookSkill", Attract = "AttractSkill", Tornado = "TornadoSkill", AntCourier = "AntSkill" })[stack.SkillId] or "")
+                    if skill then runStack(player, require(skill), stack) end
+                end
+            end
+        end
+    end
 end
 return SkillService
 ]=]
@@ -1458,6 +1587,7 @@ function WheelService.Start()
         if item.Currency == "WheelPoints" and state.WheelPoints < item.Cost then return { Ok = false, Error = "NO_WHEEL_POINTS" } end
         if item.Currency == "CakePoints" and state.CakePoints < item.Cost then return { Ok = false, Error = "NO_CAKE_POINTS" } end
         state[item.Currency] = state[item.Currency] - item.Cost
+        state.OwnedItems[item.Id] = true
         if item.UnlockType == "WheelReward" then state.UnlockedWheelRewards[item.Id] = true end
         if item.UnlockType == "Card" then state.UnlockedCards[item.Id] = true end
         StateService.UpdateLeaderstats(player)
@@ -1476,11 +1606,13 @@ local DataService = require(script.Parent.Services.DataService)
 local StateService = require(script.Parent.Services.StateService)
 local CakeService = require(script.Parent.Services.CakeService)
 local WheelService = require(script.Parent.Services.WheelService)
+local SkillService = require(script.Parent.Services.SkillService)
 
 WheelService.Start()
 
 local function setupPlayer(player)
     StateService.Create(player, DataService.Load(player))
+    SkillService.ResumePlayer(player)
     CakeService.StartPlayer(player)
 end
 
@@ -1488,6 +1620,15 @@ Players.PlayerAdded:Connect(setupPlayer)
 for _, player in ipairs(Players:GetPlayers()) do
     task.spawn(setupPlayer, player)
 end
+
+task.spawn(function()
+    while true do
+        task.wait(60)
+        for _, player in ipairs(Players:GetPlayers()) do
+            DataService.Save(player, StateService.Serialize(player))
+        end
+    end
+end)
 
 Players.PlayerRemoving:Connect(function(player)
     DataService.Save(player, StateService.Serialize(player))
@@ -1560,6 +1701,7 @@ local function bindShopButtons()
         local button = template:Clone()
         button.Name, button.Visible, button.LayoutOrder = "Item" .. index, true, index
         button.ItemName.Text = L[item.NameKey] or item.NameKey
+        button.Icon.Image = item.Icon or ""
         button.ItemCost.Text = string.format("%s %d", item.Currency == "WheelPoints" and "Wheel Points" or "Cake Points", item.Cost)
         button.Activated:Connect(function() RequestShopPurchase:InvokeServer(item.Id) end)
         button.Parent = grid
@@ -1608,34 +1750,32 @@ local function refreshEffectBar()
     buffFrame.Visible = index > 0
 end
 
-local function addBagLine(template, text, order, owned)
-    local row = template:Clone()
-    row.Name = "Entry" .. tostring(order)
-    row.LayoutOrder = order
-    row.Visible = true
-    row.Text = "  " .. text
-    row.BackgroundColor3 = owned and Color3.fromRGB(58, 96, 78) or Color3.fromRGB(82, 70, 74)
-    row.Parent = template.Parent
+local function addBagTile(template, item, order)
+    if not item.Owned then return end
+    local tile = template:Clone()
+    tile.Name = "Entry" .. tostring(order)
+    tile.LayoutOrder = order
+    tile.Visible = true
+    tile.Image = item.Icon or ""
+    tile.ItemName.Text = item.Name
+    tile.BackgroundColor3 = Color3.fromRGB(58, 96, 78)
+    tile.Parent = template.Parent
 end
 
 local function refreshBag()
     local list = bagPanel:WaitForChild("BagList")
     local template = list:WaitForChild("EntryTemplate")
-    for _, child in ipairs(list:GetChildren()) do if child:IsA("TextLabel") and child.Name ~= "EntryTemplate" then child:Destroy() end end
+    for _, child in ipairs(list:GetChildren()) do if child:IsA("ImageLabel") and child.Name ~= "EntryTemplate" then child:Destroy() end end
     local order = 0
-    order += 1
-    addBagLine(template, L.UI_Bag_Wheel, order, true)
     for _, item in ipairs((state.Inventory and state.Inventory.WheelRewards) or {}) do
         order += 1
-        addBagLine(template, string.format("%s - %s", item.Name, item.Owned and L.UI_Unlocked or L.UI_Locked), order, item.Owned)
+        addBagTile(template, item, order)
     end
-    order += 1
-    addBagLine(template, L.UI_Bag_Cards, order, true)
     for _, item in ipairs((state.Inventory and state.Inventory.Cards) or {}) do
         order += 1
-        addBagLine(template, string.format("%s - %s", item.Name, item.Owned and L.UI_Unlocked or L.UI_Locked), order, item.Owned)
+        addBagTile(template, item, order)
     end
-    task.defer(function() list.CanvasSize = UDim2.new(0, 0, 0, list.ListLayout.AbsoluteContentSize.Y + 16) end)
+    task.defer(function() list.CanvasSize = UDim2.new(0, 0, 0, list.GridLayout.AbsoluteContentSize.Y + 16) end)
 end
 
 local function refreshStats()
@@ -1687,7 +1827,13 @@ local function layoutSpinPanel(panel, index, total)
     panelDisc.Size = UDim2.new(0, width, 0, width)
     for sectorIndex = 1, 5 do
         local sector = panelDisc:FindFirstChild("Sector" .. sectorIndex)
-        if sector then sector.Size = UDim2.new(0, 110, 0, 145) end
+        if sector then
+            local angle = sector:GetAttribute("WheelAngle") or (-90 + (sectorIndex - 1) * 72)
+            local radians, radius = math.rad(angle), 98
+            sector.Size = UDim2.new(0, 104, 0, 68)
+            sector.Position = UDim2.new(0.5, math.cos(radians) * radius, 0.5, math.sin(radians) * radius)
+            sector:SetAttribute("WheelRadius", radius)
+        end
     end
 end
 
