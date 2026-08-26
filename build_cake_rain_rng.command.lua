@@ -571,6 +571,9 @@ end
 
 function DataService.Load(player)
     local key = "Player_" .. player.UserId
+    if RunService:IsStudio() then
+        return memory[key] or {}
+    end
     local activeStore = getStore()
     if activeStore then
         local ok, data = pcall(function()
@@ -1502,6 +1505,13 @@ local function unlockedRewards(state)
     local entries = {}
     for key, reward in pairs(WheelConfig.Rewards) do
         if reward.IsUnlockedDefault or state.UnlockedWheelRewards[key] then entries[key] = reward end
+    end
+    return entries
+end
+local function unlockedCards(state)
+    local entries = {}
+    for key, card in pairs(CardConfig.Cards) do
+        if card.IsUnlockedDefault or state.UnlockedCards[key] then entries[key] = card end
     end
     return entries
 end
