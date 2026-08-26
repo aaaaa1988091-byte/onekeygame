@@ -66,7 +66,6 @@ local WheelConfig = {
     },
     Rewards = {
         EatSpeed = { ScriptName = "EatSpeed", NameKey = "Reward_EatSpeed", Weight = 300, Icon = "rbxassetid://6031075938", IsUnlockedDefault = true },
-        GlowCakeBoost = { ScriptName = "GlowRate", NameKey = "Reward_GlowBoost", Weight = 50, Icon = "rbxassetid://6031071053", IsUnlockedDefault = false, UnlockCostWheelPoints = 50 },
         AutoRoll = { ScriptName = "AutoRoll", NameKey = "Reward_AutoRoll", Weight = 50, Icon = "rbxassetid://6031091002", IsUnlockedDefault = true },
         WheelHaste = { ScriptName = "WheelHaste", NameKey = "Reward_WheelHaste", Weight = 65, Icon = "rbxassetid://6031763426", IsUnlockedDefault = true },
         WheelLevelUp = { ScriptName = "WheelLevelUp", NameKey = "Reward_WheelLevelUp", Weight = 55, Icon = "rbxassetid://6031068426", IsUnlockedDefault = true },
@@ -83,9 +82,8 @@ local LocalizationConfig = {
         UI_Spins_Left = "Spins Left: ", UI_WheelPoints = "Wheel Points: ", UI_CakePoints = "Cake Points: ",
         UI_AutoRoll_Active = "Auto-Roll Active...", UI_Shop_Title = "Shop Hub", UI_CakeShop_Title = "Cake Point Shop",
         UI_WheelShop_Title = "Wheel Point Shop", UI_Time_Left = "Time Left: ", UI_No_Buff = "No Active Buff", UI_Spin = "Spin",
-        UI_Card_Draw = "Glow Cake Card Draw", UI_Open_Shop = "Shop", UI_Open_Bag = "Bag", UI_Close = "Close", UI_Buy = "Buy", UI_Bag_Title = "Ability Bag", UI_Bag_Wheel = "Wheel Terms", UI_Bag_Cards = "Drawable Skills", UI_Locked = "Locked", UI_Unlocked = "Owned",
-        Cake_Common = "Common Cake", Cake_Rare = "Rare Cake", Cake_Epic = "Epic Cake", Cake_Legendary = "Legendary Cake", Cake_Mythic = "Mythic Cake", Cake_Special = "Glow Cake",
-        Reward_EatSpeed = "Eat Speed Up", Reward_GlowBoost = "Glow Cake Rate Up", Reward_AutoRoll = "Auto-Roll", Reward_WheelHaste = "Wheel Haste", Reward_WheelLevelUp = "Wheel Level Up", Reward_PlayerSpeed = "Player Speed Up", UI_Normal_Wheel = "Reward Wheel", UI_Silver_Wheel = "Silver Wheel", UI_Merchant_Tab = "Mystery Merchant", UI_Upgrade = "Upgrade",
+        UI_Open_Shop = "Shop", UI_Open_Bag = "Bag", UI_Close = "Close", UI_Buy = "Buy", UI_Bag_Title = "Ability Bag", UI_Bag_Wheel = "Wheel Terms", UI_Bag_Cards = "Drawable Skills", UI_Locked = "Locked", UI_Unlocked = "Owned",
+        Cake_Common = "Common Cake", Cake_Rare = "Rare Cake", Cake_Epic = "Epic Cake", Cake_Legendary = "Legendary Cake", Cake_Mythic = "Mythic Cake", Reward_EatSpeed = "Eat Speed Up", Reward_AutoRoll = "Auto-Roll", Reward_WheelHaste = "Wheel Haste", Reward_WheelLevelUp = "Wheel Level Up", Reward_PlayerSpeed = "Player Speed Up", UI_Normal_Wheel = "Reward Wheel", UI_Silver_Wheel = "Silver Wheel", UI_Merchant_Tab = "Mystery Merchant", UI_Upgrade = "Upgrade",
         Card_Hook = "Grappling Hook", Card_Tornado = "Tornado", Card_Ant = "Ant Courier", Card_Attract = "Cake Attraction",
     },
 }
@@ -102,7 +100,6 @@ local CakeConfig = {
     SpawnRadius = 55,
     SpawnHeight = 85,
     -- Cake count is intentionally unbounded; CakeLifetimeSeconds is the cleanup limiter.
-    GlowBaseChance = 0.03,
     InitialBurstCount = 6,
     MeteorFallSpeed = 105,
     CakeBounciness = 0.05,
@@ -157,14 +154,12 @@ shopConfig.Source = [=[
 -- Only planned purchasable gameplay cards are listed here.  Cosmetics/themes are intentionally absent.
 local ShopConfig = {
     WheelPointShop = {
-        { Id = "GlowCakeBoost", NameKey = "Reward_GlowBoost", Cost = 50, Currency = "WheelPoints", UnlockType = "WheelReward", Icon = "rbxassetid://6031071053" },
     },
     CakePointShop = {
         { Id = "Card_Tornado", NameKey = "Card_Tornado", Cost = 1500, Currency = "CakePoints", UnlockType = "Card", Icon = "rbxassetid://6031068421" },
         { Id = "Card_Ant", NameKey = "Card_Ant", Cost = 3000, Currency = "CakePoints", UnlockType = "Card", Icon = "rbxassetid://6031068421" },
     },
     MysteryMerchantPool = {
-        { Id = "Merchant_GlowCakeBoost", Grants = "GlowCakeBoost", NameKey = "Reward_GlowBoost", Cost = 40, Currency = "WheelPoints", UnlockType = "WheelReward", Icon = "rbxassetid://6031071053", Weight = 3 },
         { Id = "Merchant_Tornado", Grants = "Card_Tornado", NameKey = "Card_Tornado", Cost = 1200, Currency = "CakePoints", UnlockType = "Card", Icon = "rbxassetid://6031068421", Weight = 2 },
         { Id = "Merchant_Ant", Grants = "Card_Ant", NameKey = "Card_Ant", Cost = 2400, Currency = "CakePoints", UnlockType = "Card", Icon = "rbxassetid://6031068421", Weight = 1 },
     },
@@ -177,7 +172,6 @@ uiConfig.Source = [=[
 local UIConfig = {
     WheelUI = { AutoHide = true, ShowCondition = "WheelSpins > 0", TitleKey = "UI_Spins_Left", Position = "RightSideHalfCircle", DisplayedSlots = 5 },
     AutoRollUI = { AutoHide = true, ShowCondition = "HasAutoRollTime", TitleKey = "UI_AutoRoll_Active" },
-    CardDrawUI = { AutoHide = true, ShowCondition = "TouchedGlowCake", TitleKey = "UI_Card_Draw" },
     BuffStatus = { AutoHide = true, ShowCondition = "ActiveBuffsCount > 0", TitleKey = "UI_Time_Left" },
     ShopUI = { AutoHide = true, ShowCondition = "ManualOpen", TitleKey = "UI_Shop_Title" },
 }
@@ -246,10 +240,22 @@ mainGui.ResetOnSpawn = false
 mainGui.IgnoreGuiInset = false
 clearChildren(mainGui)
 
+local function styleTextGui(gui)
+    if not (gui:IsA("TextLabel") or gui:IsA("TextButton")) then return end
+    gui.Font = Enum.Font.FredokaOne
+    local stroke = gui:FindFirstChild("TextStroke") or Instance.new("UIStroke")
+    stroke.Name = "TextStroke"
+    stroke.Color = Color3.fromRGB(0, 0, 0)
+    stroke.LineJoinMode = Enum.LineJoinMode.Round
+    stroke.Thickness = 3
+    stroke.Parent = gui
+end
+
 local function newGui(className, name, parent)
     local gui = Instance.new(className)
     gui.Name = name
     gui.Parent = parent
+    styleTextGui(gui)
     return gui
 end
 
@@ -264,126 +270,93 @@ for index, name in { "CakePointsLabel", "WheelPointsLabel", "SpinsLabel" } do
     label.BackgroundTransparency = 1
     label.Size = UDim2.new(1, -20, 0, 32)
     label.Position = UDim2.new(0, 10, 0, 8 + (index - 1) * 34)
-    label.Font = Enum.Font.GothamBold
+    label.Font = Enum.Font.FredokaOne
     label.TextScaled = true
     label.TextXAlignment = Enum.TextXAlignment.Left
     label.TextColor3 = Color3.fromRGB(255, 255, 255)
-    label.TextStrokeTransparency = 0.5
 end
 local shopButton = newGui("ImageButton", "ShopButton", mainGui)
 shopButton.Size = UDim2.new(0, 120, 0, 46)
 shopButton.Position = UDim2.new(0, 18, 0, 148)
 shopButton.BackgroundColor3 = Color3.fromRGB(255, 210, 110)
-shopButton.Font = Enum.Font.GothamBlack
 shopButton.Image = "rbxassetid://6031265976"
 newGui("UICorner", "Corner", shopButton).CornerRadius = UDim.new(0, 12)
 local bagButton = newGui("ImageButton", "BagButton", mainGui)
 bagButton.Size = UDim2.new(0, 120, 0, 46)
 bagButton.Position = UDim2.new(0, 148, 0, 148)
 bagButton.BackgroundColor3 = Color3.fromRGB(150, 220, 255)
-bagButton.Font = Enum.Font.GothamBlack
 bagButton.Image = "rbxassetid://6031265972"
 newGui("UICorner", "Corner", bagButton).CornerRadius = UDim.new(0, 12)
 
 local wheel = newGui("Frame", "WheelPanel", mainGui)
-wheel.Size = UDim2.new(0, 360, 0, 360)
--- Keep the entire wheel on-screen; the previous top-left positioning put half of it outside the viewport.
+wheel.Name = "WheelPanel"
+wheel.Size = UDim2.new(0, 420, 0, 410)
 wheel.AnchorPoint = Vector2.new(1, 0.5)
-wheel.Position = UDim2.new(1, -18, 0.5, 0)
+wheel.Position = UDim2.new(1, -20, 0.5, 0)
 wheel.BackgroundTransparency = 1
-wheel.ClipsDescendants = true
 wheel.Visible = false
+local wheelTitle = newGui("TextLabel", "Title", wheel)
+wheelTitle.Size = UDim2.new(1, 0, 0, 36)
+wheelTitle.BackgroundTransparency = 1
+wheelTitle.Font = Enum.Font.FredokaOne
+wheelTitle.Text = "LUCKY WHEEL"
+wheelTitle.TextScaled = true
+wheelTitle.TextColor3 = Color3.fromRGB(240, 242, 245)
 local disc = newGui("Frame", "WheelDisc", wheel)
-disc.Size = UDim2.new(0, 360, 0, 360)
-disc.Position = UDim2.new(0, 0, 0, 0)
-disc.BackgroundColor3 = Color3.fromRGB(42, 30, 70)
+disc.Size = UDim2.new(0, 160, 0, 300)
+disc.Position = UDim2.new(1, -180, 0, 44)
+disc.BackgroundColor3 = Color3.fromRGB(30, 34, 42)
 disc.ClipsDescendants = true
-newGui("UICorner", "Circle", disc).CornerRadius = UDim.new(1, 0)
-local pointer = newGui("TextLabel", "Pointer", wheel)
-pointer.BackgroundTransparency = 1
-pointer.Size = UDim2.new(0, 58, 0, 58)
-pointer.Position = UDim2.new(0, 4, 0.5, -29)
-pointer.Font = Enum.Font.GothamBlack
-pointer.Text = "▶"
-pointer.TextScaled = true
-pointer.TextColor3 = Color3.fromRGB(255, 240, 110)
-for index = 1, 5 do
-    -- Slot labels are positioned by polar coordinates so the wheel stays evenly spaced.
-    local angle = -90 + (index - 1) * 72
-    local radians = math.rad(angle)
-    local sector = newGui("Frame", "Sector" .. index, disc)
-    sector.AnchorPoint = Vector2.new(0.5, 0.5)
-    sector.Size = UDim2.new(0, 116, 0, 74)
-    sector.Position = UDim2.new(0.5, math.cos(radians) * 118, 0.5, math.sin(radians) * 118)
-    sector.Rotation = 0
-    sector:SetAttribute("WheelAngle", angle)
-    sector:SetAttribute("WheelRadius", 118)
-    sector.BackgroundColor3 = index % 2 == 0 and Color3.fromRGB(76, 54, 120) or Color3.fromRGB(95, 63, 145)
-    sector.BackgroundTransparency = 0.05
-    sector.BorderSizePixel = 0
-    newGui("UICorner", "Corner", sector).CornerRadius = UDim.new(0, 14)
-    local icon = newGui("ImageLabel", "Icon", sector)
-    icon.BackgroundTransparency = 1
-    icon.Size = UDim2.new(0, 26, 0, 26)
-    icon.Position = UDim2.new(0.5, -13, 0, 4)
-    icon.Image = ""
-    local text = newGui("TextLabel", "Text", sector)
-    text.BackgroundTransparency = 1
-    text.Size = UDim2.new(1, -12, 1, -34)
-    text.Position = UDim2.new(0, 6, 0, 31)
-    text.Font = Enum.Font.GothamBold
-    text.Text = "?"
-    text.TextScaled = true
-    text.TextWrapped = true
-    text.TextColor3 = Color3.fromRGB(255, 255, 255)
-    text.TextStrokeTransparency = 0.45
-end
+disc.BorderSizePixel = 0
+newGui("UICorner", "Corner", disc).CornerRadius = UDim.new(0, 10)
+local strip = newGui("Frame", "SlotStrip", disc)
+strip.Size = UDim2.new(1, 0, 0, 0)
+strip.BackgroundTransparency = 1
+strip.BorderSizePixel = 0
+local topShade = newGui("Frame", "TopShade", disc)
+topShade.Size = UDim2.new(1, 0, 0, 100)
+topShade.BackgroundColor3 = Color3.fromRGB(15, 17, 21)
+topShade.BackgroundTransparency = 0.45
+topShade.BorderSizePixel = 0
+topShade.ZIndex = 5
+local bottomShade = topShade:Clone()
+bottomShade.Name = "BottomShade"
+bottomShade.Position = UDim2.new(0, 0, 0, 200)
+bottomShade.Parent = disc
+local centerLine = newGui("Frame", "CenterLine", disc)
+centerLine.Size = UDim2.new(1, 0, 0, 100)
+centerLine.Position = UDim2.new(0, 0, 0, 100)
+centerLine.BackgroundTransparency = 1
+centerLine.ZIndex = 6
+local centerStroke = newGui("UIStroke", "CenterStroke", centerLine)
+centerStroke.Color = Color3.fromRGB(212, 163, 115)
+centerStroke.Thickness = 2
+local sideGrid = newGui("Frame", "SideGrid", wheel)
+sideGrid.Size = UDim2.new(0, 220, 0, 300)
+sideGrid.Position = UDim2.new(0, 20, 0, 44)
+sideGrid.BackgroundTransparency = 1
+local sideLayout = newGui("UIGridLayout", "GridLayout", sideGrid)
+sideLayout.CellSize = UDim2.new(0, 48, 0, 48)
+sideLayout.CellPadding = UDim2.new(0, 6, 0, 6)
 local spinButton = newGui("TextButton", "SpinButton", wheel)
-spinButton.Size = UDim2.new(0, 110, 0, 52)
-spinButton.Position = UDim2.new(0.5, -55, 0.5, -26)
-spinButton.BackgroundColor3 = Color3.fromRGB(255, 185, 80)
-spinButton.Font = Enum.Font.GothamBlack
-spinButton.Text = "旋轉"
+spinButton.Size = UDim2.new(0, 120, 0, 44)
+spinButton.Position = UDim2.new(0.5, -125, 1, -54)
+spinButton.BackgroundColor3 = Color3.fromRGB(200, 125, 117)
+spinButton.Font = Enum.Font.FredokaOne
+spinButton.Text = "SPIN"
 spinButton.TextScaled = true
-spinButton.TextColor3 = Color3.fromRGB(60, 35, 10)
-newGui("UICorner", "Corner", spinButton).CornerRadius = UDim.new(0, 14)
+spinButton.TextColor3 = Color3.fromRGB(240, 242, 245)
+newGui("UICorner", "Corner", spinButton).CornerRadius = UDim.new(0, 8)
 local autoRollToggle = newGui("TextButton", "AutoRollToggle", wheel)
-autoRollToggle.Size = UDim2.new(0, 150, 0, 38)
-autoRollToggle.Position = UDim2.new(0, 18, 1, -48)
-autoRollToggle.BackgroundColor3 = Color3.fromRGB(80, 95, 120)
-autoRollToggle.Font = Enum.Font.GothamBlack
-autoRollToggle.Text = "Auto-Roll: OFF"
+autoRollToggle.Size = UDim2.new(0, 120, 0, 44)
+autoRollToggle.Position = UDim2.new(0.5, 5, 1, -54)
+autoRollToggle.BackgroundColor3 = Color3.fromRGB(43, 48, 58)
+autoRollToggle.Font = Enum.Font.FredokaOne
+autoRollToggle.Text = "AUTO: OFF"
 autoRollToggle.TextScaled = true
-autoRollToggle.TextColor3 = Color3.fromRGB(255, 255, 255)
+autoRollToggle.TextColor3 = Color3.fromRGB(240, 242, 245)
 autoRollToggle.Visible = false
-newGui("UICorner", "Corner", autoRollToggle).CornerRadius = UDim.new(0, 12)
-for index = 1, 3 do
-    local anchor = newGui("Frame", "WheelAnchor" .. index, mainGui)
-    anchor.Size = UDim2.new(0, 300, 0, 300)
-    anchor.Position = UDim2.new(1, -338 - (index * 316), 0.5, -150)
-    anchor.BackgroundTransparency = 1
-end
-local silverWheel = wheel:Clone()
-silverWheel.Name = "SilverWheelPanel"
-silverWheel.Position = UDim2.new(1, -396, 0.5, 0)
-silverWheel.WheelDisc.BackgroundColor3 = Color3.fromRGB(155, 160, 170)
-silverWheel.SpinButton.Text = "DRAW"
-silverWheel.SpinButton.BackgroundColor3 = Color3.fromRGB(225, 230, 240)
-silverWheel.Parent = mainGui
-silverWheel.Visible = false
-local wheelModeButton = newGui("ImageButton", "WheelModeButton", mainGui)
-wheelModeButton.Size = UDim2.new(0, 46, 0, 46)
-wheelModeButton.Position = UDim2.new(1, -384, 0.5, 190)
-wheelModeButton.BackgroundColor3 = Color3.fromRGB(90, 75, 130)
-wheelModeButton.Image = "rbxassetid://6031094678"
-newGui("UICorner", "Corner", wheelModeButton).CornerRadius = UDim.new(0, 12)
-local silverModeButton = newGui("ImageButton", "SilverModeButton", mainGui)
-silverModeButton.Size = UDim2.new(0, 46, 0, 46)
-silverModeButton.Position = UDim2.new(1, -330, 0.5, 190)
-silverModeButton.BackgroundColor3 = Color3.fromRGB(180, 185, 195)
-silverModeButton.Image = "rbxassetid://6031763426"
-newGui("UICorner", "Corner", silverModeButton).CornerRadius = UDim.new(0, 12)
-
+newGui("UICorner", "Corner", autoRollToggle).CornerRadius = UDim.new(0, 8)
 local buffFrame = newGui("Frame", "EffectBar", mainGui)
 buffFrame.Size = UDim2.new(0, 392, 0, 74)
 buffFrame.Position = UDim2.new(0, 18, 1, -92)
@@ -414,10 +387,9 @@ templateCooldown.ZIndex = 2
 local templateCooldownText = newGui("TextLabel", "CooldownText", effectTemplate)
 templateCooldownText.BackgroundTransparency = 1
 templateCooldownText.Size = UDim2.fromScale(1, 1)
-templateCooldownText.Font = Enum.Font.GothamBlack
+templateCooldownText.Font = Enum.Font.FredokaOne
 templateCooldownText.TextScaled = true
 templateCooldownText.TextColor3 = Color3.fromRGB(255, 255, 255)
-templateCooldownText.TextStrokeTransparency = 0
 templateCooldownText.ZIndex = 3
 templateCooldownText.Visible = false
 
@@ -426,7 +398,7 @@ tooltip.Size = UDim2.new(0, 260, 0, 34)
 tooltip.Position = UDim2.new(0, 8, 0, -38)
 tooltip.BackgroundColor3 = Color3.fromRGB(15, 15, 20)
 tooltip.BackgroundTransparency = 0.08
-tooltip.Font = Enum.Font.GothamBold
+tooltip.Font = Enum.Font.FredokaOne
 tooltip.TextScaled = true
 tooltip.TextColor3 = Color3.fromRGB(255, 255, 255)
 tooltip.Visible = false
@@ -438,55 +410,11 @@ currentDrawLabel.Size = UDim2.new(0, 392, 0, 28)
 currentDrawLabel.Position = UDim2.new(0, 18, 1, -124)
 currentDrawLabel.BackgroundColor3 = Color3.fromRGB(20, 35, 45)
 currentDrawLabel.BackgroundTransparency = 0.12
-currentDrawLabel.Font = Enum.Font.GothamBold
+currentDrawLabel.Font = Enum.Font.FredokaOne
 currentDrawLabel.TextScaled = true
 currentDrawLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
 currentDrawLabel.Visible = false
 newGui("UICorner", "Corner", currentDrawLabel).CornerRadius = UDim.new(0, 8)
-
-local cardFrame = newGui("Frame", "CardDraw", mainGui)
-cardFrame.Size = UDim2.new(0, 420, 0, 230)
-cardFrame.Position = UDim2.new(0.5, -210, 0.5, -115)
-cardFrame.BackgroundColor3 = Color3.fromRGB(35, 25, 70)
-cardFrame.Visible = false
-newGui("UICorner", "Corner", cardFrame).CornerRadius = UDim.new(0, 18)
-local cardTitle = newGui("TextLabel", "Title", cardFrame)
-cardTitle.BackgroundTransparency = 1
-cardTitle.Size = UDim2.new(1, -20, 0, 52)
-cardTitle.Position = UDim2.new(0, 10, 0, 16)
-cardTitle.Font = Enum.Font.GothamBlack
-cardTitle.Text = "Glow Cake Card Draw"
-cardTitle.TextScaled = true
-cardTitle.TextColor3 = Color3.fromRGB(120, 255, 255)
-local cardResult = newGui("TextLabel", "Result", cardFrame)
-cardResult.BackgroundTransparency = 1
-cardResult.Size = UDim2.new(1, -20, 0, 68)
-cardResult.Position = UDim2.new(0, 10, 0, 82)
-cardResult.Font = Enum.Font.GothamBold
-cardResult.Text = ""
-cardResult.TextScaled = true
-cardResult.TextColor3 = Color3.fromRGB(255, 255, 255)
--- Glow-cake card draw uses three visible slot-machine reels.
-for reelIndex = 1, 3 do
-    local reel = newGui("TextLabel", "Reel" .. reelIndex, cardFrame)
-    reel.Size = UDim2.new(0, 105, 0, 48)
-    reel.Position = UDim2.new(0, 42 + (reelIndex - 1) * 118, 0, 88)
-    reel.BackgroundColor3 = Color3.fromRGB(20, 15, 38)
-    reel.Font = Enum.Font.GothamBlack
-    reel.Text = "?"
-    reel.TextScaled = true
-    reel.TextColor3 = Color3.fromRGB(120, 255, 255)
-    newGui("UICorner", "Corner", reel).CornerRadius = UDim.new(0, 10)
-end
-local drawButton = newGui("TextButton", "DrawButton", cardFrame)
-drawButton.Size = UDim2.new(0, 160, 0, 48)
-drawButton.Position = UDim2.new(0.5, -80, 1, -62)
-drawButton.BackgroundColor3 = Color3.fromRGB(110, 255, 255)
-drawButton.Font = Enum.Font.GothamBlack
-drawButton.Text = "DRAW"
-drawButton.TextScaled = true
-drawButton.TextColor3 = Color3.fromRGB(20, 30, 45)
-newGui("UICorner", "Corner", drawButton).CornerRadius = UDim.new(0, 14)
 
 local shopHub = newGui("Frame", "ShopHub", mainGui)
 shopHub.Size = UDim2.new(0, 620, 0, 360)
@@ -498,7 +426,7 @@ local closeShop = newGui("TextButton", "CloseButton", shopHub)
 closeShop.Size = UDim2.new(0, 90, 0, 38)
 closeShop.Position = UDim2.new(1, -104, 0, 12)
 closeShop.BackgroundColor3 = Color3.fromRGB(255, 100, 100)
-closeShop.Font = Enum.Font.GothamBlack
+closeShop.Font = Enum.Font.FredokaOne
 closeShop.Text = "Close"
 closeShop.TextScaled = true
 closeShop.TextColor3 = Color3.fromRGB(255, 255, 255)
@@ -530,7 +458,7 @@ local itemName = newGui("TextLabel", "ItemName", shopTemplate)
 itemName.BackgroundTransparency = 1
 itemName.Size = UDim2.new(1, -8, 0, 50)
 itemName.Position = UDim2.new(0, 4, 0, 12)
-itemName.Font = Enum.Font.GothamBold
+itemName.Font = Enum.Font.FredokaOne
 itemName.TextScaled = true
 itemName.TextWrapped = true
 itemName.TextColor3 = Color3.fromRGB(35, 25, 20)
@@ -538,7 +466,7 @@ local itemCost = newGui("TextLabel", "ItemCost", shopTemplate)
 itemCost.BackgroundTransparency = 1
 itemCost.Size = UDim2.new(1, -8, 0, 32)
 itemCost.Position = UDim2.new(0, 4, 1, -40)
-itemCost.Font = Enum.Font.GothamBlack
+itemCost.Font = Enum.Font.FredokaOne
 itemCost.TextScaled = true
 itemCost.TextColor3 = Color3.fromRGB(85, 50, 15)
 
@@ -553,7 +481,7 @@ local bagTitle = newGui("TextLabel", "Title", bagPanel)
 bagTitle.BackgroundTransparency = 1
 bagTitle.Size = UDim2.new(1, -130, 0, 44)
 bagTitle.Position = UDim2.new(0, 20, 0, 12)
-bagTitle.Font = Enum.Font.GothamBlack
+bagTitle.Font = Enum.Font.FredokaOne
 bagTitle.Text = "Ability Bag"
 bagTitle.TextScaled = true
 bagTitle.TextColor3 = Color3.fromRGB(210, 245, 255)
@@ -561,7 +489,7 @@ local closeBag = newGui("TextButton", "CloseButton", bagPanel)
 closeBag.Size = UDim2.new(0, 90, 0, 38)
 closeBag.Position = UDim2.new(1, -104, 0, 12)
 closeBag.BackgroundColor3 = Color3.fromRGB(255, 100, 100)
-closeBag.Font = Enum.Font.GothamBlack
+closeBag.Font = Enum.Font.FredokaOne
 closeBag.Text = "Close"
 closeBag.TextScaled = true
 closeBag.TextColor3 = Color3.fromRGB(255, 255, 255)
@@ -588,7 +516,7 @@ local bagEntryName = newGui("TextLabel", "ItemName", bagTemplate)
 bagEntryName.BackgroundTransparency = 1
 bagEntryName.Size = UDim2.new(1, -10, 0, 42)
 bagEntryName.Position = UDim2.new(0, 5, 1, -46)
-bagEntryName.Font = Enum.Font.GothamBold
+bagEntryName.Font = Enum.Font.FredokaOne
 bagEntryName.TextScaled = true
 bagEntryName.TextWrapped = true
 bagEntryName.TextColor3 = Color3.fromRGB(255, 255, 255)
@@ -601,7 +529,7 @@ local detailText = newGui("TextLabel", "DetailText", bagDetail)
 detailText.BackgroundTransparency = 1
 detailText.Size = UDim2.new(1, -16, 1, -72)
 detailText.Position = UDim2.new(0, 8, 0, 8)
-detailText.Font = Enum.Font.GothamBold
+detailText.Font = Enum.Font.FredokaOne
 detailText.TextWrapped = true
 detailText.TextScaled = true
 detailText.TextColor3 = Color3.fromRGB(230, 250, 255)
@@ -610,7 +538,7 @@ local upgradeButton = newGui("TextButton", "UpgradeButton", bagDetail)
 upgradeButton.Size = UDim2.new(1, -24, 0, 46)
 upgradeButton.Position = UDim2.new(0, 12, 1, -58)
 upgradeButton.BackgroundColor3 = Color3.fromRGB(255, 210, 110)
-upgradeButton.Font = Enum.Font.GothamBlack
+upgradeButton.Font = Enum.Font.FredokaOne
 upgradeButton.TextScaled = true
 upgradeButton.TextColor3 = Color3.fromRGB(70, 40, 10)
 upgradeButton.Text = "Upgrade"
@@ -701,7 +629,6 @@ function StateService.Create(player, loaded)
         WheelLevel = math.max(1, loaded.WheelLevel or 1),
         PendingWheelSpin = nil,
         CakePoints = loaded.CakePoints or 0,
-        PendingCardDraw = false,
         LastWheelReward = nil,
         Buffs = StateService.RestoreBuffs(loaded.ActiveBuffs or loaded.Buffs),
         OwnedItems = loaded.OwnedItems or {},
@@ -929,11 +856,11 @@ function StateService.Push(player)
     local wheelReward = state.LastWheelReward
     if wheelReward then
         local displayFor = math.max(0, wheelReward.ShownUntil - os.clock())
-        wheelReward = displayFor > 0 and { Key = wheelReward.Key, Name = wheelReward.Name, Rarity = wheelReward.Rarity, Stacks = wheelReward.Stacks, EffectText = wheelReward.EffectText, DisplayFor = displayFor } or nil
+        wheelReward = displayFor > 0 and { Key = wheelReward.Key, Name = wheelReward.Name, Rarity = wheelReward.Rarity, Kind = wheelReward.Kind, Stacks = wheelReward.Stacks, EffectText = wheelReward.EffectText, DisplayFor = displayFor } or nil
     end
     UpdateClientState:FireClient(player, {
         WheelSpins = state.WheelSpins, WheelPoints = state.WheelPoints, WheelLevel = state.WheelLevel, CakePoints = state.CakePoints,
-        PendingCardDraw = state.PendingCardDraw, LastWheelReward = wheelReward,
+        LastWheelReward = wheelReward,
         ActiveBuffs = StateService.ActiveBuffs(player), UnlockedWheelRewards = state.UnlockedWheelRewards, UnlockedCards = state.UnlockedCards,
         Inventory = StateService.BuildInventory(player),
         ShopItems = StateService.BuildShop and StateService.BuildShop(state) or nil,
@@ -1008,7 +935,7 @@ function CakeService.ApplyCakeLevel(cake, level)
     if trail then trail.Color = ColorSequence.new(rarity.OutlineColor) end
     local label = primary and primary:FindFirstChild("CakeLabel")
     local labelText = label and label:FindFirstChild("Text")
-    if labelText then labelText.TextStrokeColor3 = rarity.OutlineColor end
+    if labelText then labelText.TextColor3 = Color3.new(1, 1, 1) end
     CakeService.RefreshLabel(cake)
 end
 
@@ -1054,7 +981,7 @@ function CakeService.RefreshLabel(cake)
     local hp, maxHp = math.max(0, cake:GetAttribute("Health") or 1), cake:GetAttribute("MaxHealth") or 1
     local label = cake.PrimaryPart and cake.PrimaryPart:FindFirstChild("CakeLabel")
     local labelText = label and label:FindFirstChild("Text")
-    if labelText then labelText.Text = string.format("[%s] %s (HP: %d/%d)", cake:GetAttribute("IsGlow") and "SPECIAL" or rarity.RarityText, cake:GetAttribute("IsGlow") and text("Cake_Special") or text(rarity.NameKey), hp, maxHp) end
+    if labelText then labelText.Text = string.format("[%s] %s (HP: %d/%d)", rarity.RarityText, text(rarity.NameKey), hp, maxHp) end
     CakeService.UpdateScale(cake)
 end
 function CakeService.Decorate(cake, isGlow)
@@ -1064,15 +991,15 @@ function CakeService.Decorate(cake, isGlow)
     local initialLevel = math.max(1, cake:GetAttribute("InitialCakeLevel") or 1)
     local rarityKey = rarityKeyForLevel(initialLevel)
     local rarity = CakeConfig.Rarities[rarityKey] or CakeConfig.Rarities.Common
-    cake:SetAttribute("IsGlow", isGlow)
+    cake:SetAttribute("IsGlow", false)
     for _, part in ipairs(cake:GetDescendants()) do if part:IsA("BasePart") then part.Anchored, part.CanCollide = false, true; part.CustomPhysicalProperties = PhysicalProperties.new(1, .7, CakeConfig.CakeBounciness) end end
     local outline = Instance.new("Highlight"); outline.Name = "RarityOutline"; outline.FillTransparency = 1; outline.OutlineColor = rarity.OutlineColor; outline.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop; outline.Parent = cake
     local top = Instance.new("Attachment"); top.Name = "MeteorTrailTop"; top.Position = Vector3.new(0, 2.8, 0); top.Parent = primary
     local bottom = Instance.new("Attachment"); bottom.Name = "MeteorTrailBottom"; bottom.Position = Vector3.new(0, -2.8, 0); bottom.Parent = primary
     local trail = Instance.new("Trail"); trail.Name = "RarityMeteorTrail"; trail.Attachment0, trail.Attachment1 = top, bottom; trail.Color = ColorSequence.new(rarity.OutlineColor); trail.LightEmission, trail.Lifetime = .65, CakeConfig.MeteorTrailLifetime; trail.Parent = primary
-    if isGlow then local light = Instance.new("PointLight"); light.Color, light.Brightness, light.Range = Color3.fromRGB(120,255,255), 1.2, 12; light.Parent = primary end
     local label = Instance.new("BillboardGui"); label.Name, label.AlwaysOnTop, label.MaxDistance, label.Size, label.StudsOffset, label.Parent = "CakeLabel", true, CakeConfig.LabelMaxDistance, UDim2.new(0,300,0,62), Vector3.new(0,4.2,0), primary
-    local labelText = Instance.new("TextLabel"); labelText.Name, labelText.BackgroundTransparency, labelText.Size, labelText.Font, labelText.TextScaled, labelText.TextColor3, labelText.TextStrokeColor3, labelText.TextStrokeTransparency, labelText.Parent = "Text", 1, UDim2.fromScale(1,1), Enum.Font.GothamBlack, true, Color3.new(1,1,1), rarity.OutlineColor, 0, label
+    local labelText = Instance.new("TextLabel"); labelText.Name, labelText.BackgroundTransparency, labelText.Size, labelText.Font, labelText.TextScaled, labelText.TextColor3, labelText.TextStrokeTransparency, labelText.Parent = "Text", 1, UDim2.fromScale(1,1), Enum.Font.FredokaOne, true, Color3.new(1,1,1), 1, label
+    local labelStroke = Instance.new("UIStroke"); labelStroke.Name, labelStroke.Color, labelStroke.LineJoinMode, labelStroke.Thickness, labelStroke.Parent = "TextStroke", Color3.fromRGB(0, 0, 0), Enum.LineJoinMode.Round, 3, labelText
     CakeService.ApplyCakeLevel(cake, initialLevel)
 end
 local function stopEating(cake)
@@ -1093,7 +1020,6 @@ function CakeService.Finish(player, cake)
     if state then
         state.CakePoints += cake:GetAttribute("RewardCakePoints") or 1
         state.WheelSpins += cake:GetAttribute("RewardWheelTickets") or 1
-        if cake:GetAttribute("IsGlow") then state.PendingCardDraw = true end
         StateService.UpdateLeaderstats(player); StateService.Push(player)
     end
     -- Eating is deliberately distinct from expiry: disable physics, then shrink/fade into the player.
@@ -1219,10 +1145,9 @@ function CakeService.SpawnNear(player)
         return
     end
 
-    local glowChance = CakeConfig.GlowBaseChance + StateService.EffectiveStat(player, "GlowCakeRate")
-    local glow = math.random() < glowChance
     local cake = template:Clone()
-    cake.Name = (glow and "Glow" or "Cake") .. "_" .. template.Name
+    local glow = false
+    cake.Name = "Cake_" .. template.Name
     cake.Parent = Runtime
     cake:PivotTo(CFrame.new(spawnPositionNear(root)))
 
@@ -1333,7 +1258,6 @@ return RewardTemplate
 
 local rewardDefinitions = {
     EatSpeed = { BuffType = "EatSpeed", Overrides = "{ Type = \"Stat\", Stat = \"EatSpeed\" }", ByRarity = "{ Common = { Value = 1, Duration = 60, MaxAbilityLevel = 3 }, Rare = { Value = 2, Duration = 70, MaxAbilityLevel = 3 }, Epic = { Value = 3, Duration = 80, MaxAbilityLevel = 3 }, Legendary = { Value = 5, Duration = 90, MaxAbilityLevel = 3 }, Mythic = { Value = 8, Duration = 105, MaxAbilityLevel = 3 } }" },
-    GlowRate = { BuffType = "GlowCakeRate", ByRarity = "{ Common = { Value = 0.05, Duration = 20, MaxAbilityLevel = 3 }, Rare = { Value = 0.10, Duration = 20, MaxAbilityLevel = 3 }, Epic = { Value = 0.18, Duration = 22, MaxAbilityLevel = 3 }, Legendary = { Value = 0.30, Duration = 24, MaxAbilityLevel = 3 }, Mythic = { Value = 0.50, Duration = 26, MaxAbilityLevel = 3 } }" },
     AutoRoll = { BuffType = "AutoRoll", ByRarity = "{ Common = { Interval = 1.0, MultiRolls = 1, Duration = 180, MaxAbilityLevel = 3 }, Rare = { Interval = 0.9, MultiRolls = 2, Duration = 180, MaxAbilityLevel = 3 }, Epic = { Interval = 0.8, MultiRolls = 3, Duration = 190, MaxAbilityLevel = 3 }, Legendary = { Interval = 0.7, MultiRolls = 4, Duration = 200, MaxAbilityLevel = 3 }, Mythic = { Interval = 0.6, MultiRolls = 5, Duration = 210, MaxAbilityLevel = 3 } }" },
     WheelHaste = { BuffType = "WheelHaste", ByRarity = "{ Common = { Value = 0.10, Duration = 120, MaxAbilityLevel = 3 }, Rare = { Value = 0.22, Duration = 120, MaxAbilityLevel = 3 }, Epic = { Value = 0.36, Duration = 130, MaxAbilityLevel = 3 }, Legendary = { Value = 0.52, Duration = 140, MaxAbilityLevel = 3 }, Mythic = { Value = 0.75, Duration = 150, MaxAbilityLevel = 3 } }" },
     PlayerSpeed = { BuffType = "PlayerSpeed", Overrides = "{ Type = \"Stat\", Stat = \"PlayerSpeed\" }", ByRarity = "{ Common = { Value = 2, Duration = 90, MaxAbilityLevel = 3 }, Rare = { Value = 4, Duration = 100, MaxAbilityLevel = 3 }, Epic = { Value = 6, Duration = 110, MaxAbilityLevel = 3 }, Legendary = { Value = 8, Duration = 120, MaxAbilityLevel = 3 }, Mythic = { Value = 12, Duration = 140, MaxAbilityLevel = 3 } }" },
@@ -1596,39 +1520,26 @@ local function randomRarity(player, state, capOverride)
     return "Common"
 end
 local function buildSlots(player, state)
-    local pool, slots, used, count = unlockedRewards(state), {}, {}, 0
-    for _ in pairs(pool) do count += 1 end
-    local attempts = 0
-    while #slots < WheelConfig.DisplayedSlots and attempts < 100 do
-        attempts += 1
-        local key, reward = weightedPick(pool)
-        if not key then break end
-        if count < WheelConfig.DisplayedSlots or not used[key] then
-            used[key] = true
-            local _, abilityCap = StateService.RarityCapForAbility(player, key)
-            local rarity = randomRarity(player, state, WheelConfig.RarityPriority[abilityCap])
-            table.insert(slots, { Key = key, Name = text(reward.NameKey), Rarity = rarity, Color = WheelConfig.RarityColors[rarity], Icon = reward.Icon or "" })
-        end
+    local pool, slots, used, count = {}, {}, {}, 0
+    for key, reward in pairs(unlockedRewards(state)) do
+        pool["Reward_" .. key] = { Key = key, Kind = "Reward", Weight = reward.Weight, Source = reward }
+        count += 1
     end
-    return slots
-end
-local function unlockedCards(state)
-    local entries = {}
-    for key, card in pairs(CardConfig.Cards) do if card.IsUnlockedDefault or state.UnlockedCards[key] then entries[key] = card end end
-    return entries
-end
-local function buildCardSlots(player, state)
-    local pool, slots, used, count = unlockedCards(state), {}, {}, 0
-    for _ in pairs(pool) do count += 1 end
+    for key, card in pairs(unlockedCards(state)) do
+        pool["Card_" .. key] = { Key = key, Kind = "Card", Weight = card.Weight, Source = card }
+        count += 1
+    end
     local attempts = 0
-    while #slots < WheelConfig.DisplayedSlots and attempts < 100 do
+    while #slots < WheelConfig.DisplayedSlots and attempts < 120 do
         attempts += 1
-        local key, card = weightedPick(pool)
-        if key and (count < WheelConfig.DisplayedSlots or not used[key]) then
-            used[key] = true
-            local cap = StateService.RarityCapForAbility(player, card.AbilityKey or key)
-            local rarity = randomRarity(player, state, cap)
-            table.insert(slots, { Key = key, Name = text(card.NameKey), Rarity = rarity, Color = Color3.fromRGB(190, 195, 205), Icon = card.Icon or "" })
+        local poolKey, entry = weightedPick(pool)
+        if entry and (count < WheelConfig.DisplayedSlots or not used[poolKey]) then
+            used[poolKey] = true
+            local abilityKey = entry.Kind == "Card" and (entry.Source.AbilityKey or entry.Key) or entry.Key
+            local _, abilityCap = StateService.RarityCapForAbility(player, abilityKey)
+            local rarity = randomRarity(player, state, WheelConfig.RarityPriority[abilityCap])
+            local color = entry.Kind == "Card" and Color3.fromRGB(190, 195, 205) or WheelConfig.RarityColors[rarity]
+            table.insert(slots, { Key = entry.Key, Kind = entry.Kind, Name = text(entry.Source.NameKey), Rarity = rarity, Color = color, Icon = entry.Source.Icon or "" })
         end
     end
     return slots
@@ -1686,11 +1597,18 @@ function WheelService.Start()
             local claimed = {}
             for _, spin in ipairs(pending) do
                 local picked = spin.Picked
-                local reward = table.clone(WheelConfig.Rewards[picked.Key])
-                reward.Rarity = picked.Rarity
-                local stack = RewardService.Activate(player, picked.Key, reward)
+                local stack
+                if picked.Kind == "Card" then
+                    local card = table.clone(CardConfig.Cards[picked.Key])
+                    card.Rarity = picked.Rarity
+                    stack = SkillService.Activate(player, picked.Key, card)
+                else
+                    local reward = table.clone(WheelConfig.Rewards[picked.Key])
+                    reward.Rarity = picked.Rarity
+                    stack = RewardService.Activate(player, picked.Key, reward)
+                end
                 table.insert(claimed, { Picked = picked, Stacks = stack and stack.Stacks or 1 })
-                state.LastWheelReward = { Key = picked.Key, Name = picked.Name, Rarity = picked.Rarity, Stacks = stack and stack.Stacks or 1, EffectText = stack and stack.EffectText, ShownUntil = os.clock() + 3 }
+                state.LastWheelReward = { Key = picked.Key, Name = picked.Name, Rarity = picked.Rarity, Kind = picked.Kind, Stacks = stack and stack.Stacks or 1, EffectText = stack and stack.EffectText, ShownUntil = os.clock() + 3 }
             end
             StateService.UpdateLeaderstats(player)
             StateService.Push(player)
@@ -1717,17 +1635,7 @@ function WheelService.Start()
     end
 
     Events.RequestCardDraw.OnServerInvoke = function(player)
-        local state = StateService.Get(player)
-        if not state or not state.PendingCardDraw then return { Ok = false, Error = "NO_CARD_DRAW" } end
-        state.PendingCardDraw = false
-        local slots = buildCardSlots(player, state)
-        local pickedIndex = #slots > 0 and math.random(1, #slots) or 0
-        local picked = slots[pickedIndex]
-        local key, card = picked and picked.Key, picked and CardConfig.Cards[picked.Key]
-        if card then card = table.clone(card); card.Rarity = picked.Rarity end
-        local stack = card and SkillService.Activate(player, key, card)
-        StateService.Push(player)
-        return { Ok = true, Slots = slots, PickedIndex = pickedIndex, Card = card and { Key = key, Name = text(card.NameKey), Rarity = card.Rarity, Duration = card.Duration, Effect = card.SkillId, Level = card.Level or 1, Stacks = stack and stack.Stacks or 1 } or nil }
+        return { Ok = false, Error = "SKILLS_USE_WHEEL" }
     end
 
     Events.RequestShopPurchase.OnServerInvoke = function(player, itemId)
@@ -1824,7 +1732,6 @@ local player = Players.LocalPlayer
 local Events = ReplicatedStorage:WaitForChild("Events")
 local Configs = ReplicatedStorage:WaitForChild("Configs")
 local RequestWheelSpin = Events:WaitForChild("RequestWheelSpin")
-local RequestCardDraw = Events:WaitForChild("RequestCardDraw")
 local RequestShopPurchase = Events:WaitForChild("RequestShopPurchase")
 local RequestAbilityUpgrade = Events:WaitForChild("RequestAbilityUpgrade")
 local UpdateClientState = Events:WaitForChild("UpdateClientState")
@@ -1837,19 +1744,12 @@ local L = LocalizationConfig["en-us"]
 local gui = player:WaitForChild("PlayerGui"):WaitForChild("CakeRainRNGHUD")
 local stats = gui:WaitForChild("StatsFrame")
 local wheel = gui:WaitForChild("WheelPanel")
-local silverWheel = gui:WaitForChild("SilverWheelPanel")
-local wheelModeButton = gui:WaitForChild("WheelModeButton")
-local silverModeButton = gui:WaitForChild("SilverModeButton")
 local disc = wheel:WaitForChild("WheelDisc")
 local spinButton = wheel:WaitForChild("SpinButton")
-local silverSpinButton = silverWheel:WaitForChild("SpinButton")
 local autoRollToggle = wheel:WaitForChild("AutoRollToggle")
 local buffFrame = gui:WaitForChild("EffectBar")
 local tooltip = buffFrame:WaitForChild("Tooltip")
 local currentDrawLabel = gui:WaitForChild("CurrentDrawLabel")
-local cardFrame = gui:WaitForChild("CardDraw")
-local drawButton = cardFrame:WaitForChild("DrawButton")
-local cardResult = cardFrame:WaitForChild("Result")
 local shopButton = gui:WaitForChild("ShopButton")
 local bagButton = gui:WaitForChild("BagButton")
 local bagPanel = gui:WaitForChild("InventoryBag")
@@ -1857,13 +1757,11 @@ local closeBag = bagPanel:WaitForChild("CloseButton")
 local shopHub = gui:WaitForChild("ShopHub")
 local closeShop = shopHub:WaitForChild("CloseButton")
 
-local state = { WheelSpins = 0, WheelPoints = 0, WheelLevel = 1, CakePoints = 0, ActiveBuffs = {}, PendingCardDraw = false, LastWheelReward = nil, Inventory = { WheelRewards = {}, Cards = {} } }
+local state = { WheelSpins = 0, WheelPoints = 0, WheelLevel = 1, CakePoints = 0, ActiveBuffs = {}, LastWheelReward = nil, Inventory = { WheelRewards = {}, Cards = {} } }
 local spinning = false
 local autoRollEnabled = false
 local autoRollThread = nil
 local wheelRewardGeneration = 0
-local activeWheelMode = "Normal"
-local silverSpinning = false
 
 local function buttonLabel(item)
     local name = L[item.NameKey] or item.NameKey
@@ -1986,16 +1884,14 @@ local function refreshStats()
     autoRollToggle.Visible = autoAvailable
     autoRollToggle.Text = autoRollEnabled and "Auto-Roll: ON" or "Auto-Roll: OFF"
     autoRollToggle.BackgroundColor3 = autoRollEnabled and Color3.fromRGB(95, 190, 120) or Color3.fromRGB(80, 95, 120)
-    wheel.Visible = activeWheelMode == "Normal" and (state.WheelSpins > 0 or spinning or autoAvailable)
-    silverWheel.Visible = activeWheelMode == "Silver" and (state.PendingCardDraw or silverSpinning)
-    cardFrame.Visible = false
+    wheel.Visible = state.WheelSpins > 0 or spinning or autoAvailable
     local reward = state.LastWheelReward
     currentDrawLabel.Visible = reward ~= nil
     if reward then
         if reward.EffectText then
-            currentDrawLabel.Text = string.format("Wheel reward: %s [%s] | %s", reward.Name, reward.Rarity, reward.EffectText)
+            currentDrawLabel.Text = string.format("Draw reward: %s [%s] | %s", reward.Name, reward.Rarity, reward.EffectText)
         else
-            currentDrawLabel.Text = string.format("Wheel reward: %s [%s] | Stacks %d", reward.Name, reward.Rarity, reward.Stacks or 1)
+            currentDrawLabel.Text = string.format("Draw reward: %s [%s] | Stacks %d", reward.Name, reward.Rarity, reward.Stacks or 1)
         end
     end
     refreshEffectBar()
@@ -2003,113 +1899,121 @@ local function refreshStats()
     bindShopButtons()
 end
 
-local function paintSlots(slots, pickedIndex)
-    for index = 1, 5 do
-        local sector = disc:FindFirstChild("Sector" .. index)
-        local label = sector and sector:FindFirstChild("Text")
-        local slot = slots and slots[index]
-        if sector and label and slot then
-            label.Text = slot.Name
-            if sector:FindFirstChild("Icon") then sector.Icon.Image = slot.Icon or "" end
-            sector.Rotation = sector:GetAttribute("WheelAngle") or 0
-            label.Rotation = -(sector:GetAttribute("WheelAngle") or 0)
-            if sector:FindFirstChild("Icon") then sector.Icon.Rotation = -(sector:GetAttribute("WheelAngle") or 0) end
-            sector.BackgroundColor3 = slot.Color or Color3.fromRGB(95, 63, 145)
-            sector.BackgroundTransparency = index == pickedIndex and 0 or 0.12
-        elseif label then
-            label.Text = "?"
+local SLOT_ITEM_HEIGHT = 100
+local SLOT_WINDOW_HEIGHT = SLOT_ITEM_HEIGHT * 3
+
+local function applyTextStyle(textObject)
+    textObject.Font = Enum.Font.FredokaOne
+    local stroke = textObject:FindFirstChild("TextStroke") or Instance.new("UIStroke")
+    stroke.Name = "TextStroke"
+    stroke.Color = Color3.fromRGB(0, 0, 0)
+    stroke.LineJoinMode = Enum.LineJoinMode.Round
+    stroke.Thickness = 3
+    stroke.Parent = textObject
+end
+
+local function clearRuntimeSlotChildren(parent)
+    for _, child in ipairs(parent:GetChildren()) do
+        if not child:IsA("UILayout") and child.Name ~= "TopShade" and child.Name ~= "BottomShade" and child.Name ~= "CenterLine" then
+            child:Destroy()
         end
     end
 end
 
-local function layoutSpinPanel(panel, index, total)
-    if total <= 1 then return end
-    local width, gap = 300, 14
-    panel.Size = UDim2.new(0, width, 0, width)
-    panel.AnchorPoint = Vector2.new(0.5, 0.5)
-    panel.Position = UDim2.new(0.5, (index - (total + 1) / 2) * (width + gap), 0.5, 0)
-    local panelDisc = panel:WaitForChild("WheelDisc")
-    panelDisc.Size = UDim2.new(0, width, 0, width)
-    for sectorIndex = 1, 5 do
-        local sector = panelDisc:FindFirstChild("Sector" .. sectorIndex)
-        if sector then
-            local angle = sector:GetAttribute("WheelAngle") or (-90 + (sectorIndex - 1) * 72)
-            local radians, radius = math.rad(angle), 98
-            sector.Size = UDim2.new(0, 104, 0, 68)
-            sector.Position = UDim2.new(0.5, math.cos(radians) * radius, 0.5, math.sin(radians) * radius)
-            sector:SetAttribute("WheelRadius", radius)
-        end
+local function renderSlotItem(slot, parent)
+    parent.BackgroundColor3 = slot.Color or Color3.fromRGB(43, 48, 58)
+    parent.BackgroundTransparency = 0.18
+    parent.BorderSizePixel = 0
+    local corner = Instance.new("UICorner")
+    corner.CornerRadius = UDim.new(0, 8)
+    corner.Parent = parent
+    if slot.Icon and slot.Icon ~= "" then
+        local icon = Instance.new("ImageLabel")
+        icon.Size = UDim2.new(0, 42, 0, 42)
+        icon.Position = UDim2.new(0.5, -21, 0, 8)
+        icon.BackgroundTransparency = 1
+        icon.Image = slot.Icon
+        icon.Parent = parent
     end
+    local label = Instance.new("TextLabel")
+    label.Size = UDim2.new(1, -10, 0, 40)
+    label.Position = UDim2.new(0, 5, 1, -44)
+    label.BackgroundTransparency = 1
+    label.Font = Enum.Font.FredokaOne
+    label.Text = string.format("%s\n[%s]", slot.Name or "Reward", slot.Rarity or "Common")
+    label.TextScaled = true
+    label.TextWrapped = true
+    label.TextColor3 = Color3.fromRGB(240, 242, 245)
+    applyTextStyle(label)
+    label.Parent = parent
 end
 
-local function panelDisc(panel)
-    return panel:WaitForChild("WheelDisc")
-end
-
-local function paintPanelSlots(panel, slots, pickedIndex)
-    local panelDiscInstance = panelDisc(panel)
-    for index = 1, 5 do
-        local sector = panelDiscInstance:FindFirstChild("Sector" .. index)
-        local label = sector and sector:FindFirstChild("Text")
-        local slot = slots and slots[index]
-        if sector and label and slot then
-            label.Text = slot.Name
-            if sector:FindFirstChild("Icon") then sector.Icon.Image = slot.Icon or "" end
-            sector.Rotation = sector:GetAttribute("WheelAngle") or 0
-            label.Rotation = -(sector:GetAttribute("WheelAngle") or 0)
-            if sector:FindFirstChild("Icon") then sector.Icon.Rotation = -(sector:GetAttribute("WheelAngle") or 0) end
-            sector.BackgroundColor3 = slot.Color or Color3.fromRGB(95, 63, 145)
-            sector.BackgroundTransparency = index == pickedIndex and 0 or 0.12
-        elseif label then
-            label.Text = "?"
-        end
-    end
+local function makeMiniCell(sideGrid, order, slot)
+    local cell = Instance.new("Frame")
+    cell.Name = "MiniCell" .. order
+    cell.LayoutOrder = order
+    cell.Size = UDim2.new(0, 48, 0, 48)
+    cell.BackgroundColor3 = slot.Color or Color3.fromRGB(30, 34, 42)
+    cell.BorderSizePixel = 0
+    cell.Parent = sideGrid
+    Instance.new("UICorner", cell).CornerRadius = UDim.new(0, 8)
+    local text = Instance.new("TextLabel")
+    text.Size = UDim2.fromScale(1, 1)
+    text.BackgroundTransparency = 1
+    text.Font = Enum.Font.FredokaOne
+    text.Text = string.sub(slot.Name or "?", 1, 3)
+    text.TextScaled = true
+    text.TextColor3 = Color3.fromRGB(240, 242, 245)
+    applyTextStyle(text)
+    text.Parent = cell
 end
 
 local function playWheelAnimation(panel, slots, pickedIndex, speedMultiplier)
-    local panelDiscInstance = panelDisc(panel)
-    paintPanelSlots(panel, slots, nil)
-    panelDiscInstance.Rotation = 0
-    local selectedSector = panelDiscInstance:FindFirstChild("Sector" .. pickedIndex)
-    local selectedAngle = selectedSector and selectedSector:GetAttribute("WheelAngle") or -90
-    -- The pointer faces right from the disc's left edge (180°), so finish with the selected panel under it.
-    local targetRotation = 1080 + (180 - selectedAngle)
+    local window = panel:WaitForChild("WheelDisc")
+    local strip = window:WaitForChild("SlotStrip")
+    local sideGrid = panel:FindFirstChild("SideGrid")
+    clearRuntimeSlotChildren(strip)
+    if sideGrid then
+        for _, child in ipairs(sideGrid:GetChildren()) do
+            if child:IsA("Frame") then child:Destroy() end
+        end
+    end
+    local count = #slots
+    if count == 0 then return end
+    local repeats = 24
+    local total = count * repeats
+    strip.Size = UDim2.new(1, 0, 0, total * SLOT_ITEM_HEIGHT)
+    for index = 1, total do
+        local frame = Instance.new("Frame")
+        frame.Size = UDim2.new(1, 0, 0, SLOT_ITEM_HEIGHT)
+        frame.Position = UDim2.new(0, 0, 0, (index - 1) * SLOT_ITEM_HEIGHT)
+        frame.Parent = strip
+        renderSlotItem(slots[((index - 1) % count) + 1], frame)
+    end
+    if sideGrid then
+        for index, slot in ipairs(slots) do makeMiniCell(sideGrid, index, slot) end
+    end
+    local startIndex = count + 1
+    strip.Position = UDim2.new(0, 0, 0, SLOT_WINDOW_HEIGHT / 2 - ((startIndex - 1) * SLOT_ITEM_HEIGHT + SLOT_ITEM_HEIGHT / 2))
+    local targetIndex = startIndex + count * 4 + ((pickedIndex or 1) - 1)
+    local targetY = SLOT_WINDOW_HEIGHT / 2 - ((targetIndex - 1) * SLOT_ITEM_HEIGHT + SLOT_ITEM_HEIGHT / 2)
     local duration = 2.4 / math.max(0.35, speedMultiplier or 1)
-    local tween = TweenService:Create(panelDiscInstance, TweenInfo.new(duration, Enum.EasingStyle.Quart, Enum.EasingDirection.Out), { Rotation = targetRotation })
+    local tween = TweenService:Create(strip, TweenInfo.new(duration, Enum.EasingStyle.Back, Enum.EasingDirection.Out), { Position = UDim2.new(0, 0, 0, targetY) })
     tween:Play()
     tween.Completed:Wait()
-    paintPanelSlots(panel, slots, pickedIndex)
-    local pulseSize = UDim2.new(panelDiscInstance.Size.X.Scale, panelDiscInstance.Size.X.Offset + 14, panelDiscInstance.Size.Y.Scale, panelDiscInstance.Size.Y.Offset + 14)
-    local pulsePosition = UDim2.new(panelDiscInstance.Position.X.Scale, panelDiscInstance.Position.X.Offset - 7, panelDiscInstance.Position.Y.Scale, panelDiscInstance.Position.Y.Offset - 7)
-    local pulse = TweenService:Create(panelDiscInstance, TweenInfo.new(0.16, Enum.EasingStyle.Back, Enum.EasingDirection.Out, 1, true), { Size = pulseSize, Position = pulsePosition })
-    pulse:Play()
 end
 
 local function playWheelAnimations(spins, speedMultiplier)
-    local original = { Size = wheel.Size, Position = wheel.Position, AnchorPoint = wheel.AnchorPoint, DiscSize = disc.Size }
-    local originalSectorSizes = {}
-    for sectorIndex = 1, 5 do
-        local sector = disc:FindFirstChild("Sector" .. sectorIndex)
-        originalSectorSizes[sectorIndex] = sector and sector.Size
-    end
-    local panels = {}
     for index, spin in ipairs(spins) do
-        local panel = index == 1 and wheel or wheel:Clone()
-        panel.Name = index == 1 and "WheelPanel" or "WheelPanelClone" .. index
-        panel.Visible = true
-        panel.SpinButton.Visible = index == 1
-        panel.AutoRollToggle.Visible = false
-        if index > 1 then panel.Parent = gui end
-        layoutSpinPanel(panel, index, #spins)
-        panels[index] = panel
-        task.spawn(function() playWheelAnimation(panel, spin.Slots, spin.PickedIndex, speedMultiplier) end)
-    end
-    task.wait(2.45 / math.max(0.35, speedMultiplier or 1) + 0.25)
-    for index, panel in ipairs(panels) do if index > 1 then panel:Destroy() end end
-    wheel.Size, wheel.Position, wheel.AnchorPoint, disc.Size = original.Size, original.Position, original.AnchorPoint, original.DiscSize
-    for sectorIndex, size in pairs(originalSectorSizes) do
-        local sector = disc:FindFirstChild("Sector" .. sectorIndex)
-        if sector and size then sector.Size = size end
+        if index == 1 then
+            playWheelAnimation(wheel, spin.Slots, spin.PickedIndex, speedMultiplier)
+        else
+            task.spawn(function()
+                task.wait(index * 0.08)
+                local sideGrid = wheel:FindFirstChild("SideGrid")
+                if sideGrid and spin.Picked then makeMiniCell(sideGrid, 10 + index, spin.Picked) end
+            end)
+        end
     end
 end
 
@@ -2145,25 +2049,6 @@ local function ensureAutoRollLoop()
     end)
 end
 
-local function performSilverDraw()
-    if silverSpinning or not state.PendingCardDraw then return end
-    silverSpinning = true
-    refreshStats()
-    local result = RequestCardDraw:InvokeServer()
-    if result and result.Ok then
-        playWheelAnimation(silverWheel, result.Slots or {}, result.PickedIndex or 1, 1)
-        if result.Card then
-            cardResult.Text = result.Card.Name .. " Lv." .. tostring(result.Card.Level or 1) .. " [" .. result.Card.Rarity .. "]"
-        end
-    end
-    silverSpinning = false
-    refreshStats()
-end
-
-wheelModeButton.Activated:Connect(function() activeWheelMode = "Normal"; refreshStats() end)
-silverModeButton.Activated:Connect(function() activeWheelMode = "Silver"; refreshStats() end)
-silverSpinButton.Activated:Connect(performSilverDraw)
-
 spinButton.Activated:Connect(function()
     performSpin()
 end)
@@ -2173,25 +2058,6 @@ autoRollToggle.Activated:Connect(function()
     autoRollEnabled = not autoRollEnabled
     refreshStats()
     if autoRollEnabled then ensureAutoRollLoop() end
-end)
-
-drawButton.Activated:Connect(function()
-    performSilverDraw()
-    if true then return end
-    if drawButton:GetAttribute("Spinning") then return end
-    drawButton:SetAttribute("Spinning", true)
-    for tick = 1, 14 do
-        for reelIndex = 1, 3 do cardFrame["Reel" .. reelIndex].Text = ({ "★", "◆", "✦", "?" })[math.random(1, 4)] end
-        task.wait(.07 + tick * .008)
-    end
-    local result = RequestCardDraw:InvokeServer()
-    if result and result.Ok and result.Card then
-        for reelIndex = 1, 3 do cardFrame["Reel" .. reelIndex].Text = result.Card.Rarity end
-        cardResult.Text = result.Card.Name .. " Lv." .. tostring(result.Card.Level or 1) .. " [" .. result.Card.Rarity .. "]"
-        cardResult.TextTransparency = 1
-        TweenService:Create(cardResult, TweenInfo.new(0.35), { TextTransparency = 0 }):Play()
-    end
-    drawButton:SetAttribute("Spinning", false)
 end)
 
 shopButton.Activated:Connect(function()
