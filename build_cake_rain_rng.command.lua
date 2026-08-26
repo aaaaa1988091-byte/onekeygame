@@ -270,18 +270,13 @@ for index, name in { "CakePointsLabel", "WheelPointsLabel", "SpinsLabel" } do
     label.TextColor3 = Color3.fromRGB(255, 255, 255)
     label.TextStrokeTransparency = 0.5
 end
-local shopButton = newGui("ImageButton", "ShopButton", mainGui)
-shopButton.Size = UDim2.new(0, 120, 0, 46)
-shopButton.Position = UDim2.new(0, 18, 0, 148)
-shopButton.BackgroundColor3 = Color3.fromRGB(255, 210, 110)
-shopButton.Image = "rbxassetid://6031265976"
-newGui("UICorner", "Corner", shopButton).CornerRadius = UDim.new(0, 12)
-local bagButton = newGui("ImageButton", "BagButton", mainGui)
-bagButton.Size = UDim2.new(0, 120, 0, 46)
-bagButton.Position = UDim2.new(0, 148, 0, 148)
-bagButton.BackgroundColor3 = Color3.fromRGB(150, 220, 255)
-bagButton.Image = "rbxassetid://6031265972"
-newGui("UICorner", "Corner", bagButton).CornerRadius = UDim.new(0, 12)
+local upgradeButton = newGui("TextButton", "UpgradeButton", mainGui)
+upgradeButton.Size = UDim2.new(0, 180, 0, 46)
+upgradeButton.Position = UDim2.new(0, 18, 0, 148)
+upgradeButton.BackgroundColor3 = Color3.fromRGB(72, 150, 104)
+upgradeButton.Text = "UPGRADES"
+upgradeButton.TextScaled = true
+newGui("UICorner", "Corner", upgradeButton).CornerRadius = UDim.new(0, 12)
 
 local buffFrame = newGui("Frame", "EffectBar", mainGui)
 buffFrame.Size = UDim2.new(0, 392, 0, 74)
@@ -366,28 +361,36 @@ return UpgradeTreeConfig
 ]=]
 
 local upgradeTree = newGui("Frame", "UpgradeTree", mainGui)
-upgradeTree.Size = UDim2.new(0, 700, 0, 540)
-upgradeTree.Position = UDim2.new(0.5, -350, 0.5, -270)
-upgradeTree.BackgroundColor3 = Color3.fromRGB(18, 22, 35)
+upgradeTree.Size = UDim2.fromScale(1, 1)
+upgradeTree.Position = UDim2.fromScale(0, 0)
+upgradeTree.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
+upgradeTree.BackgroundTransparency = 0.38
 upgradeTree.Visible = false
-newGui("UICorner", "Corner", upgradeTree).CornerRadius = UDim.new(0, 18)
+upgradeTree.Active = true
 local treeTitle = newGui("TextLabel", "Title", upgradeTree)
-treeTitle.BackgroundTransparency, treeTitle.Size, treeTitle.Position, treeTitle.Text = 1, UDim2.new(1, -120, 0, 48), UDim2.new(0, 18, 0, 12), "UPGRADE TREE"
+treeTitle.BackgroundTransparency, treeTitle.Size, treeTitle.Position, treeTitle.Text = 1, UDim2.new(0, 300, 0, 48), UDim2.new(.5, -150, 0, 12), "UPGRADE TREE"
 treeTitle.TextScaled, treeTitle.TextColor3 = true, Color3.fromRGB(255, 255, 255)
 local treeClose = newGui("TextButton", "CloseButton", upgradeTree)
 treeClose.Size, treeClose.Position, treeClose.Text = UDim2.new(0, 90, 0, 38), UDim2.new(1, -104, 0, 14), "CLOSE"
-treeClose.BackgroundColor3, treeClose.TextScaled = Color3.fromRGB(210, 75, 75), true
+treeClose.BackgroundColor3, treeClose.TextScaled = Color3.fromRGB(170, 65, 65), true
 newGui("UICorner", "Corner", treeClose).CornerRadius = UDim.new(0, 10)
-local hexLayer = newGui("Frame", "HexLayer", upgradeTree)
-hexLayer.Size, hexLayer.Position, hexLayer.BackgroundTransparency = UDim2.new(1, -24, 1, -76), UDim2.new(0, 12, 0, 64), 1
+-- The scrolling canvas is the draggable viewport: it never changes node layout at runtime.
+local hexLayer = newGui("ScrollingFrame", "HexLayer", upgradeTree)
+hexLayer.Size, hexLayer.Position = UDim2.new(1, -40, 1, -78), UDim2.new(0, 20, 0, 64)
+hexLayer.BackgroundTransparency, hexLayer.BorderSizePixel = 1, 0
+hexLayer.CanvasSize = UDim2.new(0, 1800, 0, 1400)
+hexLayer.CanvasPosition = Vector2.new(540, 430)
+hexLayer.ScrollBarThickness = 8
+hexLayer.ScrollingDirection = Enum.ScrollingDirection.XY
+hexLayer.ElasticBehavior = Enum.ElasticBehavior.Always
 local treeNodes = require(upgradeTreeConfig).Nodes
 local hexImage = require(upgradeTreeConfig).HexImage
--- Flat-top axial conversion: x = size * 3/2*q, y = size * sqrt(3)*(r + q/2).
-for index, node in ipairs(treeNodes) do
+-- Flat-top axial conversion, deliberately compact: x = size * 3/2*q, y = size * sqrt(3)*(r + q/2).
+for _, node in ipairs(treeNodes) do
     local hex = newGui("ImageButton", "Hex_" .. node.Key, hexLayer)
     hex.AnchorPoint = Vector2.new(.5, .5)
-    hex.Size = UDim2.new(0, 126, 0, 112)
-    hex.Position = UDim2.new(.5, 84 * 1.5 * node.Q, .5, 84 * math.sqrt(3) * (node.R + node.Q / 2))
+    hex.Size = UDim2.new(0, 108, 0, 96)
+    hex.Position = UDim2.new(0, 900 + 68 * 1.5 * node.Q, 0, 700 + 68 * math.sqrt(3) * (node.R + node.Q / 2))
     hex.BackgroundTransparency, hex.Image, hex.ScaleType = 1, hexImage, Enum.ScaleType.Stretch
     hex:SetAttribute("NodeKey", node.Key)
     hex:SetAttribute("Default", node.Default == true)
@@ -398,7 +401,7 @@ for index, node in ipairs(treeNodes) do
     gradient.Color = ColorSequence.new(Color3.fromRGB(50, 55, 68), Color3.fromRGB(20, 24, 32))
     gradient.Rotation = 45
     local center = newGui("TextLabel", "CenterText", hex)
-    center.BackgroundTransparency, center.Size, center.Position = 1, UDim2.new(0.72, 0, .48, 0), UDim2.new(.14, 0, .20, 0)
+    center.BackgroundTransparency, center.Size, center.Position = 1, UDim2.new(.72, 0, .48, 0), UDim2.new(.14, 0, .20, 0)
     center.TextScaled, center.TextWrapped, center.Text = true, true, "?"
     local cost = newGui("TextLabel", "Cost", hex)
     cost.BackgroundTransparency, cost.Size, cost.Position = 1, UDim2.new(.46, 0, .20, 0), UDim2.new(.40, 0, .67, 0)
@@ -408,40 +411,24 @@ for index, node in ipairs(treeNodes) do
     icon.Image = require(upgradeTreeConfig).CurrencyIcons[node.Currency or "CakePoints"]
 end
 
--- Every reel variant is statically authored under one right-edge slot machine.  No runtime cloning is used.
+-- A single, neutral reel: manual draws are one spin; the Auto-Roll effect controls automatic draw count.
 local slotMachine = newGui("Frame", "SlotMachine", mainGui)
-slotMachine.AnchorPoint, slotMachine.Size, slotMachine.Position = Vector2.new(1, .5), UDim2.new(0, 330, 0, 260), UDim2.new(1, -18, .5, 0)
-slotMachine.BackgroundColor3, slotMachine.Visible = Color3.fromRGB(35, 25, 70), true
-newGui("UICorner", "Corner", slotMachine).CornerRadius = UDim.new(0, 18)
-local slotTitle = newGui("TextLabel", "Title", slotMachine)
-slotTitle.BackgroundTransparency, slotTitle.Size, slotTitle.Position, slotTitle.Text = 1, UDim2.new(1, -20, 0, 36), UDim2.new(0, 10, 0, 10), "SLOT REEL"
-slotTitle.TextScaled = true
-for count = 1, 3 do
-    local drawFrame = newGui("Frame", ({"SingleDraw", "DoubleDraw", "TripleDraw"})[count], slotMachine)
-    drawFrame.Size, drawFrame.Position, drawFrame.BackgroundTransparency, drawFrame.Visible = UDim2.new(1, -20, 1, -58), UDim2.new(0, 10, 0, 48), 1, count == 1
-    for reelIndex = 1, count do
-        local reel = newGui("TextLabel", "Reel" .. reelIndex, drawFrame)
-        reel.Size, reel.Position = UDim2.new(1 / count, -8, 0, 82), UDim2.new((reelIndex - 1) / count, 4, 0, 12)
-        reel.BackgroundColor3, reel.Text, reel.TextScaled = Color3.fromRGB(18, 15, 32), "?", true
-        newGui("UICorner", "Corner", reel).CornerRadius = UDim.new(0, 12)
-    end
-    local cost = newGui("TextLabel", "Cost", drawFrame)
-    cost.BackgroundTransparency, cost.Size, cost.Position, cost.Text = 1, UDim2.new(.34, 0, 0, 28), UDim2.new(.55, 0, 0, 104), tostring(count)
-    cost.TextScaled, cost.TextXAlignment = true, Enum.TextXAlignment.Right
-    local icon = newGui("ImageLabel", "CurrencyIcon", cost)
-    icon.BackgroundTransparency, icon.Size, icon.Position, icon.Image = 1, UDim2.new(0, 22, 0, 22), UDim2.new(0, -26, .5, -11), "rbxassetid://6031075938"
-    local button = newGui("TextButton", "DrawButton", drawFrame)
-    button.Size, button.Position, button.Text, button.TextScaled = UDim2.new(.68, 0, 0, 44), UDim2.new(.16, 0, 1, -52), "DRAW", true
-    button.BackgroundColor3 = Color3.fromRGB(110, 255, 255)
-    newGui("UICorner", "Corner", button).CornerRadius = UDim.new(0, 12)
-end
-local modes = newGui("Frame", "Modes", slotMachine)
-modes.Size, modes.Position, modes.BackgroundTransparency = UDim2.new(1, -20, 0, 28), UDim2.new(0, 10, 1, -32), 1
-for count = 1, 3 do
-    local mode = newGui("TextButton", "Mode" .. count, modes)
-    mode.Size, mode.Position, mode.Text, mode.TextScaled = UDim2.new(1/3, -4, 1, 0), UDim2.new((count-1)/3, 2, 0, 0), tostring(count) .. "X", true
-    mode.BackgroundColor3 = Color3.fromRGB(82, 68, 126)
-end
+slotMachine.AnchorPoint, slotMachine.Size, slotMachine.Position = Vector2.new(1, .5), UDim2.new(0, 300, 0, 214), UDim2.new(1, -18, .5, 0)
+slotMachine.BackgroundTransparency, slotMachine.BorderSizePixel = 1, 0
+local reel = newGui("TextLabel", "Reel", slotMachine)
+reel.Size, reel.Position = UDim2.new(1, -24, 0, 102), UDim2.new(0, 12, 0, 12)
+reel.BackgroundColor3, reel.Text, reel.TextScaled, reel.TextWrapped = Color3.fromRGB(24, 24, 28), "?", true, true
+newGui("UICorner", "Corner", reel).CornerRadius = UDim.new(0, 14)
+local reelStroke = newGui("UIStroke", "Outline", reel)
+reelStroke.Color, reelStroke.Thickness = Color3.fromRGB(235, 235, 235), 2
+local drawButton = newGui("TextButton", "DrawButton", slotMachine)
+drawButton.Size, drawButton.Position, drawButton.Text, drawButton.TextScaled = UDim2.new(.48, -6, 0, 52), UDim2.new(0, 12, 1, -64), "DRAW", true
+drawButton.BackgroundColor3 = Color3.fromRGB(238, 178, 70)
+newGui("UICorner", "Corner", drawButton).CornerRadius = UDim.new(0, 12)
+local autoDrawButton = newGui("TextButton", "AutoDrawButton", slotMachine)
+autoDrawButton.Size, autoDrawButton.Position, autoDrawButton.Text, autoDrawButton.TextScaled = UDim2.new(.52, -18, 0, 52), UDim2.new(.48, 12, 1, -64), "AUTO DRAW: OFF", true
+autoDrawButton.BackgroundColor3 = Color3.fromRGB(70, 105, 85)
+newGui("UICorner", "Corner", autoDrawButton).CornerRadius = UDim.new(0, 12)
 
 -- A single style pass guarantees every text object uses the same required font and round black outline.
 local function applyTextStyle(root)
@@ -1536,22 +1523,22 @@ function WheelService.Start()
             StateService.Push(player)
             return { Ok = true, Claimed = claimed }
         end
-        local count = math.clamp(math.floor(tonumber(requestedCount) or 1), 1, 3)
-        local usesCakePoints = action == "Slot"
-        if usesCakePoints then
-            count = math.min(count, state.CakePoints)
-        else
-            count = math.min(count, state.WheelSpins)
+        -- Draws always consume earned wheel spins. Manual draw is exactly one spin; only an
+        -- active Auto-Roll reward may request its configured multi-roll count.
+        local count = 1
+        if action == "Auto" then
+            local autoRoll = StateService.TickBuffType(state, "AutoRoll")
+            if not autoRoll or (autoRoll.Remaining or 0) <= 0 then return { Ok = false, Error = "NO_AUTO_ROLL" } end
+            count = math.clamp(math.floor(tonumber(autoRoll.MultiRolls) or 1), 1, 6)
+        elseif action ~= "Begin" then
+            return { Ok = false, Error = "INVALID_DRAW_ACTION" }
         end
-        if count <= 0 or state.PendingWheelSpin then return { Ok = false, Error = usesCakePoints and "NO_CAKE_POINTS" or "NO_SPINS" } end
+        count = math.min(count, state.WheelSpins)
+        if count <= 0 or state.PendingWheelSpin then return { Ok = false, Error = "NO_SPINS" } end
         local pending = {}
         for _ = 1, count do
-            if usesCakePoints then
-                state.CakePoints -= 1
-            else
-                state.WheelSpins -= 1
-                state.WheelPoints += 1
-            end
+            state.WheelSpins -= 1
+            state.WheelPoints += 1
             local slots = buildSlots(player, state)
             if #slots == 0 then break end
             local pickedIndex = math.random(1, #slots)
@@ -1667,6 +1654,7 @@ local clientScript = getOrCreate(StarterPlayer.StarterPlayerScripts, "LocalScrip
 clientScript.Source = [=[
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Players = game:GetService("Players")
+local TweenService = game:GetService("TweenService")
 
 local player = Players.LocalPlayer
 local Events = ReplicatedStorage:WaitForChild("Events")
@@ -1679,9 +1667,14 @@ local L = require(Configs:WaitForChild("LocalizationConfig"))["en-us"]
 local Tree = require(Configs:WaitForChild("UpgradeTreeConfig"))
 
 local gui = player:WaitForChild("PlayerGui"):WaitForChild("CakeRainRNGHUD")
-local stats, tree, slotMachine = gui:WaitForChild("StatsFrame"), gui:WaitForChild("UpgradeTree"), gui:WaitForChild("SlotMachine")
-local state = { CakePoints = 0, WheelPoints = 0, WheelSpins = 0, UnlockedWheelRewards = {}, UnlockedCards = {}, Inventory = { WheelRewards = {}, Cards = {} } }
-local selectedDrawCount, drawing = 1, false
+local stats = gui:WaitForChild("StatsFrame")
+local tree = gui:WaitForChild("UpgradeTree")
+local slotMachine = gui:WaitForChild("SlotMachine")
+local reel = slotMachine:WaitForChild("Reel")
+local drawButton = slotMachine:WaitForChild("DrawButton")
+local autoDrawButton = slotMachine:WaitForChild("AutoDrawButton")
+local state = { CakePoints = 0, WheelPoints = 0, WheelSpins = 0, ActiveBuffs = {}, UnlockedWheelRewards = {}, UnlockedCards = {}, Inventory = { WheelRewards = {}, Cards = {} } }
+local drawing, autoDrawEnabled, autoDrawThread = false, false, nil
 
 local function roman(number)
     local symbols = { {1000,"M"}, {900,"CM"}, {500,"D"}, {400,"CD"}, {100,"C"}, {90,"XC"}, {50,"L"}, {40,"XL"}, {10,"X"}, {9,"IX"}, {5,"V"}, {4,"IV"}, {1,"I"} }
@@ -1695,7 +1688,6 @@ local function ownedLevel(key)
         for _, item in ipairs(group) do if item.Key == key and item.Owned then return item.AbilityLevel or 1 end end
     end
 end
-
 local axialNeighbors = { {1,0}, {1,-1}, {0,-1}, {-1,0}, {-1,1}, {0,1} }
 local function isOwned(node)
     return node.Default or state.UnlockedWheelRewards[node.Key] or state.UnlockedCards[node.Key] or ownedLevel(node.Key) ~= nil
@@ -1711,7 +1703,6 @@ local function isVisible(node)
     end
     return false
 end
-
 local function refreshTree()
     for _, node in ipairs(Tree.Nodes) do
         local hex = tree.HexLayer:FindFirstChild("Hex_" .. node.Key)
@@ -1722,20 +1713,25 @@ local function refreshTree()
             hex.CenterText.Text = unlocked and ((L[node.NameKey] or node.NameKey) .. "\n" .. roman(level)) or "?"
             hex.CenterText.TextSize = unlocked and 18 or 36
             hex.Cost.Text = unlocked and (node.Upgrade and tostring((({800, 2200})[level]) or 0) or "") or tostring(node.Cost or 0)
-            hex.StateGradient.Color = unlocked
-                and ColorSequence.new(Color3.fromRGB(108, 235, 150), Color3.fromRGB(35, 105, 75))
-                or ColorSequence.new(Color3.fromRGB(0, 0, 0), Color3.fromRGB(24, 24, 24))
+            hex.StateGradient.Color = unlocked and ColorSequence.new(Color3.fromRGB(108, 235, 150), Color3.fromRGB(35, 105, 75)) or ColorSequence.new(Color3.fromRGB(0, 0, 0), Color3.fromRGB(24, 24, 24))
         end
     end
 end
-
+local function hasAutoRoll()
+    local buff = state.ActiveBuffs and state.ActiveBuffs.AutoRoll
+    return buff and (buff.Remaining or 0) > 0
+end
 local function refresh()
     stats.CakePointsLabel.Text = "CAKE POINTS: " .. state.CakePoints
     stats.WheelPointsLabel.Text = "WHEEL POINTS: " .. state.WheelPoints
     stats.SpinsLabel.Text = "SPINS: " .. state.WheelSpins
+    if not hasAutoRoll() then autoDrawEnabled = false end
+    autoDrawButton.Visible = hasAutoRoll()
+    autoDrawButton.Text = autoDrawEnabled and "AUTO DRAW: ON" or "AUTO DRAW: OFF"
+    autoDrawButton.BackgroundColor3 = autoDrawEnabled and Color3.fromRGB(85, 175, 105) or Color3.fromRGB(70, 105, 85)
+    slotMachine.Visible = state.WheelSpins > 0 or drawing or hasAutoRoll()
     refreshTree()
 end
-
 for _, node in ipairs(Tree.Nodes) do
     local hex = tree.HexLayer:WaitForChild("Hex_" .. node.Key)
     hex.Activated:Connect(function()
@@ -1747,38 +1743,58 @@ for _, node in ipairs(Tree.Nodes) do
         end
     end)
 end
-
 tree.CloseButton.Activated:Connect(function() tree.Visible = false end)
-gui.ShopButton.Activated:Connect(function() tree.Visible = not tree.Visible end)
-gui.BagButton.Activated:Connect(function() tree.Visible = not tree.Visible end)
+gui.UpgradeButton.Activated:Connect(function() tree.Visible = not tree.Visible end)
 
-local function selectMode(count)
-    selectedDrawCount = count
-    for index, name in ipairs({ "SingleDraw", "DoubleDraw", "TripleDraw" }) do
-        slotMachine[name].Visible = index == count
-        slotMachine.Modes["Mode" .. index].BackgroundColor3 = index == count and Color3.fromRGB(110, 255, 255) or Color3.fromRGB(82, 68, 126)
+local function playReel(spin)
+    local slots, winner = spin.Slots or {}, spin.PickedIndex or 1
+    if #slots == 0 then return end
+    reel.TextTransparency = 0
+    -- A decelerating complete reel cycle gives every server-provided candidate time on screen.
+    for tick = 1, 18 do
+        local index = ((tick - 1) % #slots) + 1
+        reel.Text = slots[index].Name or "?"
+        task.wait(0.035 + tick * 0.009)
     end
+    local picked = slots[winner] or spin.Picked
+    reel.Text = picked and picked.Name or "?"
+    local originalSize = reel.Size
+    local pulse = TweenService:Create(reel, TweenInfo.new(.22, Enum.EasingStyle.Quint, Enum.EasingDirection.Out, 1, true), { Size = UDim2.new(originalSize.X.Scale, originalSize.X.Offset + 10, originalSize.Y.Scale, originalSize.Y.Offset + 8) })
+    pulse:Play()
+    pulse.Completed:Wait()
 end
-
-local function draw()
-    if drawing or state.CakePoints <= 0 then return end
+local function performDraw(action)
+    if drawing or state.WheelSpins <= 0 then return false end
     drawing = true
-    local frame = slotMachine[({ "SingleDraw", "DoubleDraw", "TripleDraw" })[selectedDrawCount]]
-    local response = RequestWheelSpin:InvokeServer("Slot", math.min(selectedDrawCount, state.CakePoints))
+    refresh()
+    local response = RequestWheelSpin:InvokeServer(action)
     if response and response.Ok then
-        for index, spin in ipairs(response.Spins or {}) do
-            local reel = frame:FindFirstChild("Reel" .. index)
-            if reel then reel.Text = spin.Picked and spin.Picked.Name or "?" end
-        end
+        for _, spin in ipairs(response.Spins or {}) do playReel(spin) end
         RequestWheelSpin:InvokeServer("Claim")
     end
     drawing = false
+    refresh()
+    return response and response.Ok
 end
-for count, name in ipairs({ "SingleDraw", "DoubleDraw", "TripleDraw" }) do
-    slotMachine[name].DrawButton.Activated:Connect(draw)
-    slotMachine.Modes["Mode" .. count].Activated:Connect(function() selectMode(count) end)
+local function ensureAutoDrawLoop()
+    if autoDrawThread then return end
+    autoDrawThread = task.spawn(function()
+        while autoDrawEnabled and hasAutoRoll() do
+            if state.WheelSpins > 0 then performDraw("Auto") end
+            local buff = state.ActiveBuffs.AutoRoll or {}
+            task.wait(math.max(.5, buff.Interval or 1))
+        end
+        autoDrawEnabled, autoDrawThread = false, nil
+        refresh()
+    end)
 end
-selectMode(1)
+drawButton.Activated:Connect(function() performDraw("Begin") end)
+autoDrawButton.Activated:Connect(function()
+    if not hasAutoRoll() then return end
+    autoDrawEnabled = not autoDrawEnabled
+    refresh()
+    if autoDrawEnabled then ensureAutoDrawLoop() end
+end)
 UpdateClientState.OnClientEvent:Connect(function(update)
     for key, value in pairs(update) do state[key] = value end
     refresh()
