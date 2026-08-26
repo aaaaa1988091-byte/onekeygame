@@ -1931,12 +1931,19 @@ local function clearRuntimeSlotChildren(parent)
 end
 
 local function renderSlotItem(slot, parent)
+    for _, child in ipairs(parent:GetChildren()) do
+        if not child:IsA("UICorner") and not child:IsA("UIStroke") then
+            child:Destroy()
+        end
+    end
     parent.BackgroundColor3 = slot.Color or Color3.fromRGB(43, 48, 58)
     parent.BackgroundTransparency = 0.18
     parent.BorderSizePixel = 0
-    local corner = Instance.new("UICorner")
-    corner.CornerRadius = UDim.new(0, 8)
-    corner.Parent = parent
+    if not parent:FindFirstChildOfClass("UICorner") then
+        local corner = Instance.new("UICorner")
+        corner.CornerRadius = UDim.new(0, 8)
+        corner.Parent = parent
+    end
     if slot.Icon and slot.Icon ~= "" then
         local icon = Instance.new("ImageLabel")
         icon.Size = UDim2.new(0, 42, 0, 42)
@@ -1958,36 +1965,74 @@ local function renderSlotItem(slot, parent)
     label.Parent = parent
 end
 
-local function makeMiniCell(sideGrid, order, slot)
+local function clearSideGrid()
+    local sideGrid = wheel:FindFirstChild("SideGrid")
+    if not sideGrid then return end
+    for _, child in ipairs(sideGrid:GetChildren()) do
+        if child:IsA("Frame") then child:Destroy() end
+    end
+end
+
+local function makeMiniCell(sideGrid, order)
     local cell = Instance.new("Frame")
     cell.Name = "MiniCell" .. order
     cell.LayoutOrder = order
-    cell.Size = UDim2.new(0, 48, 0, 48)
-    cell.BackgroundColor3 = slot.Color or Color3.fromRGB(30, 34, 42)
+    cell.Size = UDim2.new(0, 0, 0, 0)
+    cell.BackgroundColor3 = Color3.fromRGB(30, 34, 42)
     cell.BorderSizePixel = 0
     cell.Parent = sideGrid
     Instance.new("UICorner", cell).CornerRadius = UDim.new(0, 8)
-    local text = Instance.new("TextLabel")
-    text.Size = UDim2.fromScale(1, 1)
-    text.BackgroundTransparency = 1
-    text.Font = Enum.Font.FredokaOne
-    text.Text = string.sub(slot.Name or "?", 1, 3)
-    text.TextScaled = true
-    text.TextColor3 = Color3.fromRGB(240, 242, 245)
-    applyTextStyle(text)
-    text.Parent = cell
+
+    local stroke = Instance.new("UIStroke")
+    stroke.Color = Color3.fromRGB(112, 138, 153)
+    stroke.Thickness = 2
+    stroke.Parent = cell
+
+    local holder = Instance.new("Frame")
+    holder.Name = "Content"
+    holder.Size = UDim2.fromScale(1, 1)
+    holder.BackgroundTransparency = 1
+    holder.BorderSizePixel = 0
+    holder.Parent = cell
+    Instance.new("UICorner", holder).CornerRadius = UDim.new(0, 8)
+
+    TweenService:Create(cell, TweenInfo.new(0.35, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {
+        Size = UDim2.new(0, 48, 0, 48),
+    }):Play()
+
+    return cell, holder, stroke
+end
+
+local function spinMiniReel(cell, holder, stroke, spinData, duration)
+    local slots = spinData.Slots or {}
+    local picked = spinData.Picked
+    local started = os.clock()
+
+    while #slots > 0 and os.clock() - started < duration do
+        local progress = math.clamp((os.clock() - started) / duration, 0, 1)
+        renderSlotItem(slots[math.random(1, #slots)], holder)
+        task.wait(0.04 + (progress ^ 2) * 0.15)
+    end
+
+    if picked then
+        renderSlotItem(picked, holder)
+        stroke.Color = picked.Color or Color3.fromRGB(138, 154, 134)
+        stroke.Thickness = 3
+    end
+
+    TweenService:Create(cell, TweenInfo.new(0.15, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {
+        Size = UDim2.new(0, 54, 0, 54),
+    }):Play()
+    task.wait(0.15)
+    TweenService:Create(cell, TweenInfo.new(0.15, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
+        Size = UDim2.new(0, 48, 0, 48),
+    }):Play()
 end
 
 local function playWheelAnimation(panel, slots, pickedIndex, speedMultiplier)
     local window = panel:WaitForChild("WheelDisc")
     local strip = window:WaitForChild("SlotStrip")
-    local sideGrid = panel:FindFirstChild("SideGrid")
     clearRuntimeSlotChildren(strip)
-    if sideGrid then
-        for _, child in ipairs(sideGrid:GetChildren()) do
-            if child:IsA("Frame") then child:Destroy() end
-        end
-    end
     local count = #slots
     if count == 0 then return end
     local repeats = 24
@@ -2000,9 +2045,6 @@ local function playWheelAnimation(panel, slots, pickedIndex, speedMultiplier)
         frame.Parent = strip
         renderSlotItem(slots[((index - 1) % count) + 1], frame)
     end
-    if sideGrid then
-        for index, slot in ipairs(slots) do makeMiniCell(sideGrid, index, slot) end
-    end
     local startIndex = count + 1
     strip.Position = UDim2.new(0, 0, 0, SLOT_WINDOW_HEIGHT / 2 - ((startIndex - 1) * SLOT_ITEM_HEIGHT + SLOT_ITEM_HEIGHT / 2))
     local targetIndex = startIndex + count * 4 + ((pickedIndex or 1) - 1)
@@ -2014,17 +2056,33 @@ local function playWheelAnimation(panel, slots, pickedIndex, speedMultiplier)
 end
 
 local function playWheelAnimations(spins, speedMultiplier)
-    for index, spin in ipairs(spins) do
-        if index == 1 then
-            playWheelAnimation(wheel, spin.Slots, spin.PickedIndex, speedMultiplier)
-        else
+    clearSideGrid()
+    if #spins == 0 then return end
+
+    local sideGrid = wheel:FindFirstChild("SideGrid")
+    local finished = 0
+    local total = #spins
+
+    task.spawn(function()
+        playWheelAnimation(wheel, spins[1].Slots or {}, spins[1].PickedIndex or 1, speedMultiplier)
+        finished += 1
+    end)
+
+    if sideGrid then
+        for index = 2, #spins do
+            local spin = spins[index]
+            local cell, holder, stroke = makeMiniCell(sideGrid, index - 1)
             task.spawn(function()
-                task.wait(index * 0.08)
-                local sideGrid = wheel:FindFirstChild("SideGrid")
-                if sideGrid and spin.Picked then makeMiniCell(sideGrid, 10 + index, spin.Picked) end
+                task.wait((index - 1) * 0.08)
+                spinMiniReel(cell, holder, stroke, spin, 1.0 + math.random() * 0.3)
+                finished += 1
             end)
         end
+    else
+        finished += #spins - 1
     end
+
+    repeat task.wait(0.05) until finished >= total
 end
 
 local function performSpin(count)
