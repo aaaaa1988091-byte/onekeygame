@@ -545,6 +545,8 @@ skillTabButton.TextColor3 = Color3.new(1, 1, 1)
 newGui("UICorner", "Corner", skillTabButton).CornerRadius = UDim.new(0, 8)
 -- Equipped skill slots now live at the TOP of the bag panel (under the tabs) so they read as a
 -- drag-and-drop destination row above the drawable-skill grid, and the buttons are smaller.
+-- These are pure visual "boxes" -- no numbering, no fixed identity; whatever is in the player's
+-- equipped-skills list just gets displayed left to right.
 local equippedFrame = newGui("Frame", "EquippedSkillSlots", bagPanel)
 equippedFrame.Size = UDim2.new(1, -260, 0, 46)
 equippedFrame.Position = UDim2.new(0, 20, 0, 94)
@@ -560,7 +562,7 @@ for slotIndex = 1, 5 do
     slot.Font = Enum.Font.FredokaOne
     slot.TextScaled = true
     slot.TextColor3 = Color3.new(1, 1, 1)
-    slot.Text = tostring(slotIndex)
+    slot.Text = "" -- empty box shows nothing; filled boxes get their skill's name at runtime
     slot.AutoButtonColor = false
     newGui("UICorner", "Corner", slot).CornerRadius = UDim.new(0, 8)
     -- Magnetic drop highlight: made visible while a dragged skill icon hovers over this slot.
@@ -577,6 +579,11 @@ bagList.BorderSizePixel = 0
 bagList.ScrollBarThickness = 8
 bagList.CanvasSize = UDim2.new(0, 0, 0, 0)
 newGui("UICorner", "Corner", bagList).CornerRadius = UDim.new(0, 14)
+-- Highlighted while dragging a skill DOWN off a box, to show "drop here to put it back".
+local bagDropHint = newGui("UIStroke", "UIStroke_DropHint", bagList)
+bagDropHint.Thickness = 4
+bagDropHint.Color = Color3.fromRGB(255, 220, 90)
+bagDropHint.Transparency = 1
 local bagLayout = newGui("UIGridLayout", "GridLayout", bagList)
 bagLayout.CellSize = UDim2.new(0, 128, 0, 128)
 bagLayout.CellPadding = UDim2.new(0, 12, 0, 12)
@@ -754,7 +761,15 @@ function StateService.Create(player, loaded)
         Stats = loaded.Stats or {},
         UnlockedWheelRewards = loaded.UnlockedWheelRewards or {},
         UnlockedCards = loaded.UnlockedCards or {},
-        EquippedSkills = loaded.EquippedSkills or {},
+        -- EquippedSkills is a free-form, order-free list of up to 5 skill keys (no slot numbers).
+        -- pairs() here also migrates any older save data that stored it as a slot-indexed table.
+        EquippedSkills = (function()
+            local compact = {}
+            for _, key in pairs(loaded.EquippedSkills or {}) do
+                table.insert(compact, key)
+            end
+            return compact
+        end)(),
     }
     StateService.UpdateLeaderstats(player)
     StateService.Push(player)
@@ -951,27 +966,60 @@ function StateService.GetLeaderboardSnapshot()
 end
 
 function StateService.IsSkillEquipped(state, key)
-    for _, equippedKey in pairs(state.EquippedSkills or {}) do
+    for _, equippedKey in ipairs(state.EquippedSkills or {}) do
         if equippedKey == key then return true end
     end
     return false
 end
 
-function StateService.EquipSkill(player, key, slot)
-    local state = StateService.Get(player)
-    local SkillConfig = require(Configs.SkillConfig)
-    local card = SkillConfig.Cards[key]
-    if not state or not card or (not card.IsUnlockedDefault and not state.UnlockedCards[key]) then return false, "LOCKED_SKILL" end
-    slot = math.clamp(math.floor(tonumber(slot) or 1), 1, 5)
-    state.EquippedSkills = state.EquippedSkills or {}
-    -- BUG FIX: EquippedSkills is a sparse table keyed by slot (1-5) once any slot is empty.
-    -- ipairs stops at the first nil "hole", which could skip a skill sitting in a later slot
-    -- and leave it registered in two slots at once after a move. pairs() visits every slot.
-    for index, equippedKey in pairs(state.EquippedSkills) do
-        if equippedKey == key then state.EquippedSkills[index] = nil end
+local MAX_EQUIPPED_SKILLS = 5
+
+-- Removes a key from the compact EquippedSkills array (if present) using table.remove, so the
+-- array never develops gaps. Returns true if something was removed.
+local function removeEquippedKey(state, key)
+    for index, equippedKey in ipairs(state.EquippedSkills) do
+        if equippedKey == key then
+            table.remove(state.EquippedSkills, index)
+            return true
+        end
     end
-    state.EquippedSkills[slot] = key
-    return true
+    return false
+end
+
+-- Equip/Replace/Unequip work on a free-form, order-free list of skill keys -- there is no such
+-- thing as "slot 1-5" server-side anymore, so nothing can end up in two places or land in a
+-- position the client can't render.
+--   action == "Equip"    : keyA is added if there's room.
+--   action == "Replace"  : keyB (currently shown in the drop target) is removed, keyA takes its place.
+--   action == "Unequip"  : keyA is removed (used when dragging a skill back down to the bag).
+function StateService.EquipSkill(player, action, keyA, keyB)
+    local state = StateService.Get(player)
+    if not state then return false, "NO_STATE" end
+    state.EquippedSkills = state.EquippedSkills or {}
+    local SkillConfig = require(Configs.SkillConfig)
+
+    if action == "Unequip" then
+        removeEquippedKey(state, keyA)
+        return true
+    end
+
+    local card = SkillConfig.Cards[keyA]
+    if not card or (not card.IsUnlockedDefault and not state.UnlockedCards[keyA]) then return false, "LOCKED_SKILL" end
+
+    if action == "Equip" then
+        if not removeEquippedKey(state, keyA) and #state.EquippedSkills >= MAX_EQUIPPED_SKILLS then
+            return false, "FULL"
+        end
+        table.insert(state.EquippedSkills, keyA)
+        return true
+    elseif action == "Replace" then
+        removeEquippedKey(state, keyA)
+        removeEquippedKey(state, keyB)
+        if #state.EquippedSkills >= MAX_EQUIPPED_SKILLS then return false, "FULL" end
+        table.insert(state.EquippedSkills, keyA)
+        return true
+    end
+    return false, "BAD_ACTION"
 end
 
 function StateService.BuildInventory(player)
@@ -2249,9 +2297,9 @@ function WheelService.Start()
         StateService.Push(player)
         return { Ok = true }
     end
-    Events.RequestEquipSkill.OnServerInvoke = function(player, skillKey, slot)
+    Events.RequestEquipSkill.OnServerInvoke = function(player, action, keyA, keyB)
         if not ServerGuardService.Allow(player, "RequestEquipSkill", 12, 5) then return { Ok = false, Error = "RATE_LIMIT" } end
-        local ok, err = StateService.EquipSkill(player, tostring(skillKey), slot)
+        local ok, err = StateService.EquipSkill(player, tostring(action), keyA and tostring(keyA) or nil, keyB and tostring(keyB) or nil)
         if not ok then return { Ok = false, Error = err } end
         StateService.Push(player)
         return { Ok = true }
@@ -2477,7 +2525,7 @@ end
 local selectedAbilityKey
 local bagMode = "Terms"
 local dragState = nil
-local MAGNET_PADDING = 18 -- extra hit-test margin around each slot so a nearby drop still "snaps" in
+local MAGNET_PADDING = 18 -- extra hit-test margin around each box so a nearby drop still "snaps" in
 
 local function showAbilityDetail(item)
     selectedAbilityKey = item.Key
@@ -2487,41 +2535,53 @@ local function showAbilityDetail(item)
     detail.UpgradeButton.Text = item.UpgradeCost and string.format("Upgrade - %d Cake", item.UpgradeCost) or "Max Level"
 end
 
--- Returns the slot index (1-5) a given skill key currently occupies, or nil if it isn't equipped.
-local function equippedSlotForKey(key)
+-- EquippedSkills is just a free-form list (no slot numbers). isEquipped only needs to know
+-- whether a key is anywhere in that list.
+local function isEquipped(key)
     local equipped = (state.Inventory and state.Inventory.EquippedSkills) or {}
-    for slotIndex, equippedKey in pairs(equipped) do
-        if equippedKey == key then return slotIndex end
+    for _, equippedKey in ipairs(equipped) do
+        if equippedKey == key then return true end
     end
-    return nil
+    return false
 end
 
-local function getSkillSlots()
+local function getSkillBoxes()
     return bagPanel:WaitForChild("EquippedSkillSlots")
 end
 
-local function setSlotHighlight(slot, on)
-    local stroke = slot and slot:FindFirstChild("Highlight")
+local function getBagList()
+    return bagPanel:WaitForChild("BagList")
+end
+
+local function setBoxHighlight(box, on)
+    local stroke = box and box:FindFirstChild("Highlight")
     if stroke then stroke.Transparency = on and 0 or 1 end
 end
 
-local function clearSlotHighlights()
-    local slots = getSkillSlots()
-    for slotIndex = 1, 5 do
-        setSlotHighlight(slots:FindFirstChild("SkillSlot" .. tostring(slotIndex)), false)
+local function clearBoxHighlights()
+    local boxes = getSkillBoxes()
+    for boxIndex = 1, 5 do
+        setBoxHighlight(boxes:FindFirstChild("SkillSlot" .. tostring(boxIndex)), false)
     end
 end
 
--- Magnetic hit test: expands each slot's bounds by MAGNET_PADDING so the drop doesn't need pixel precision.
-local function slotUnderPosition(position)
-    local slots = getSkillSlots()
-    for slotIndex = 1, 5 do
-        local slot = slots:FindFirstChild("SkillSlot" .. tostring(slotIndex))
-        if slot then
-            local topLeft = slot.AbsolutePosition - Vector2.new(MAGNET_PADDING, MAGNET_PADDING)
-            local size = slot.AbsoluteSize + Vector2.new(MAGNET_PADDING * 2, MAGNET_PADDING * 2)
+local function isPositionInFrame(position, frame)
+    local topLeft = frame.AbsolutePosition
+    local size = frame.AbsoluteSize
+    return position.X >= topLeft.X and position.X <= topLeft.X + size.X and position.Y >= topLeft.Y and position.Y <= topLeft.Y + size.Y
+end
+
+-- Magnetic hit test: expands each box's bounds by MAGNET_PADDING so the drop doesn't need pixel precision.
+-- boxIndex here is purely a *display position* (1st box, 2nd box...), never a saved identity.
+local function boxUnderPosition(position)
+    local boxes = getSkillBoxes()
+    for boxIndex = 1, 5 do
+        local box = boxes:FindFirstChild("SkillSlot" .. tostring(boxIndex))
+        if box then
+            local topLeft = box.AbsolutePosition - Vector2.new(MAGNET_PADDING, MAGNET_PADDING)
+            local size = box.AbsoluteSize + Vector2.new(MAGNET_PADDING * 2, MAGNET_PADDING * 2)
             if position.X >= topLeft.X and position.X <= topLeft.X + size.X and position.Y >= topLeft.Y and position.Y <= topLeft.Y + size.Y then
-                return slot, slotIndex
+                return box, boxIndex
             end
         end
     end
@@ -2534,39 +2594,75 @@ local function endDrag(dropPosition)
     dragState = nil
     if drag.inputChanged then drag.inputChanged:Disconnect() end
     if drag.inputEnded then drag.inputEnded:Disconnect() end
-    clearSlotHighlights()
+    clearBoxHighlights()
     drag.ghost:Destroy() -- destroy right away so the icon doesn't hang mid-air during the network round trip
-    local targetIndex
+
+    local targetBoxIndex, targetKeyAtBox, droppedInBagArea = nil, nil, false
     if dropPosition then
-        local _, foundIndex = slotUnderPosition(dropPosition)
-        targetIndex = foundIndex
+        local _, foundIndex = boxUnderPosition(dropPosition)
+        targetBoxIndex = foundIndex
+        if targetBoxIndex then
+            local equipped = (state.Inventory and state.Inventory.EquippedSkills) or {}
+            targetKeyAtBox = equipped[targetBoxIndex]
+        else
+            droppedInBagArea = isPositionInFrame(dropPosition, getBagList())
+        end
     end
-    -- Don't bother re-equipping into the exact slot it was already dragged from (a plain tap/no-move).
-    if targetIndex and targetIndex ~= drag.sourceSlot then
+
+    local action, keyA, keyB
+    if drag.fromBox then
+        -- Dragging a skill OFF one of the top boxes: dropping it back down onto the bag area
+        -- below is how you put it back (unequip). Dropping on any box (same or different) is a
+        -- no-op since order has no meaning; dropping nowhere useful just cancels.
+        if droppedInBagArea then
+            action, keyA = "Unequip", drag.key
+        end
+    else
+        -- Dragging a skill UP from the bag: dropping on an empty box equips it; dropping on a
+        -- box that already shows something replaces that one.
+        if targetBoxIndex and targetKeyAtBox and targetKeyAtBox ~= drag.key then
+            action, keyA, keyB = "Replace", drag.key, targetKeyAtBox
+        elseif targetBoxIndex then
+            action, keyA = "Equip", drag.key
+        end
+    end
+
+    if action then
         local ok, result = pcall(function()
-            return RequestEquipSkill:InvokeServer(drag.key, targetIndex)
+            return RequestEquipSkill:InvokeServer(action, keyA, keyB)
         end)
         if ok and result and result.Ok then
             playSound("Interact")
             -- BUG FIX ("ghost slot"): UpdateClientState's broadcast isn't guaranteed to arrive
             -- before InvokeServer's response does, so refreshBag() below could still render with
-            -- stale data (old slot cleared visually, new slot appearing empty even though the
-            -- server already placed it there). Apply the same move locally right now so the UI
-            -- is correct immediately; the later broadcast just re-confirms the same result.
+            -- stale data. Apply the same change locally right now so the UI is correct
+            -- immediately; the later broadcast just re-confirms the same result.
             state.Inventory = state.Inventory or {}
             state.Inventory.EquippedSkills = state.Inventory.EquippedSkills or {}
-            for existingSlot, existingKey in pairs(state.Inventory.EquippedSkills) do
-                if existingKey == drag.key then state.Inventory.EquippedSkills[existingSlot] = nil end
+            local list = state.Inventory.EquippedSkills
+            local function removeLocal(key)
+                for index, existingKey in ipairs(list) do
+                    if existingKey == key then table.remove(list, index) break end
+                end
             end
-            state.Inventory.EquippedSkills[targetIndex] = drag.key
+            if action == "Unequip" then
+                removeLocal(keyA)
+            elseif action == "Equip" then
+                removeLocal(keyA)
+                table.insert(list, keyA)
+            elseif action == "Replace" then
+                removeLocal(keyA)
+                removeLocal(keyB)
+                table.insert(list, keyA)
+            end
         end
     end
     refreshBag()
 end
 
--- A real drag gesture: an icon follows the cursor/finger and only equips if released on top of
--- (or magnetically near) a slot. sourceSlot is set when dragging FROM an equipped slot (to move it).
-local function beginDrag(key, iconImage, startPosition, sourceSlot)
+-- A real drag gesture: an icon follows the cursor/finger. fromBox marks a drag that picked its
+-- skill up off one of the top boxes (as opposed to the bag list below).
+local function beginDrag(key, iconImage, startPosition, fromBox)
     if dragState then return end
     local ghost = Instance.new("ImageLabel")
     ghost.Name = "SkillDragGhost"
@@ -2578,19 +2674,30 @@ local function beginDrag(key, iconImage, startPosition, sourceSlot)
     ghost.ZIndex = 500
     ghost.Parent = gui
 
-    dragState = { key = key, ghost = ghost, sourceSlot = sourceSlot }
+    dragState = { key = key, ghost = ghost, fromBox = fromBox }
 
     dragState.inputChanged = UserInputService.InputChanged:Connect(function(input)
         if input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch then
             local pos = Vector2.new(input.Position.X, input.Position.Y)
             ghost.Position = UDim2.fromOffset(pos.X, pos.Y)
-            clearSlotHighlights()
-            local slot = slotUnderPosition(pos)
-            setSlotHighlight(slot, true)
+            clearBoxHighlights()
+            if fromBox then
+                -- Highlight the whole bag list to show "drop here to put it back".
+                local list = getBagList()
+                if isPositionInFrame(pos, list) then
+                    list.UIStroke_DropHint.Transparency = 0
+                else
+                    list.UIStroke_DropHint.Transparency = 1
+                end
+            else
+                local box = boxUnderPosition(pos)
+                setBoxHighlight(box, true)
+            end
         end
     end)
     dragState.inputEnded = UserInputService.InputEnded:Connect(function(input)
         if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+            getBagList().UIStroke_DropHint.Transparency = 1
             endDrag(Vector2.new(input.Position.X, input.Position.Y))
         end
     end)
@@ -2604,22 +2711,22 @@ local function addBagTile(template, item, order)
     tile.Visible = true
     tile.Image = item.Icon or ""
     tile.ItemName.Text = item.Name
-    -- BUG FIX: a skill already sitting in one of the top slots is locked here at the bottom.
-    -- It can only be moved by dragging it FROM its equipped slot, never re-dragged from this grid.
-    local lockedByEquip = bagMode == "Skills" and equippedSlotForKey(item.Key) ~= nil
+    -- A skill already sitting in a top box is locked here at the bottom: it can only be moved by
+    -- dragging it FROM its box, never re-dragged from this grid.
+    local lockedByEquip = bagMode == "Skills" and isEquipped(item.Key)
     tile.BackgroundColor3 = lockedByEquip and Color3.fromRGB(108, 126, 116) or Color3.fromRGB(142, 166, 146)
     tile.Parent = template.Parent
     tile.InputBegan:Connect(function(input)
         if input.UserInputType ~= Enum.UserInputType.MouseButton1 and input.UserInputType ~= Enum.UserInputType.Touch then return end
         showAbilityDetail(item)
         if bagMode == "Skills" and not lockedByEquip then
-            beginDrag(item.Key, item.Icon or "", Vector2.new(input.Position.X, input.Position.Y), nil)
+            beginDrag(item.Key, item.Icon or "", Vector2.new(input.Position.X, input.Position.Y), false)
         end
     end)
 end
 
 local function refreshBag()
-    local list = bagPanel:WaitForChild("BagList")
+    local list = getBagList()
     local template = list:WaitForChild("EntryTemplate")
     for _, child in ipairs(list:GetChildren()) do if child:IsA("ImageButton") and child.Name ~= "EntryTemplate" then child:Destroy() end end
     local order = 0
@@ -2634,12 +2741,17 @@ local function refreshBag()
             addBagTile(template, item, order)
         end
     end
-    local slots = getSkillSlots()
-    slots.Visible = bagMode == "Skills"
+    local boxes = getSkillBoxes()
+    boxes.Visible = bagMode == "Skills"
     local equipped = (state.Inventory and state.Inventory.EquippedSkills) or {}
-    for slotIndex = 1, 5 do
-        local slot = slots:FindFirstChild("SkillSlot" .. tostring(slotIndex))
-        if slot then slot.Text = equipped[slotIndex] or tostring(slotIndex) end
+    for boxIndex = 1, 5 do
+        local box = boxes:FindFirstChild("SkillSlot" .. tostring(boxIndex))
+        if box then
+            -- No "1/2/3/4/5" labels: a filled box shows the skill's name, an empty one shows nothing.
+            local key = equipped[boxIndex]
+            local card = key and SkillConfig.Cards[key]
+            box.Text = card and (L[card.NameKey] or key) or ""
+        end
     end
     task.defer(function() list.CanvasSize = UDim2.new(0, 0, 0, list.GridLayout.AbsoluteContentSize.Y + 16) end)
 end
@@ -2929,19 +3041,19 @@ bagPanel.SkillTabButton.Activated:Connect(function()
     bagMode = "Skills"
     refreshBag()
 end)
--- Equipped slots are now the ONLY place a skill can be picked back up and re-dragged from
--- (e.g. to move it into a different slot). They no longer "equip on click".
-for slotIndex = 1, 5 do
-    local slot = bagPanel.EquippedSkillSlots:FindFirstChild("SkillSlot" .. tostring(slotIndex))
-    if slot then
-        slot.InputBegan:Connect(function(input)
+-- The top boxes are the ONLY place an equipped skill can be picked back up and re-dragged from.
+-- Drag it down onto the bag list below to put it back; they no longer "equip on click".
+for boxIndex = 1, 5 do
+    local box = bagPanel.EquippedSkillSlots:FindFirstChild("SkillSlot" .. tostring(boxIndex))
+    if box then
+        box.InputBegan:Connect(function(input)
             if input.UserInputType ~= Enum.UserInputType.MouseButton1 and input.UserInputType ~= Enum.UserInputType.Touch then return end
             if bagMode ~= "Skills" then return end
             local equipped = (state.Inventory and state.Inventory.EquippedSkills) or {}
-            local key = equipped[slotIndex]
+            local key = equipped[boxIndex]
             if not key then return end
             local card = SkillConfig.Cards[key]
-            beginDrag(key, card and card.Icon or "", Vector2.new(input.Position.X, input.Position.Y), slotIndex)
+            beginDrag(key, card and card.Icon or "", Vector2.new(input.Position.X, input.Position.Y), true)
         end)
     end
 end
