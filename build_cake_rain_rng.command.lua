@@ -1053,14 +1053,25 @@ function CakeService.Finish(player, cake)
     local startPivot, startScale, started = cake:GetPivot(), cake:GetScale(), os.clock()
     local primary = cake.PrimaryPart
     if primary then
+        local root = rootOf(player)
+        local soundAnchor = Instance.new("Part")
+        soundAnchor.Name = "CakeShrinkSoundAnchor"
+        soundAnchor.Anchored = true
+        soundAnchor.CanCollide = false
+        soundAnchor.Transparency = 1
+        soundAnchor.Size = Vector3.new(0.2, 0.2, 0.2)
+        soundAnchor.CFrame = CFrame.new((root and root.Position or primary.Position) + Vector3.new(0, 1, 0))
+        soundAnchor.Parent = Workspace
+
         local shrinkSound = Instance.new("Sound")
         shrinkSound.Name = "CakeShrinkSound"
         shrinkSound.SoundId = "rbxassetid://135833732254676"
-        shrinkSound.Volume = 0.75
-        shrinkSound.RollOffMaxDistance = 45
-        shrinkSound.Parent = primary
+        shrinkSound.Volume = 1.6
+        shrinkSound.RollOffMinDistance = 8
+        shrinkSound.RollOffMaxDistance = 90
+        shrinkSound.Parent = soundAnchor
         shrinkSound:Play()
-        Debris:AddItem(shrinkSound, 3)
+        Debris:AddItem(soundAnchor, math.max(3, shrinkSound.TimeLength + 0.5))
     end
     for _, part in ipairs(cake:GetDescendants()) do if part:IsA("BasePart") then part.CanCollide, part.Anchored = false, true end end
     task.spawn(function()
@@ -1792,6 +1803,8 @@ clientScript.Source = [=[
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Players = game:GetService("Players")
 local TweenService = game:GetService("TweenService")
+local SoundService = game:GetService("SoundService")
+local ContentProvider = game:GetService("ContentProvider")
 
 local player = Players.LocalPlayer
 local Events = ReplicatedStorage:WaitForChild("Events")
@@ -1831,15 +1844,30 @@ local wheelRewardGeneration = 0
 
 local soundFolder = Instance.new("Folder")
 soundFolder.Name = "CakeRainSounds"
-soundFolder.Parent = gui
+soundFolder.Parent = SoundService
+
+local soundVolumes = { Button = 1.2, Interact = 1.35, WheelTick = 0.9, CakeShrink = 1.6 }
+local soundTemplates = {}
+for key, soundId in pairs(UIConfig.Sounds or {}) do
+    local sound = Instance.new("Sound")
+    sound.Name = key .. "Template"
+    sound.SoundId = soundId
+    sound.Volume = soundVolumes[key] or 1
+    sound.Parent = soundFolder
+    soundTemplates[key] = sound
+end
+task.spawn(function()
+    local preloadList = {}
+    for _, sound in pairs(soundTemplates) do table.insert(preloadList, sound) end
+    pcall(function() ContentProvider:PreloadAsync(preloadList) end)
+end)
 
 local function playSound(soundKey, volume)
-    local soundId = UIConfig.Sounds and UIConfig.Sounds[soundKey]
-    if not soundId then return end
-    local sound = Instance.new("Sound")
+    local template = soundTemplates[soundKey]
+    if not template then return end
+    local sound = template:Clone()
     sound.Name = soundKey .. "Sound"
-    sound.SoundId = soundId
-    sound.Volume = volume or 0.65
+    sound.Volume = volume or template.Volume
     sound.Parent = soundFolder
     sound:Play()
     sound.Ended:Connect(function() sound:Destroy() end)
@@ -2084,7 +2112,7 @@ local function spinMiniReel(cell, holder, stroke, spinData, duration)
     while #slots > 0 and os.clock() - started < duration do
         local progress = math.clamp((os.clock() - started) / duration, 0, 1)
         renderSlotItem(slots[math.random(1, #slots)], holder)
-        playSound("WheelTick", 0.35)
+        playSound("WheelTick")
         task.wait(0.04 + (progress ^ 2) * 0.15)
     end
 
@@ -2126,10 +2154,12 @@ local function playWheelAnimation(panel, slots, pickedIndex, speedMultiplier)
     local duration = 2.4 / math.max(0.35, speedMultiplier or 1)
     local tween = TweenService:Create(strip, TweenInfo.new(duration, Enum.EasingStyle.Back, Enum.EasingDirection.Out), { Position = UDim2.new(0, 0, 0, targetY) })
     local ticksActive = true
+    local tickCount = math.max(1, targetIndex - startIndex)
+    local tickInterval = math.clamp(duration / tickCount, 0.08, 0.22)
     task.spawn(function()
         while ticksActive do
-            playSound("WheelTick", 0.35)
-            task.wait(0.08)
+            playSound("WheelTick")
+            task.wait(tickInterval)
         end
     end)
     tween:Play()
