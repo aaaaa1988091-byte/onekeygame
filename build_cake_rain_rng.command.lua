@@ -586,7 +586,19 @@ local CakeConfig = require(ReplicatedStorage.Configs.CakeConfig)
 
 local DataService = {}
 local store
+local orderedStores = {}
 local memory = {}
+
+local function getOrderedStore(name)
+    if orderedStores[name] ~= nil then
+        return orderedStores[name]
+    end
+    local ok, result = pcall(function()
+        return DataStoreService:GetOrderedDataStore(CakeConfig.DataStoreKey .. "_" .. name)
+    end)
+    orderedStores[name] = ok and result or false
+    return orderedStores[name]
+end
 
 local function getStore()
     if store ~= nil then
@@ -624,7 +636,33 @@ function DataService.Save(player, data)
         pcall(function()
             activeStore:SetAsync(key, data)
         end)
+        local cakeStore = getOrderedStore("CakePoints")
+        if cakeStore then
+            pcall(function()
+                cakeStore:SetAsync(tostring(player.UserId), math.max(0, math.floor(tonumber(data.CakePoints) or 0)))
+            end)
+        end
+        local spinsStore = getOrderedStore("WheelSpins")
+        if spinsStore then
+            pcall(function()
+                spinsStore:SetAsync(tostring(player.UserId), math.max(0, math.floor(tonumber(data.TotalRolls or data.WheelPoints or data.WheelSpins) or 0)))
+            end)
+        end
     end
+end
+
+function DataService.GetGlobalLeaderboard(metric, limit)
+    local activeStore = getOrderedStore(metric)
+    if not activeStore then return {} end
+    local ok, pages = pcall(function()
+        return activeStore:GetSortedAsync(false, limit or 10)
+    end)
+    if not ok then return {} end
+    local rows = {}
+    for rank, entry in ipairs(pages:GetCurrentPage()) do
+        table.insert(rows, { Rank = rank, UserId = tonumber(entry.key) or 0, Value = entry.value or 0 })
+    end
+    return rows
 end
 
 return DataService
@@ -658,6 +696,7 @@ function StateService.Create(player, loaded)
 
     StateService.States[player] = {
         WheelSpins = loaded.WheelSpins or 0,
+        TotalRolls = loaded.TotalRolls or loaded.WheelPoints or 0,
         WheelPoints = loaded.WheelPoints or 0,
         WheelLevel = math.max(1, loaded.WheelLevel or 1),
         PendingWheelSpin = nil,
@@ -753,6 +792,7 @@ function StateService.Serialize(player)
     if not state then return {} end
     return {
         WheelSpins = state.WheelSpins,
+        TotalRolls = state.TotalRolls,
         WheelPoints = state.WheelPoints,
         WheelLevel = state.WheelLevel,
         CakePoints = state.CakePoints,
@@ -892,7 +932,7 @@ function StateService.Push(player)
         wheelReward = displayFor > 0 and { Key = wheelReward.Key, Name = wheelReward.Name, Rarity = wheelReward.Rarity, Kind = wheelReward.Kind, Stacks = wheelReward.Stacks, EffectText = wheelReward.EffectText, DisplayFor = displayFor } or nil
     end
     UpdateClientState:FireClient(player, {
-        WheelSpins = state.WheelSpins, WheelPoints = state.WheelPoints, WheelLevel = state.WheelLevel, CakePoints = state.CakePoints,
+        WheelSpins = state.WheelSpins, TotalRolls = state.TotalRolls, WheelPoints = state.WheelPoints, WheelLevel = state.WheelLevel, CakePoints = state.CakePoints,
         LastWheelReward = wheelReward,
         ActiveBuffs = StateService.ActiveBuffs(player), UnlockedWheelRewards = state.UnlockedWheelRewards, UnlockedCards = state.UnlockedCards,
         Inventory = StateService.BuildInventory(player),
@@ -900,6 +940,241 @@ function StateService.Push(player)
     })
 end
 return StateService
+]=]
+
+local globalLeaderboardService = getOrCreate(servicesPackage, "ModuleScript", "GlobalLeaderboardService")
+globalLeaderboardService.Source = [=[
+local Players = game:GetService("Players")
+local Workspace = game:GetService("Workspace")
+
+local DataService = require(script.Parent.DataService)
+local StateService = require(script.Parent.StateService)
+
+local GlobalLeaderboardService = {}
+local boardGui
+
+local function getOrCreate(parent, className, name)
+    local object = parent:FindFirstChild(name)
+    if object and object.ClassName ~= className then object:Destroy(); object = nil end
+    if not object then object = Instance.new(className); object.Name = name; object.Parent = parent end
+    return object
+end
+
+local function playerName(userId)
+    local online = Players:GetPlayerByUserId(userId)
+    if online then return online.DisplayName end
+    local ok, name = pcall(function() return Players:GetNameFromUserIdAsync(userId) end)
+    return ok and name or ("User " .. tostring(userId))
+end
+
+local function mergeOnlineRows(metric, rows)
+    local seen = {}
+    for _, row in ipairs(rows) do seen[row.UserId] = true end
+    for player, state in pairs(StateService.States) do
+        if not seen[player.UserId] then
+            table.insert(rows, { UserId = player.UserId, Value = metric == "CakePoints" and (state.CakePoints or 0) or (state.TotalRolls or state.WheelPoints or 0) })
+        end
+    end
+    table.sort(rows, function(a, b) return (a.Value or 0) > (b.Value or 0) end)
+    while #rows > 10 do table.remove(rows) end
+    for rank, row in ipairs(rows) do row.Rank = rank end
+    return rows
+end
+
+local function formatRows(title, metric)
+    local rows = mergeOnlineRows(metric, DataService.GetGlobalLeaderboard(metric, 10))
+    local lines = { title }
+    if #rows == 0 then
+        table.insert(lines, "No scores yet")
+    end
+    for _, row in ipairs(rows) do
+        table.insert(lines, string.format("#%d  %s  %s", row.Rank, playerName(row.UserId), tostring(row.Value or 0)))
+    end
+    return table.concat(lines, "\n")
+end
+
+function GlobalLeaderboardService.BuildBoard()
+    local map = Workspace:FindFirstChild("Map") or Workspace
+    local board = getOrCreate(map, "Part", "GlobalLeaderboardBoard")
+    board.Anchored = true
+    board.CanCollide = true
+    board.Size = Vector3.new(28, 16, 1)
+    board.CFrame = CFrame.new(0, 10, -38)
+    board.Color = Color3.fromRGB(35, 27, 22)
+    board.Material = Enum.Material.WoodPlanks
+
+    boardGui = getOrCreate(board, "SurfaceGui", "GlobalLeaderboardSurface")
+    boardGui.Face = Enum.NormalId.Front
+    boardGui.AlwaysOnTop = false
+    boardGui.SizingMode = Enum.SurfaceGuiSizingMode.PixelsPerStud
+    boardGui.PixelsPerStud = 42
+
+    local frame = getOrCreate(boardGui, "Frame", "LeaderboardFrame")
+    frame.BackgroundColor3 = Color3.fromRGB(255, 239, 196)
+    frame.BackgroundTransparency = 0.05
+    frame.Size = UDim2.fromScale(1, 1)
+
+    local cake = getOrCreate(frame, "TextLabel", "CakePointsRanking")
+    cake.BackgroundTransparency = 1
+    cake.Font = Enum.Font.FredokaOne
+    cake.TextColor3 = Color3.fromRGB(78, 45, 31)
+    cake.TextScaled = true
+    cake.TextXAlignment = Enum.TextXAlignment.Left
+    cake.TextYAlignment = Enum.TextYAlignment.Top
+    cake.Position = UDim2.fromScale(0.04, 0.08)
+    cake.Size = UDim2.fromScale(0.43, 0.84)
+
+    local spins = getOrCreate(frame, "TextLabel", "WheelSpinsRanking")
+    spins.BackgroundTransparency = 1
+    spins.Font = Enum.Font.FredokaOne
+    spins.TextColor3 = Color3.fromRGB(78, 45, 31)
+    spins.TextScaled = true
+    spins.TextXAlignment = Enum.TextXAlignment.Left
+    spins.TextYAlignment = Enum.TextYAlignment.Top
+    spins.Position = UDim2.fromScale(0.53, 0.08)
+    spins.Size = UDim2.fromScale(0.43, 0.84)
+end
+
+function GlobalLeaderboardService.Refresh()
+    if not boardGui then GlobalLeaderboardService.BuildBoard() end
+    local frame = boardGui:FindFirstChild("LeaderboardFrame")
+    if not frame then return end
+    frame.CakePointsRanking.Text = formatRows("GLOBAL CAKE POINTS", "CakePoints")
+    frame.WheelSpinsRanking.Text = formatRows("GLOBAL ROLLS", "WheelSpins")
+end
+
+function GlobalLeaderboardService.Start()
+    GlobalLeaderboardService.BuildBoard()
+    task.spawn(function()
+        while true do
+            GlobalLeaderboardService.Refresh()
+            task.wait(60)
+        end
+    end)
+end
+
+return GlobalLeaderboardService
+]=]
+
+local cakeEffectsService = getOrCreate(servicesPackage, "ModuleScript", "CakeEffectsService")
+cakeEffectsService.Source = [=[
+local Debris = game:GetService("Debris")
+local TweenService = game:GetService("TweenService")
+local Workspace = game:GetService("Workspace")
+
+local CakeEffectsService = {}
+
+function CakeEffectsService.PlaySoundAt(name, soundId, position, volume)
+    local soundAnchor = Instance.new("Part")
+    soundAnchor.Name = name .. "Anchor"
+    soundAnchor.Anchored = true
+    soundAnchor.CanCollide = false
+    soundAnchor.Transparency = 1
+    soundAnchor.Size = Vector3.new(0.2, 0.2, 0.2)
+    soundAnchor.Position = position
+    soundAnchor.Parent = Workspace
+    local sound = Instance.new("Sound")
+    sound.Name = name
+    sound.SoundId = "rbxassetid://" .. tostring(soundId)
+    sound.Volume = volume or 1
+    sound.RollOffMinDistance = 8
+    sound.RollOffMaxDistance = 90
+    sound.Parent = soundAnchor
+    sound:Play()
+    Debris:AddItem(soundAnchor, math.max(3, sound.TimeLength + 0.5))
+end
+
+function CakeEffectsService.PlayOutwardSmokeEffect(cake, isGrowing)
+    local primary = cake.PrimaryPart
+    if not primary then return end
+    local scale = cake:GetScale()
+    local burst = Instance.new("ParticleEmitter")
+    burst.Name = isGrowing and "CakeGrowSparkles" or "CakeShrinkCrumbs"
+    burst.Texture = "rbxassetid://241876023"
+    burst.Color = ColorSequence.new(isGrowing and Color3.fromRGB(255, 245, 140) or Color3.fromRGB(255, 210, 170))
+    burst.Lifetime = NumberRange.new(0.22, 0.42)
+    burst.Rate = 0
+    burst.Speed = NumberRange.new(2 * scale, 5 * scale)
+    burst.SpreadAngle = Vector2.new(180, 180)
+    burst.Parent = primary
+    burst:Emit(18)
+    Debris:AddItem(burst, 0.6)
+end
+
+function CakeEffectsService.PlayUpgradeHighlight(cake)
+    local primary = cake.PrimaryPart
+    if not primary then return end
+    primary.AssemblyLinearVelocity += Vector3.new(0, 32, 0)
+    CakeEffectsService.PlaySoundAt("CakeUpgradeSound", 81872425338792, primary.Position, 1)
+    local burst = Instance.new("ParticleEmitter")
+    burst.Name = "CakeUpgradeGoldSmoke"
+    burst.Texture = "rbxasset://textures/particles/smoke_main.dds"
+    burst.Color = ColorSequence.new(Color3.fromRGB(255, 210, 80))
+    burst.Lifetime = NumberRange.new(0.35, 0.7)
+    burst.Rate = 0
+    burst.Speed = NumberRange.new(8, 18)
+    burst.SpreadAngle = Vector2.new(180, 180)
+    burst.Parent = primary
+    burst:Emit(35)
+    Debris:AddItem(burst, 1)
+    local outline = cake:FindFirstChild("RarityOutline")
+    if outline then
+        local originalColor, originalTransparency = outline.OutlineColor, outline.FillTransparency
+        outline.FillColor = Color3.fromRGB(255, 230, 120)
+        outline.FillTransparency = 0.35
+        task.delay(0.14, function()
+            if outline.Parent then
+                outline.OutlineColor = originalColor
+                outline.FillTransparency = originalTransparency
+            end
+        end)
+    end
+end
+
+function CakeEffectsService.CreateDynamicGroundStain(cake, runtime, visibleSeconds)
+    local primary = cake.PrimaryPart
+    if not primary then return end
+    local rayParams = RaycastParams.new()
+    rayParams.FilterType = Enum.RaycastFilterType.Exclude
+    rayParams.FilterDescendantsInstances = { cake, runtime }
+    local hit = Workspace:Raycast(primary.Position, Vector3.new(0, -120, 0), rayParams)
+    if not hit then return end
+    local stain = Instance.new("Part")
+    stain.Name = "CakeGroundStain"
+    stain.Anchored = true
+    stain.CanCollide = false
+    stain.Transparency = 1
+    stain.Size = Vector3.new(4 * cake:GetScale(), 0.04, 4 * cake:GetScale())
+    stain.CFrame = CFrame.new(hit.Position + hit.Normal * 0.03)
+    stain.Parent = runtime
+    local decal = Instance.new("Decal")
+    decal.Name = "CakeStainDecal"
+    decal.Face = Enum.NormalId.Top
+    decal.Texture = "rbxassetid://6880896391"
+    decal.Transparency = 0.15
+    decal.Parent = stain
+    TweenService:Create(decal, TweenInfo.new(visibleSeconds, Enum.EasingStyle.Quad), { Transparency = 1 }):Play()
+    Debris:AddItem(stain, visibleSeconds + 0.25)
+end
+
+function CakeEffectsService.PlaySpawnFadeIn(cake)
+    local parts = {}
+    for _, part in ipairs(cake:GetDescendants()) do
+        if part:IsA("BasePart") then
+            table.insert(parts, part)
+            part.Transparency = 1
+        end
+    end
+    task.delay(0.2, function()
+        for _, part in ipairs(parts) do
+            if part.Parent then
+                TweenService:Create(part, TweenInfo.new(0.2, Enum.EasingStyle.Quad), { Transparency = 0 }):Play()
+            end
+        end
+    end)
+end
+
+return CakeEffectsService
 ]=]
 
 local cakeService = getOrCreate(servicesPackage, "ModuleScript", "CakeService")
@@ -915,6 +1190,7 @@ local Configs = ReplicatedStorage.Configs
 local CakeConfig = require(Configs.CakeConfig)
 local LocalizationConfig = require(Configs.LocalizationConfig)
 local StateService = require(script.Parent.StateService)
+local CakeEffectsService = require(script.Parent.CakeEffectsService)
 local CakeModels = ReplicatedStorage:FindFirstChild("cake") or ReplicatedStorage.Models.cake
 
 -- Public cake API used by SkillService.  Keep all cake movement/damage here so skills
@@ -952,7 +1228,6 @@ end
 local function scaledValue(baseValue, level, initialLevel)
     return math.max(1, math.floor((baseValue or 1) * (CakeConfig.ValueScalePerLevel ^ math.max(0, level - initialLevel)) + 0.5))
 end
-local playOutwardSmokeEffect
 function CakeService.ApplyCakeLevel(cake, level)
     local initialLevel = cake:GetAttribute("InitialCakeLevel") or 1
     local rarityKey = rarityKeyForLevel(level)
@@ -990,7 +1265,7 @@ function CakeService.UpdateScale(cake)
     local token = (cake:GetAttribute("ScaleTweenToken") or 0) + 1
     cake:SetAttribute("ScaleTweenToken", token)
     if math.abs(scale - previousTarget) > 0.025 then
-        playOutwardSmokeEffect(cake, scale > previousTarget)
+        CakeEffectsService.PlayOutwardSmokeEffect(cake, scale > previousTarget)
     end
     task.spawn(function()
         local started, duration = os.clock(), 0.28
@@ -1012,98 +1287,6 @@ function CakeService.RefreshLabel(cake)
     CakeService.UpdateScale(cake)
 end
 
-local function playSoundAt(name, soundId, position, volume)
-    local soundAnchor = Instance.new("Part")
-    soundAnchor.Name = name .. "Anchor"
-    soundAnchor.Anchored = true
-    soundAnchor.CanCollide = false
-    soundAnchor.Transparency = 1
-    soundAnchor.Size = Vector3.new(0.2, 0.2, 0.2)
-    soundAnchor.Position = position
-    soundAnchor.Parent = Workspace
-    local sound = Instance.new("Sound")
-    sound.Name = name
-    sound.SoundId = "rbxassetid://" .. tostring(soundId)
-    sound.Volume = volume or 1
-    sound.RollOffMinDistance = 8
-    sound.RollOffMaxDistance = 90
-    sound.Parent = soundAnchor
-    sound:Play()
-    Debris:AddItem(soundAnchor, math.max(3, sound.TimeLength + 0.5))
-end
-
-playOutwardSmokeEffect = function(cake, isGrowing)
-    local primary = cake.PrimaryPart
-    if not primary then return end
-    local scale = cake:GetScale()
-    local burst = Instance.new("ParticleEmitter")
-    burst.Name = isGrowing and "CakeGrowSparkles" or "CakeShrinkCrumbs"
-    burst.Texture = "rbxassetid://241876023"
-    burst.Color = ColorSequence.new(isGrowing and Color3.fromRGB(255, 245, 140) or Color3.fromRGB(255, 210, 170))
-    burst.Lifetime = NumberRange.new(0.22, 0.42)
-    burst.Rate = 0
-    burst.Speed = NumberRange.new(2 * scale, 5 * scale)
-    burst.SpreadAngle = Vector2.new(180, 180)
-    burst.Parent = primary
-    burst:Emit(18)
-    Debris:AddItem(burst, 0.6)
-end
-
-local function playUpgradeHighlight(cake)
-    local primary = cake.PrimaryPart
-    if not primary then return end
-    primary.AssemblyLinearVelocity += Vector3.new(0, 32, 0)
-    playSoundAt("CakeUpgradeSound", 81872425338792, primary.Position, 1)
-    local burst = Instance.new("ParticleEmitter")
-    burst.Name = "CakeUpgradeGoldSmoke"
-    burst.Texture = "rbxasset://textures/particles/smoke_main.dds"
-    burst.Color = ColorSequence.new(Color3.fromRGB(255, 210, 80))
-    burst.Lifetime = NumberRange.new(0.35, 0.7)
-    burst.Rate = 0
-    burst.Speed = NumberRange.new(8, 18)
-    burst.SpreadAngle = Vector2.new(180, 180)
-    burst.Parent = primary
-    burst:Emit(35)
-    Debris:AddItem(burst, 1)
-    local outline = cake:FindFirstChild("RarityOutline")
-    if outline then
-        local originalColor, originalTransparency = outline.OutlineColor, outline.FillTransparency
-        outline.FillColor = Color3.fromRGB(255, 230, 120)
-        outline.FillTransparency = 0.35
-        task.delay(0.14, function()
-            if outline.Parent then
-                outline.OutlineColor = originalColor
-                outline.FillTransparency = originalTransparency
-            end
-        end)
-    end
-end
-
-local function createDynamicGroundStain(cake)
-    local primary = cake.PrimaryPart
-    if not primary then return end
-    local rayParams = RaycastParams.new()
-    rayParams.FilterType = Enum.RaycastFilterType.Exclude
-    rayParams.FilterDescendantsInstances = { cake, Runtime }
-    local hit = Workspace:Raycast(primary.Position, Vector3.new(0, -120, 0), rayParams)
-    if not hit then return end
-    local stain = Instance.new("Part")
-    stain.Name = "CakeGroundStain"
-    stain.Anchored = true
-    stain.CanCollide = false
-    stain.Transparency = 1
-    stain.Size = Vector3.new(4 * cake:GetScale(), 0.04, 4 * cake:GetScale())
-    stain.CFrame = CFrame.new(hit.Position + hit.Normal * 0.03)
-    stain.Parent = Runtime
-    local decal = Instance.new("Decal")
-    decal.Name = "CakeStainDecal"
-    decal.Face = Enum.NormalId.Top
-    decal.Texture = "rbxassetid://6880896391"
-    decal.Transparency = 0.15
-    decal.Parent = stain
-    TweenService:Create(decal, TweenInfo.new(CakeConfig.StainVisibleSeconds, Enum.EasingStyle.Quad), { Transparency = 1 }):Play()
-    Debris:AddItem(stain, CakeConfig.StainVisibleSeconds + 0.25)
-end
 local function playLandingEffect(cake)
     local primary = cake.PrimaryPart
     if not primary then return end
@@ -1127,7 +1310,7 @@ local function playLandingEffect(cake)
     emitter.SpreadAngle = Vector2.new(90, 0)
     emitter.Parent = attachment
     emitter:Emit(math.max(8, math.floor(25 * scale)))
-    playSoundAt("CakeLandingSound", 183716578, primary.Position, 1)
+    CakeEffectsService.PlaySoundAt("CakeLandingSound", 183716578, primary.Position, 1)
     Debris:AddItem(puff, 1)
 end
 
@@ -1238,7 +1421,7 @@ function CakeService.Expire(cake)
     cake:SetAttribute("Finishing", true)
     CakeService.Owners[cake] = nil
     stopEatingCake(cake)
-    createDynamicGroundStain(cake)
+    CakeEffectsService.CreateDynamicGroundStain(cake, Runtime, CakeConfig.StainVisibleSeconds)
 
     local startPivot, targetPivot, started = cake:GetPivot(), cake:GetPivot() - Vector3.new(0, 8, 0), os.clock()
     for _, part in ipairs(cake:GetDescendants()) do if part:IsA("BasePart") then part.CanCollide, part.Anchored = false, true end end
@@ -1268,7 +1451,7 @@ function CakeService.ApplyServerCakeChange(player, cake, change)
         local currentHealth = math.floor(math.max(0, cake:GetAttribute("Health") or 1) + 0.5)
         local hp = math.max(0, currentHealth - damage)
         cake:SetAttribute("Health", hp)
-        if cake.PrimaryPart then playSoundAt("CakeBiteSound", 86778542937419, cake.PrimaryPart.Position, 1) end
+        if cake.PrimaryPart then CakeEffectsService.PlaySoundAt("CakeBiteSound", 86778542937419, cake.PrimaryPart.Position, 1) end
         CakeService.RefreshLabel(cake)
         if hp <= 0 then
             CakeService.Finish(player, cake)
@@ -1358,23 +1541,6 @@ local function spawnPositionNear(root)
     return root.Position + Vector3.new(math.cos(angle) * radius, CakeConfig.SpawnHeight, math.sin(angle) * radius)
 end
 
-local function playSpawnFadeIn(cake)
-    local parts = {}
-    for _, part in ipairs(cake:GetDescendants()) do
-        if part:IsA("BasePart") then
-            table.insert(parts, part)
-            part.Transparency = 1
-        end
-    end
-    task.delay(0.2, function()
-        for _, part in ipairs(parts) do
-            if part.Parent then
-                TweenService:Create(part, TweenInfo.new(0.2, Enum.EasingStyle.Quad), { Transparency = 0 }):Play()
-            end
-        end
-    end)
-end
-
 function CakeService.SplitCake(player, sourceCake)
     if not player or not sourceCake or not sourceCake.Parent or not sourceCake.PrimaryPart then return end
     local clone = sourceCake:Clone()
@@ -1392,7 +1558,7 @@ function CakeService.SplitCake(player, sourceCake)
     CakeService.ApplyServerCakeChange(player, clone, { LinearVelocity = Vector3.new(math.random(-8, 8), 18, math.random(-8, 8)) })
     CakeService.HookTouches(clone)
     bindLandingImpact(clone)
-    playSpawnFadeIn(clone)
+    CakeEffectsService.PlaySpawnFadeIn(clone)
     task.delay(CakeConfig.CakeLifetimeSeconds, function()
         if clone.Parent and CakeService.Owners[clone] then
             CakeService.Expire(clone)
@@ -1420,7 +1586,7 @@ function CakeService.SpawnNear(player)
     cake:PivotTo(CFrame.new(spawnPositionNear(root)))
 
     CakeService.Decorate(cake, glow)
-    playSpawnFadeIn(cake)
+    CakeEffectsService.PlaySpawnFadeIn(cake)
     CakeService.Owners[cake] = player
     CakeService.ApplyServerCakeChange(player, cake, { LinearVelocity = Vector3.new(0, -CakeConfig.MeteorFallSpeed, 0) })
     CakeService.HookTouches(cake)
@@ -1440,7 +1606,7 @@ function CakeService.SpawnNear(player)
                 return
             end
             CakeService.ApplyCakeLevel(cake, level + 1)
-            playUpgradeHighlight(cake)
+            CakeEffectsService.PlayUpgradeHighlight(cake)
             local rarity = CakeConfig.Rarities[cake:GetAttribute("RarityKey")]
             if rarity and rarity.SplitChance and math.random() < rarity.SplitChance then
                 CakeService.SplitCake(player, cake)
@@ -1911,6 +2077,7 @@ function WheelService.Start()
         local pending = {}
         for _ = 1, count do
             state.WheelSpins -= 1
+            state.TotalRolls = (state.TotalRolls or 0) + 1
             state.WheelPoints += 1
             local slots = buildSlots(player, state)
             if #slots == 0 then break end
@@ -1977,8 +2144,10 @@ local StateService = require(script.Parent.Services.StateService)
 local CakeService = require(script.Parent.Services.CakeService)
 local WheelService = require(script.Parent.Services.WheelService)
 local SkillService = require(script.Parent.Services.SkillService)
+local GlobalLeaderboardService = require(script.Parent.Services.GlobalLeaderboardService)
 
 WheelService.Start()
+GlobalLeaderboardService.Start()
 
 local function setupPlayer(player)
     StateService.Create(player, DataService.Load(player))
