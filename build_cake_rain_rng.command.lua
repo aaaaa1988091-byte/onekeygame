@@ -170,6 +170,12 @@ return ShopConfig
 local uiConfig = getOrCreate(configsFolder, "ModuleScript", "UIConfig")
 uiConfig.Source = [=[
 local UIConfig = {
+    Sounds = {
+        CakeShrink = "rbxassetid://135833732254676",
+        WheelTick = "rbxassetid://94819910959155",
+        Interact = "rbxassetid://116172477936174",
+        Button = "rbxassetid://105828157215739",
+    },
     WheelUI = { AutoHide = true, ShowCondition = "WheelSpins > 0", TitleKey = "UI_Spins_Left", Position = "RightSideHalfCircle", DisplayedSlots = 5 },
     AutoRollUI = { AutoHide = true, ShowCondition = "HasAutoRollTime", TitleKey = "UI_AutoRoll_Active" },
     BuffStatus = { AutoHide = true, ShowCondition = "ActiveBuffsCount > 0", TitleKey = "UI_Time_Left" },
@@ -264,7 +270,14 @@ stats.Size = UDim2.new(0, 285, 0, 118)
 stats.Position = UDim2.new(0, 18, 0, 18)
 stats.BackgroundColor3 = Color3.fromRGB(25, 20, 32)
 stats.BackgroundTransparency = 0.12
-newGui("UICorner", "Corner", stats).CornerRadius = UDim.new(0, 14)
+newGui("UICorner", "Corner", stats).CornerRadius = UDim.new(0, 18)
+local statsStroke = newGui("UIStroke", "SoftOutline", stats)
+statsStroke.Color = Color3.fromRGB(255, 225, 165)
+statsStroke.Transparency = 0.35
+statsStroke.Thickness = 2
+local statsGradient = newGui("UIGradient", "WarmGradient", stats)
+statsGradient.Color = ColorSequence.new(Color3.fromRGB(44, 34, 56), Color3.fromRGB(24, 20, 34))
+statsGradient.Rotation = 25
 for index, name in { "CakePointsLabel", "WheelPointsLabel", "SpinsLabel" } do
     local label = newGui("TextLabel", name, stats)
     label.BackgroundTransparency = 1
@@ -280,13 +293,15 @@ shopButton.Size = UDim2.new(0, 120, 0, 46)
 shopButton.Position = UDim2.new(0, 18, 0, 148)
 shopButton.BackgroundColor3 = Color3.fromRGB(255, 210, 110)
 shopButton.Image = "rbxassetid://6031265976"
-newGui("UICorner", "Corner", shopButton).CornerRadius = UDim.new(0, 12)
+newGui("UICorner", "Corner", shopButton).CornerRadius = UDim.new(0, 16)
+newGui("UIStroke", "ButtonOutline", shopButton).Color = Color3.fromRGB(255, 245, 210)
 local bagButton = newGui("ImageButton", "BagButton", mainGui)
 bagButton.Size = UDim2.new(0, 120, 0, 46)
 bagButton.Position = UDim2.new(0, 148, 0, 148)
 bagButton.BackgroundColor3 = Color3.fromRGB(150, 220, 255)
 bagButton.Image = "rbxassetid://6031265972"
-newGui("UICorner", "Corner", bagButton).CornerRadius = UDim.new(0, 12)
+newGui("UICorner", "Corner", bagButton).CornerRadius = UDim.new(0, 16)
+newGui("UIStroke", "ButtonOutline", bagButton).Color = Color3.fromRGB(225, 250, 255)
 
 local wheel = newGui("Frame", "WheelPanel", mainGui)
 wheel.Name = "WheelPanel"
@@ -306,6 +321,9 @@ local disc = newGui("Frame", "WheelDisc", wheel)
 disc.Size = UDim2.new(0, 160, 0, 300)
 disc.Position = UDim2.new(1, -180, 0, 44)
 disc.BackgroundColor3 = Color3.fromRGB(30, 34, 42)
+local discGradient = newGui("UIGradient", "DiscGradient", disc)
+discGradient.Color = ColorSequence.new(Color3.fromRGB(53, 43, 68), Color3.fromRGB(24, 28, 36))
+discGradient.Rotation = 90
 disc.ClipsDescendants = true
 disc.BorderSizePixel = 0
 newGui("UICorner", "Corner", disc).CornerRadius = UDim.new(0, 10)
@@ -330,7 +348,7 @@ centerLine.BackgroundTransparency = 1
 centerLine.ZIndex = 6
 local centerStroke = newGui("UIStroke", "CenterStroke", centerLine)
 centerStroke.Color = Color3.fromRGB(212, 163, 115)
-centerStroke.Thickness = 2
+centerStroke.Thickness = 3
 local sideGrid = newGui("Frame", "SideGrid", wheel)
 sideGrid.Size = UDim2.new(0, 220, 0, 300)
 sideGrid.Position = UDim2.new(0, 20, 0, 44)
@@ -420,6 +438,9 @@ local shopHub = newGui("Frame", "ShopHub", mainGui)
 shopHub.Size = UDim2.new(0, 620, 0, 360)
 shopHub.Position = UDim2.new(0.5, -310, 0.5, -180)
 shopHub.BackgroundColor3 = Color3.fromRGB(32, 24, 40)
+local shopHubGradient = newGui("UIGradient", "PanelGradient", shopHub)
+shopHubGradient.Color = ColorSequence.new(Color3.fromRGB(58, 42, 68), Color3.fromRGB(30, 23, 38))
+shopHubGradient.Rotation = 35
 shopHub.Visible = false
 newGui("UICorner", "Corner", shopHub).CornerRadius = UDim.new(0, 18)
 local closeShop = newGui("TextButton", "CloseButton", shopHub)
@@ -475,6 +496,9 @@ local bagPanel = newGui("Frame", "InventoryBag", mainGui)
 bagPanel.Size = UDim2.new(0, 620, 0, 360)
 bagPanel.Position = UDim2.new(0.5, -310, 0.5, -180)
 bagPanel.BackgroundColor3 = Color3.fromRGB(24, 34, 44)
+local bagPanelGradient = newGui("UIGradient", "PanelGradient", bagPanel)
+bagPanelGradient.Color = ColorSequence.new(Color3.fromRGB(38, 60, 72), Color3.fromRGB(24, 32, 44))
+bagPanelGradient.Rotation = 35
 bagPanel.Visible = false
 newGui("UICorner", "Corner", bagPanel).CornerRadius = UDim.new(0, 18)
 local bagTitle = newGui("TextLabel", "Title", bagPanel)
@@ -1027,6 +1051,17 @@ function CakeService.Finish(player, cake)
     end
     -- Eating is deliberately distinct from expiry: disable physics, then shrink/fade into the player.
     local startPivot, startScale, started = cake:GetPivot(), cake:GetScale(), os.clock()
+    local primary = cake.PrimaryPart
+    if primary then
+        local shrinkSound = Instance.new("Sound")
+        shrinkSound.Name = "CakeShrinkSound"
+        shrinkSound.SoundId = "rbxassetid://135833732254676"
+        shrinkSound.Volume = 0.75
+        shrinkSound.RollOffMaxDistance = 45
+        shrinkSound.Parent = primary
+        shrinkSound:Play()
+        Debris:AddItem(shrinkSound, 3)
+    end
     for _, part in ipairs(cake:GetDescendants()) do if part:IsA("BasePart") then part.CanCollide, part.Anchored = false, true end end
     task.spawn(function()
         while cake.Parent do
@@ -1062,12 +1097,31 @@ function CakeService.Expire(cake)
         end
     end)
 end
-function CakeService.DamageCake(player, cake, amount)
-    if CakeService.Owners[cake] ~= player or cake:GetAttribute("Finishing") then return false end
-    amount = math.max(0, tonumber(amount) or 0)
-    local hp = math.max(0, (cake:GetAttribute("Health") or 1) - amount); cake:SetAttribute("Health", hp); CakeService.RefreshLabel(cake)
-    if hp <= 0 then CakeService.Finish(player, cake) end
+function CakeService.ApplyServerCakeChange(player, cake, change)
+    if CakeService.Owners[cake] ~= player or not cake.Parent or cake:GetAttribute("Finishing") then return false end
+    change = change or {}
+    local damage = math.max(0, tonumber(change.Damage) or 0)
+    if change.DamagePercent then
+        local percentDamage = (cake:GetAttribute("Health") or 0) * (tonumber(change.DamagePercent) or 0)
+        if percentDamage > 0 then damage += math.max(0.01, percentDamage) end
+    end
+    if damage > 0 then
+        local hp = math.max(0, (cake:GetAttribute("Health") or 1) - damage)
+        cake:SetAttribute("Health", hp)
+        CakeService.RefreshLabel(cake)
+        if hp <= 0 then
+            CakeService.Finish(player, cake)
+            return true
+        end
+    end
+    if change.CFrame and cake.PrimaryPart then
+        cake.PrimaryPart.AssemblyLinearVelocity = Vector3.zero
+        cake:PivotTo(change.CFrame)
+    end
     return true
+end
+function CakeService.DamageCake(player, cake, amount)
+    return CakeService.ApplyServerCakeChange(player, cake, { Damage = amount })
 end
 function CakeService.GetCakes(player, maximum, minimumDistance)
     local root, results = rootOf(player), {}
@@ -1091,7 +1145,7 @@ function CakeService.MoveNearPlayer(player, cake, distance, travelSeconds)
     if travelSeconds and travelSeconds > 0 then
         TweenService:Create(cake.PrimaryPart, TweenInfo.new(travelSeconds, Enum.EasingStyle.Linear), { CFrame = destination }):Play()
     else
-        cake:PivotTo(destination)
+        CakeService.ApplyServerCakeChange(player, cake, { CFrame = destination })
     end
     return destination
 end
@@ -1323,8 +1377,9 @@ function Template.New(player, parameters)
     return {
         Player = player, Parameters = parameters, Root = root,
         GetCakes = function(_, count, minimumDistance) return CakeService.GetCakes(player, count, minimumDistance) end,
-        Damage = function(_, cake, amount) return CakeService.DamageCake(player, cake, amount) end,
-        DamagePercent = function(_, cake, percent) local hp = cake:GetAttribute("Health") or 0; return CakeService.DamageCake(player, cake, math.max(.01, hp * percent)) end,
+        ApplyCakeChange = function(_, cake, change) return CakeService.ApplyServerCakeChange(player, cake, change) end,
+        Damage = function(_, cake, amount) return CakeService.ApplyServerCakeChange(player, cake, { Damage = amount }) end,
+        DamagePercent = function(_, cake, percent) return CakeService.ApplyServerCakeChange(player, cake, { DamagePercent = percent }) end,
         MoveNear = function(_, cake, distance, seconds) return CakeService.MoveNearPlayer(player, cake, distance, seconds) end,
         GetAbilityLevel = function(_, abilityKey)
             local state, best, now = StateService.Get(player), 0, os.clock()
@@ -1749,6 +1804,7 @@ local LocalizationConfig = require(Configs:WaitForChild("LocalizationConfig"))
 local ShopConfig = require(Configs:WaitForChild("ShopConfig"))
 local WheelConfig = require(Configs:WaitForChild("WheelConfig"))
 local SkillConfig = require(Configs:WaitForChild("SkillConfig"))
+local UIConfig = require(Configs:WaitForChild("UIConfig"))
 local L = LocalizationConfig["en-us"]
 
 local gui = player:WaitForChild("PlayerGui"):WaitForChild("CakeRainRNGHUD")
@@ -1773,6 +1829,23 @@ local autoRollEnabled = false
 local autoRollThread = nil
 local wheelRewardGeneration = 0
 
+local soundFolder = Instance.new("Folder")
+soundFolder.Name = "CakeRainSounds"
+soundFolder.Parent = gui
+
+local function playSound(soundKey, volume)
+    local soundId = UIConfig.Sounds and UIConfig.Sounds[soundKey]
+    if not soundId then return end
+    local sound = Instance.new("Sound")
+    sound.Name = soundKey .. "Sound"
+    sound.SoundId = soundId
+    sound.Volume = volume or 0.65
+    sound.Parent = soundFolder
+    sound:Play()
+    sound.Ended:Connect(function() sound:Destroy() end)
+    task.delay(4, function() if sound.Parent then sound:Destroy() end end)
+end
+
 local function buttonLabel(item)
     local name = L[item.NameKey] or item.NameKey
     return string.format("%s\n%s %d", name, item.Currency == "WheelPoints" and "Wheel Points" or "Cake Points", item.Cost)
@@ -1796,7 +1869,7 @@ local function bindShopButtons()
         button.ItemName.Text = (L[item.NameKey] or item.NameKey) .. (string.find(item.Id, "^Merchant_") and " ★" or "")
         button.Icon.Image = item.Icon or ""
         button.ItemCost.Text = string.format("%s %d", item.Currency == "WheelPoints" and "Wheel Points" or "Cake Points", item.Cost)
-        button.Activated:Connect(function() RequestShopPurchase:InvokeServer(item.Id) end)
+        button.Activated:Connect(function() playSound("Interact"); RequestShopPurchase:InvokeServer(item.Id) end)
         button.Parent = grid
     end
     task.defer(function() grid.CanvasSize = UDim2.new(0, 0, 0, grid.GridLayout.AbsoluteContentSize.Y + 16) end)
@@ -2011,6 +2084,7 @@ local function spinMiniReel(cell, holder, stroke, spinData, duration)
     while #slots > 0 and os.clock() - started < duration do
         local progress = math.clamp((os.clock() - started) / duration, 0, 1)
         renderSlotItem(slots[math.random(1, #slots)], holder)
+        playSound("WheelTick", 0.35)
         task.wait(0.04 + (progress ^ 2) * 0.15)
     end
 
@@ -2051,8 +2125,16 @@ local function playWheelAnimation(panel, slots, pickedIndex, speedMultiplier)
     local targetY = SLOT_WINDOW_HEIGHT / 2 - ((targetIndex - 1) * SLOT_ITEM_HEIGHT + SLOT_ITEM_HEIGHT / 2)
     local duration = 2.4 / math.max(0.35, speedMultiplier or 1)
     local tween = TweenService:Create(strip, TweenInfo.new(duration, Enum.EasingStyle.Back, Enum.EasingDirection.Out), { Position = UDim2.new(0, 0, 0, targetY) })
+    local ticksActive = true
+    task.spawn(function()
+        while ticksActive do
+            playSound("WheelTick", 0.35)
+            task.wait(0.08)
+        end
+    end)
     tween:Play()
     tween.Completed:Wait()
+    ticksActive = false
 end
 
 local function playWheelAnimations(spins, speedMultiplier)
@@ -2118,10 +2200,12 @@ local function ensureAutoRollLoop()
 end
 
 spinButton.Activated:Connect(function()
+    playSound("Button")
     performSpin()
 end)
 
 autoRollToggle.Activated:Connect(function()
+    playSound("Button")
     if not hasAutoRoll() then return end
     autoRollEnabled = not autoRollEnabled
     refreshStats()
@@ -2129,10 +2213,12 @@ autoRollToggle.Activated:Connect(function()
 end)
 
 shopButton.Activated:Connect(function()
+    playSound("Button")
     shopHub.Visible = not shopHub.Visible
     if shopHub.Visible then bagPanel.Visible = false end
 end)
 bagButton.Activated:Connect(function()
+    playSound("Button")
     bagPanel.Visible = not bagPanel.Visible
     if bagPanel.Visible then
         shopHub.Visible = false
@@ -2140,13 +2226,15 @@ bagButton.Activated:Connect(function()
     end
 end)
 closeShop.Activated:Connect(function()
+    playSound("Button")
     shopHub.Visible = false
 end)
 bagPanel.DetailPanel.UpgradeButton.Activated:Connect(function()
-    if selectedAbilityKey then RequestAbilityUpgrade:InvokeServer(selectedAbilityKey) end
+    if selectedAbilityKey then playSound("Interact"); RequestAbilityUpgrade:InvokeServer(selectedAbilityKey) end
 end)
 
 closeBag.Activated:Connect(function()
+    playSound("Button")
     bagPanel.Visible = false
 end)
 
