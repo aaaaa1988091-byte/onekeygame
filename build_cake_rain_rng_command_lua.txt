@@ -2546,7 +2546,20 @@ local function endDrag(dropPosition)
         local ok, result = pcall(function()
             return RequestEquipSkill:InvokeServer(drag.key, targetIndex)
         end)
-        if ok and result and result.Ok then playSound("Interact") end
+        if ok and result and result.Ok then
+            playSound("Interact")
+            -- BUG FIX ("ghost slot"): UpdateClientState's broadcast isn't guaranteed to arrive
+            -- before InvokeServer's response does, so refreshBag() below could still render with
+            -- stale data (old slot cleared visually, new slot appearing empty even though the
+            -- server already placed it there). Apply the same move locally right now so the UI
+            -- is correct immediately; the later broadcast just re-confirms the same result.
+            state.Inventory = state.Inventory or {}
+            state.Inventory.EquippedSkills = state.Inventory.EquippedSkills or {}
+            for existingSlot, existingKey in pairs(state.Inventory.EquippedSkills) do
+                if existingKey == drag.key then state.Inventory.EquippedSkills[existingSlot] = nil end
+            end
+            state.Inventory.EquippedSkills[targetIndex] = drag.key
+        end
     end
     refreshBag()
 end
