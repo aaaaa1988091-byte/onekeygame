@@ -1117,7 +1117,11 @@ function CakeService.ApplyServerCakeChange(player, cake, change)
         if percentDamage > 0 then damage += math.max(0.01, percentDamage) end
     end
     if damage > 0 then
-        local hp = math.max(0, (cake:GetAttribute("Health") or 1) - damage)
+        damage = math.floor(damage + 0.5)
+    end
+    if damage > 0 then
+        local currentHealth = math.floor(math.max(0, cake:GetAttribute("Health") or 1) + 0.5)
+        local hp = math.max(0, currentHealth - damage)
         cake:SetAttribute("Health", hp)
         CakeService.RefreshLabel(cake)
         if hp <= 0 then
@@ -1803,6 +1807,7 @@ clientScript.Source = [=[
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Players = game:GetService("Players")
 local TweenService = game:GetService("TweenService")
+local RunService = game:GetService("RunService")
 local SoundService = game:GetService("SoundService")
 local ContentProvider = game:GetService("ContentProvider")
 
@@ -2153,18 +2158,22 @@ local function playWheelAnimation(panel, slots, pickedIndex, speedMultiplier)
     local targetY = SLOT_WINDOW_HEIGHT / 2 - ((targetIndex - 1) * SLOT_ITEM_HEIGHT + SLOT_ITEM_HEIGHT / 2)
     local duration = 2.4 / math.max(0.35, speedMultiplier or 1)
     local tween = TweenService:Create(strip, TweenInfo.new(duration, Enum.EasingStyle.Back, Enum.EasingDirection.Out), { Position = UDim2.new(0, 0, 0, targetY) })
-    local ticksActive = true
-    local tickCount = math.max(1, targetIndex - startIndex)
-    local tickInterval = math.clamp(duration / tickCount, 0.08, 0.22)
-    task.spawn(function()
-        while ticksActive do
-            playSound("WheelTick")
-            task.wait(tickInterval)
+    local lastCenteredIndex = nil
+    local tickConnection
+    local function centeredSlotIndex()
+        local centerContentY = SLOT_WINDOW_HEIGHT / 2 - strip.Position.Y.Offset
+        return math.floor(centerContentY / SLOT_ITEM_HEIGHT) + 1
+    end
+    tickConnection = RunService.RenderStepped:Connect(function()
+        local centeredIndex = centeredSlotIndex()
+        if centeredIndex ~= lastCenteredIndex then
+            if lastCenteredIndex ~= nil then playSound("WheelTick") end
+            lastCenteredIndex = centeredIndex
         end
     end)
     tween:Play()
     tween.Completed:Wait()
-    ticksActive = false
+    if tickConnection then tickConnection:Disconnect() end
 end
 
 local function playWheelAnimations(spins, speedMultiplier)
