@@ -43,6 +43,7 @@ local requestWheelSpin = getOrCreate(eventsFolder, "RemoteFunction", "RequestWhe
 local requestCardDraw = getOrCreate(eventsFolder, "RemoteFunction", "RequestCardDraw")
 local requestShopPurchase = getOrCreate(eventsFolder, "RemoteFunction", "RequestShopPurchase")
 local requestAbilityUpgrade = getOrCreate(eventsFolder, "RemoteFunction", "RequestAbilityUpgrade")
+local requestEquipSkill = getOrCreate(eventsFolder, "RemoteFunction", "RequestEquipSkill")
 local updateClientState = getOrCreate(eventsFolder, "RemoteEvent", "UpdateClientState")
 
 local wheelConfig = getOrCreate(configsFolder, "ModuleScript", "WheelConfig")
@@ -524,9 +525,45 @@ closeBag.Text = "Close"
 closeBag.TextScaled = true
 closeBag.TextColor3 = Color3.fromRGB(255, 255, 255)
 newGui("UICorner", "Corner", closeBag).CornerRadius = UDim.new(0, 10)
+local termTabButton = newGui("TextButton", "TermTabButton", bagPanel)
+termTabButton.Size = UDim2.new(0, 120, 0, 34)
+termTabButton.Position = UDim2.new(0, 20, 0, 54)
+termTabButton.BackgroundColor3 = Color3.fromRGB(120, 160, 210)
+termTabButton.Font = Enum.Font.FredokaOne
+termTabButton.Text = "Terms"
+termTabButton.TextScaled = true
+termTabButton.TextColor3 = Color3.new(1, 1, 1)
+newGui("UICorner", "Corner", termTabButton).CornerRadius = UDim.new(0, 8)
+local skillTabButton = newGui("TextButton", "SkillTabButton", bagPanel)
+skillTabButton.Size = UDim2.new(0, 120, 0, 34)
+skillTabButton.Position = UDim2.new(0, 148, 0, 54)
+skillTabButton.BackgroundColor3 = Color3.fromRGB(130, 150, 170)
+skillTabButton.Font = Enum.Font.FredokaOne
+skillTabButton.Text = "Skills"
+skillTabButton.TextScaled = true
+skillTabButton.TextColor3 = Color3.new(1, 1, 1)
+newGui("UICorner", "Corner", skillTabButton).CornerRadius = UDim.new(0, 8)
+local equippedFrame = newGui("Frame", "EquippedSkillSlots", bagPanel)
+equippedFrame.Size = UDim2.new(1, -260, 0, 58)
+equippedFrame.Position = UDim2.new(0, 20, 1, -68)
+equippedFrame.BackgroundTransparency = 1
+equippedFrame.Visible = false
+local equippedLayout = newGui("UIListLayout", "SlotLayout", equippedFrame)
+equippedLayout.FillDirection = Enum.FillDirection.Horizontal
+equippedLayout.Padding = UDim.new(0, 8)
+for slotIndex = 1, 5 do
+    local slot = newGui("TextButton", "SkillSlot" .. tostring(slotIndex), equippedFrame)
+    slot.Size = UDim2.new(0, 68, 0, 54)
+    slot.BackgroundColor3 = Color3.fromRGB(92, 118, 136)
+    slot.Font = Enum.Font.FredokaOne
+    slot.TextScaled = true
+    slot.TextColor3 = Color3.new(1, 1, 1)
+    slot.Text = tostring(slotIndex)
+    newGui("UICorner", "Corner", slot).CornerRadius = UDim.new(0, 8)
+end
 local bagList = newGui("ScrollingFrame", "BagList", bagPanel)
-bagList.Size = UDim2.new(1, -260, 1, -82)
-bagList.Position = UDim2.new(0, 20, 0, 62)
+bagList.Size = UDim2.new(1, -260, 1, -140)
+bagList.Position = UDim2.new(0, 20, 0, 96)
 bagList.BackgroundColor3 = Color3.fromRGB(210, 220, 214)
 bagList.BorderSizePixel = 0
 bagList.ScrollBarThickness = 8
@@ -709,6 +746,7 @@ function StateService.Create(player, loaded)
         Stats = loaded.Stats or {},
         UnlockedWheelRewards = loaded.UnlockedWheelRewards or {},
         UnlockedCards = loaded.UnlockedCards or {},
+        EquippedSkills = loaded.EquippedSkills or {},
     }
     StateService.UpdateLeaderstats(player)
     StateService.Push(player)
@@ -803,6 +841,7 @@ function StateService.Serialize(player)
         Stats = state.Stats,
         UnlockedWheelRewards = state.UnlockedWheelRewards,
         UnlockedCards = state.UnlockedCards,
+        EquippedSkills = state.EquippedSkills,
     }
 end
 
@@ -903,9 +942,30 @@ function StateService.GetLeaderboardSnapshot()
     return rows
 end
 
+function StateService.IsSkillEquipped(state, key)
+    for _, equippedKey in ipairs(state.EquippedSkills or {}) do
+        if equippedKey == key then return true end
+    end
+    return false
+end
+
+function StateService.EquipSkill(player, key, slot)
+    local state = StateService.Get(player)
+    local SkillConfig = require(Configs.SkillConfig)
+    local card = SkillConfig.Cards[key]
+    if not state or not card or (not card.IsUnlockedDefault and not state.UnlockedCards[key]) then return false, "LOCKED_SKILL" end
+    slot = math.clamp(math.floor(tonumber(slot) or 1), 1, 5)
+    state.EquippedSkills = state.EquippedSkills or {}
+    for index, equippedKey in ipairs(state.EquippedSkills) do
+        if equippedKey == key then state.EquippedSkills[index] = nil end
+    end
+    state.EquippedSkills[slot] = key
+    return true
+end
+
 function StateService.BuildInventory(player)
     local state = StateService.GetProfile(player)
-    local inventory = { WheelRewards = {}, Cards = {} }
+    local inventory = { WheelRewards = {}, Cards = {}, EquippedSkills = state.EquippedSkills or {} }
     if not state then return inventory end
     for key, reward in pairs(WheelConfig.Rewards) do
         if reward.IsUnlockedDefault or state.UnlockedWheelRewards[key] == true then
@@ -940,6 +1000,36 @@ function StateService.Push(player)
     })
 end
 return StateService
+]=]
+
+local serverGuardService = getOrCreate(servicesPackage, "ModuleScript", "ServerGuardService")
+serverGuardService.Source = [=[
+local HttpService = game:GetService("HttpService")
+
+local ServerGuardService = { Buckets = {}, ServerSecret = HttpService:GenerateGUID(false) }
+
+function ServerGuardService.Allow(player, action, limit, windowSeconds)
+    local now = os.clock()
+    local key = tostring(player.UserId) .. ":" .. tostring(action)
+    local bucket = ServerGuardService.Buckets[key]
+    if not bucket or now - bucket.StartedAt > windowSeconds then
+        bucket = { StartedAt = now, Count = 0 }
+        ServerGuardService.Buckets[key] = bucket
+    end
+    bucket.Count += 1
+    return bucket.Count <= limit
+end
+
+function ServerGuardService.ClearPlayer(player)
+    local prefix = tostring(player.UserId) .. ":"
+    for key in pairs(ServerGuardService.Buckets) do
+        if string.sub(key, 1, #prefix) == prefix then
+            ServerGuardService.Buckets[key] = nil
+        end
+    end
+end
+
+return ServerGuardService
 ]=]
 
 local globalLeaderboardService = getOrCreate(servicesPackage, "ModuleScript", "GlobalLeaderboardService")
@@ -1196,7 +1286,7 @@ local CakeModels = ReplicatedStorage:FindFirstChild("cake") or ReplicatedStorage
 -- Public cake API used by SkillService.  Keep all cake movement/damage here so skills
 -- cannot bypass rewards, animation, or cleanup rules. Cakes are world objects: any
 -- nearby player can eat them, and each eat tick reselects the nearest cake in range.
-local CakeService = { Owners = {}, EatingByPlayer = {} }
+local CakeService = { Owners = {}, EatingByPlayer = {}, TouchingByPlayer = {} }
 local Runtime = Workspace:FindFirstChild("cake") or Instance.new("Folder")
 Runtime.Name, Runtime.Parent = "cake", Workspace
 local function text(key) return LocalizationConfig["en-us"][key] or key end
@@ -1359,6 +1449,27 @@ local function stopEatingCake(cake)
             CakeService.EatingByPlayer[eatingPlayer] = nil
         end
     end
+    for _, touching in pairs(CakeService.TouchingByPlayer) do
+        touching[cake] = nil
+    end
+end
+local function touchedCakesFor(player)
+    CakeService.TouchingByPlayer[player] = CakeService.TouchingByPlayer[player] or {}
+    return CakeService.TouchingByPlayer[player]
+end
+local function nearestTouchedCake(player)
+    local root = rootOf(player)
+    if not root then return nil end
+    local bestCake, bestDistance
+    for cake in pairs(touchedCakesFor(player)) do
+        if cake.Parent and cake.PrimaryPart and not cake:GetAttribute("Finishing") then
+            local distance = (cake.PrimaryPart.Position - root.Position).Magnitude
+            if distance <= (CakeConfig.EatRangeStuds or 9) and (not bestDistance or distance < bestDistance) then
+                bestCake, bestDistance = cake, distance
+            end
+        end
+    end
+    return bestCake
 end
 function CakeService.Finish(player, cake)
     if not cake.Parent or cake:GetAttribute("Finishing") then
@@ -1501,12 +1612,10 @@ function CakeService.BeginAutoEat(player)
     CakeService.EatingByPlayer[player] = true
     task.spawn(function()
         while player.Parent do
-            local root = rootOf(player)
-            if not root then break end
-            local item = CakeService.GetCakes(player, 1, nil, CakeConfig.EatRangeStuds or 9)[1]
-            if not item then break end
-            CakeService.EatingByPlayer[player] = item.Cake
-            CakeService.DamageCake(player, item.Cake, CakeConfig.BaseEatDamagePerSecond + StateService.EffectiveStat(player, "EatSpeed"))
+            local cake = nearestTouchedCake(player)
+            if not cake then break end
+            CakeService.EatingByPlayer[player] = cake
+            CakeService.DamageCake(player, cake, CakeConfig.BaseEatDamagePerSecond + StateService.EffectiveStat(player, "EatSpeed"))
             task.wait(CakeConfig.EatTickSeconds)
         end
         stopEating(player)
@@ -1518,7 +1627,14 @@ function CakeService.HookTouches(cake)
             part.Touched:Connect(function(hit)
                 local toucher = Players:GetPlayerFromCharacter(hit.Parent)
                 if toucher then
+                    touchedCakesFor(toucher)[cake] = true
                     CakeService.BeginAutoEat(toucher)
+                end
+            end)
+            part.TouchEnded:Connect(function(hit)
+                local toucher = Players:GetPlayerFromCharacter(hit.Parent)
+                if toucher and CakeService.TouchingByPlayer[toucher] then
+                    CakeService.TouchingByPlayer[toucher][cake] = nil
                 end
             end)
         end
@@ -1671,6 +1787,7 @@ function CakeService.CleanupPlayer(player)
         end
     end
     stopEating(player)
+    CakeService.TouchingByPlayer[player] = nil
 end
 
 return CakeService
@@ -1928,6 +2045,7 @@ local LocalizationConfig = require(Configs.LocalizationConfig)
 local StateService = require(script.Parent.StateService)
 local SkillService = require(script.Parent.SkillService)
 local RewardService = require(script.Parent.RewardService)
+local ServerGuardService = require(script.Parent.ServerGuardService)
 
 local WheelService = {}
 
@@ -1955,7 +2073,7 @@ end
 local function unlockedCards(state)
     local entries = {}
     for key, card in pairs(CardConfig.Cards) do
-        if card.IsUnlockedDefault or state.UnlockedCards[key] then entries[key] = card end
+        if StateService.IsSkillEquipped(state, key) then entries[key] = card end
     end
     return entries
 end
@@ -2045,6 +2163,7 @@ end
 
 function WheelService.Start()
     Events.RequestWheelSpin.OnServerInvoke = function(player, action, requestedCount)
+        if not ServerGuardService.Allow(player, "RequestWheelSpin", 12, 2) then return { Ok = false, Error = "RATE_LIMIT" } end
         local state = StateService.Get(player)
         if not state then return { Ok = false, Error = "NO_STATE" } end
         if action == "Claim" then
@@ -2093,10 +2212,12 @@ function WheelService.Start()
     end
 
     Events.RequestCardDraw.OnServerInvoke = function(player)
+        if not ServerGuardService.Allow(player, "RequestCardDraw", 4, 5) then return { Ok = false, Error = "RATE_LIMIT" } end
         return { Ok = false, Error = "SKILLS_USE_WHEEL" }
     end
 
     Events.RequestShopPurchase.OnServerInvoke = function(player, itemId)
+        if not ServerGuardService.Allow(player, "RequestShopPurchase", 8, 5) then return { Ok = false, Error = "RATE_LIMIT" } end
         local state = StateService.Get(player)
         local item = state and shopItem(state, itemId)
         if not state or not item then return { Ok = false, Error = "INVALID_ITEM" } end
@@ -2117,7 +2238,16 @@ function WheelService.Start()
         StateService.Push(player)
         return { Ok = true }
     end
+    Events.RequestEquipSkill.OnServerInvoke = function(player, skillKey, slot)
+        if not ServerGuardService.Allow(player, "RequestEquipSkill", 12, 5) then return { Ok = false, Error = "RATE_LIMIT" } end
+        local ok, err = StateService.EquipSkill(player, tostring(skillKey), slot)
+        if not ok then return { Ok = false, Error = err } end
+        StateService.Push(player)
+        return { Ok = true }
+    end
+
     Events.RequestAbilityUpgrade.OnServerInvoke = function(player, abilityKey)
+        if not ServerGuardService.Allow(player, "RequestAbilityUpgrade", 8, 5) then return { Ok = false, Error = "RATE_LIMIT" } end
         local state = StateService.Get(player)
         if not state then return { Ok = false, Error = "NO_STATE" } end
         local nextLevel = math.max(1, state.AbilityLevels[abilityKey] or 1)
@@ -2145,6 +2275,7 @@ local CakeService = require(script.Parent.Services.CakeService)
 local WheelService = require(script.Parent.Services.WheelService)
 local SkillService = require(script.Parent.Services.SkillService)
 local GlobalLeaderboardService = require(script.Parent.Services.GlobalLeaderboardService)
+local ServerGuardService = require(script.Parent.Services.ServerGuardService)
 
 WheelService.Start()
 GlobalLeaderboardService.Start()
@@ -2172,6 +2303,7 @@ end)
 Players.PlayerRemoving:Connect(function(player)
     DataService.Save(player, StateService.Serialize(player))
     CakeService.CleanupPlayer(player)
+    ServerGuardService.ClearPlayer(player)
     StateService.Remove(player)
 end)
 
@@ -2197,6 +2329,7 @@ local Configs = ReplicatedStorage:WaitForChild("Configs")
 local RequestWheelSpin = Events:WaitForChild("RequestWheelSpin")
 local RequestShopPurchase = Events:WaitForChild("RequestShopPurchase")
 local RequestAbilityUpgrade = Events:WaitForChild("RequestAbilityUpgrade")
+local RequestEquipSkill = Events:WaitForChild("RequestEquipSkill")
 local UpdateClientState = Events:WaitForChild("UpdateClientState")
 local LocalizationConfig = require(Configs:WaitForChild("LocalizationConfig"))
 local ShopConfig = require(Configs:WaitForChild("ShopConfig"))
@@ -2221,7 +2354,7 @@ local closeBag = bagPanel:WaitForChild("CloseButton")
 local shopHub = gui:WaitForChild("ShopHub")
 local closeShop = shopHub:WaitForChild("CloseButton")
 
-local state = { WheelSpins = 0, WheelPoints = 0, WheelLevel = 1, CakePoints = 0, ActiveBuffs = {}, LastWheelReward = nil, Inventory = { WheelRewards = {}, Cards = {} } }
+local state = { WheelSpins = 0, WheelPoints = 0, WheelLevel = 1, CakePoints = 0, ActiveBuffs = {}, LastWheelReward = nil, Inventory = { WheelRewards = {}, Cards = {}, EquippedSkills = {} } }
 local spinning = false
 local autoRollEnabled = false
 local autoRollThread = nil
@@ -2330,6 +2463,7 @@ local function refreshEffectBar()
 end
 
 local selectedAbilityKey
+local bagMode = "Terms"
 local function showAbilityDetail(item)
     selectedAbilityKey = item.Key
     local detail = bagPanel:WaitForChild("DetailPanel")
@@ -2360,13 +2494,23 @@ local function refreshBag()
     local template = list:WaitForChild("EntryTemplate")
     for _, child in ipairs(list:GetChildren()) do if child:IsA("ImageButton") and child.Name ~= "EntryTemplate" then child:Destroy() end end
     local order = 0
-    for _, item in ipairs((state.Inventory and state.Inventory.WheelRewards) or {}) do
-        order += 1
-        addBagTile(template, item, order)
+    if bagMode == "Terms" then
+        for _, item in ipairs((state.Inventory and state.Inventory.WheelRewards) or {}) do
+            order += 1
+            addBagTile(template, item, order)
+        end
+    else
+        for _, item in ipairs((state.Inventory and state.Inventory.Cards) or {}) do
+            order += 1
+            addBagTile(template, item, order)
+        end
     end
-    for _, item in ipairs((state.Inventory and state.Inventory.Cards) or {}) do
-        order += 1
-        addBagTile(template, item, order)
+    local slots = bagPanel:WaitForChild("EquippedSkillSlots")
+    slots.Visible = bagMode == "Skills"
+    local equipped = (state.Inventory and state.Inventory.EquippedSkills) or {}
+    for slotIndex = 1, 5 do
+        local slot = slots:FindFirstChild("SkillSlot" .. tostring(slotIndex))
+        if slot then slot.Text = equipped[slotIndex] or tostring(slotIndex) end
     end
     task.defer(function() list.CanvasSize = UDim2.new(0, 0, 0, list.GridLayout.AbsoluteContentSize.Y + 16) end)
 end
@@ -2648,6 +2792,25 @@ closeShop.Activated:Connect(function()
     playSound("Button")
     shopHub.Visible = false
 end)
+bagPanel.TermTabButton.Activated:Connect(function()
+    bagMode = "Terms"
+    refreshBag()
+end)
+bagPanel.SkillTabButton.Activated:Connect(function()
+    bagMode = "Skills"
+    refreshBag()
+end)
+for slotIndex = 1, 5 do
+    local slot = bagPanel.EquippedSkillSlots:FindFirstChild("SkillSlot" .. tostring(slotIndex))
+    if slot then
+        slot.Activated:Connect(function()
+            if selectedAbilityKey and bagMode == "Skills" then
+                local result = RequestEquipSkill:InvokeServer(selectedAbilityKey, slotIndex)
+                if result and result.Ok then refreshBag() end
+            end
+        end)
+    end
+end
 bagPanel.DetailPanel.UpgradeButton.Activated:Connect(function()
     if selectedAbilityKey then playSound("Interact"); RequestAbilityUpgrade:InvokeServer(selectedAbilityKey) end
 end)
