@@ -99,6 +99,7 @@ local CakeConfig = {
     DataStoreKey = "CakeRainRNG_PlayerData_v2",
     BaseEatDamagePerSecond = 1,
     EatTickSeconds = 1,
+    EatRangeStuds = 9,
     SpawnInterval = 1.0,
     SpawnRadius = 30,
     SpawnHeight = 40,
@@ -122,10 +123,10 @@ local CakeConfig = {
     RarityOrder = { "Common", "Rare", "Epic", "Legendary", "Mythic" },
     Rarities = {
         Common = { NameKey = "Cake_Common", RarityText = "COMMON", OutlineColor = Color3.fromRGB(210, 210, 210), BaseHealth = 10, Scale = 1.0 },
-        Rare = { NameKey = "Cake_Rare", RarityText = "RARE", OutlineColor = Color3.fromRGB(70, 170, 255), BaseHealth = 30, Scale = 1.3 },
-        Epic = { NameKey = "Cake_Epic", RarityText = "EPIC", OutlineColor = Color3.fromRGB(185, 85, 255), BaseHealth = 80, Scale = 1.7 },
-        Legendary = { NameKey = "Cake_Legendary", RarityText = "LEGENDARY", OutlineColor = Color3.fromRGB(255, 170, 0), BaseHealth = 200, Scale = 2.2 },
-        Mythic = { NameKey = "Cake_Mythic", RarityText = "MYTHIC", OutlineColor = Color3.fromRGB(255, 60, 120), BaseHealth = 500, Scale = 2.8 },
+        Rare = { NameKey = "Cake_Rare", RarityText = "RARE", OutlineColor = Color3.fromRGB(70, 170, 255), BaseHealth = 30, Scale = 1.3, SplitChance = 0.04 },
+        Epic = { NameKey = "Cake_Epic", RarityText = "EPIC", OutlineColor = Color3.fromRGB(185, 85, 255), BaseHealth = 80, Scale = 1.7, SplitChance = 0.07 },
+        Legendary = { NameKey = "Cake_Legendary", RarityText = "LEGENDARY", OutlineColor = Color3.fromRGB(255, 170, 0), BaseHealth = 200, Scale = 2.2, SplitChance = 0.1 },
+        Mythic = { NameKey = "Cake_Mythic", RarityText = "MYTHIC", OutlineColor = Color3.fromRGB(255, 60, 120), BaseHealth = 500, Scale = 2.8, SplitChance = 0.14 },
     },
 }
 return CakeConfig
@@ -917,8 +918,9 @@ local StateService = require(script.Parent.StateService)
 local CakeModels = ReplicatedStorage:FindFirstChild("cake") or ReplicatedStorage.Models.cake
 
 -- Public cake API used by SkillService.  Keep all cake movement/damage here so skills
--- cannot bypass rewards, ownership, animation, or the one-cake eating rule.
-local CakeService = { Owners = {}, Eating = {}, EatingByPlayer = {} }
+-- cannot bypass rewards, animation, or cleanup rules. Cakes are world objects: any
+-- nearby player can eat them, and each eat tick reselects the nearest cake in range.
+local CakeService = { Owners = {}, EatingByPlayer = {} }
 local Runtime = Workspace:FindFirstChild("cake") or Instance.new("Folder")
 Runtime.Name, Runtime.Parent = "cake", Workspace
 local function text(key) return LocalizationConfig["en-us"][key] or key end
@@ -950,6 +952,7 @@ end
 local function scaledValue(baseValue, level, initialLevel)
     return math.max(1, math.floor((baseValue or 1) * (CakeConfig.ValueScalePerLevel ^ math.max(0, level - initialLevel)) + 0.5))
 end
+local playOutwardSmokeEffect
 function CakeService.ApplyCakeLevel(cake, level)
     local initialLevel = cake:GetAttribute("InitialCakeLevel") or 1
     local rarityKey = rarityKeyForLevel(level)
@@ -986,19 +989,8 @@ function CakeService.UpdateScale(cake)
     end
     local token = (cake:GetAttribute("ScaleTweenToken") or 0) + 1
     cake:SetAttribute("ScaleTweenToken", token)
-    local primary = cake.PrimaryPart
-    if primary and math.abs(scale - previousTarget) > 0.025 then
-        local burst = Instance.new("ParticleEmitter")
-        burst.Name = scale > previousTarget and "CakeGrowSparkles" or "CakeShrinkCrumbs"
-        burst.Texture = "rbxassetid://241876023"
-        burst.Color = ColorSequence.new(scale > previousTarget and Color3.fromRGB(255, 245, 140) or Color3.fromRGB(255, 210, 170))
-        burst.Lifetime = NumberRange.new(0.22, 0.42)
-        burst.Rate = 0
-        burst.Speed = NumberRange.new(2, 5)
-        burst.SpreadAngle = Vector2.new(180, 180)
-        burst.Parent = primary
-        burst:Emit(18)
-        game:GetService("Debris"):AddItem(burst, 0.6)
+    if math.abs(scale - previousTarget) > 0.025 then
+        playOutwardSmokeEffect(cake, scale > previousTarget)
     end
     task.spawn(function()
         local started, duration = os.clock(), 0.28
@@ -1018,6 +1010,99 @@ function CakeService.RefreshLabel(cake)
     local labelText = label and label:FindFirstChild("Text")
     if labelText then labelText.Text = string.format("[%s] %s (HP: %d/%d)", rarity.RarityText, text(rarity.NameKey), hp, maxHp) end
     CakeService.UpdateScale(cake)
+end
+
+local function playSoundAt(name, soundId, position, volume)
+    local soundAnchor = Instance.new("Part")
+    soundAnchor.Name = name .. "Anchor"
+    soundAnchor.Anchored = true
+    soundAnchor.CanCollide = false
+    soundAnchor.Transparency = 1
+    soundAnchor.Size = Vector3.new(0.2, 0.2, 0.2)
+    soundAnchor.Position = position
+    soundAnchor.Parent = Workspace
+    local sound = Instance.new("Sound")
+    sound.Name = name
+    sound.SoundId = "rbxassetid://" .. tostring(soundId)
+    sound.Volume = volume or 1
+    sound.RollOffMinDistance = 8
+    sound.RollOffMaxDistance = 90
+    sound.Parent = soundAnchor
+    sound:Play()
+    Debris:AddItem(soundAnchor, math.max(3, sound.TimeLength + 0.5))
+end
+
+playOutwardSmokeEffect = function(cake, isGrowing)
+    local primary = cake.PrimaryPart
+    if not primary then return end
+    local scale = cake:GetScale()
+    local burst = Instance.new("ParticleEmitter")
+    burst.Name = isGrowing and "CakeGrowSparkles" or "CakeShrinkCrumbs"
+    burst.Texture = "rbxassetid://241876023"
+    burst.Color = ColorSequence.new(isGrowing and Color3.fromRGB(255, 245, 140) or Color3.fromRGB(255, 210, 170))
+    burst.Lifetime = NumberRange.new(0.22, 0.42)
+    burst.Rate = 0
+    burst.Speed = NumberRange.new(2 * scale, 5 * scale)
+    burst.SpreadAngle = Vector2.new(180, 180)
+    burst.Parent = primary
+    burst:Emit(18)
+    Debris:AddItem(burst, 0.6)
+end
+
+local function playUpgradeHighlight(cake)
+    local primary = cake.PrimaryPart
+    if not primary then return end
+    primary.AssemblyLinearVelocity += Vector3.new(0, 32, 0)
+    playSoundAt("CakeUpgradeSound", 81872425338792, primary.Position, 1)
+    local burst = Instance.new("ParticleEmitter")
+    burst.Name = "CakeUpgradeGoldSmoke"
+    burst.Texture = "rbxasset://textures/particles/smoke_main.dds"
+    burst.Color = ColorSequence.new(Color3.fromRGB(255, 210, 80))
+    burst.Lifetime = NumberRange.new(0.35, 0.7)
+    burst.Rate = 0
+    burst.Speed = NumberRange.new(8, 18)
+    burst.SpreadAngle = Vector2.new(180, 180)
+    burst.Parent = primary
+    burst:Emit(35)
+    Debris:AddItem(burst, 1)
+    local outline = cake:FindFirstChild("RarityOutline")
+    if outline then
+        local originalColor, originalTransparency = outline.OutlineColor, outline.FillTransparency
+        outline.FillColor = Color3.fromRGB(255, 230, 120)
+        outline.FillTransparency = 0.35
+        task.delay(0.14, function()
+            if outline.Parent then
+                outline.OutlineColor = originalColor
+                outline.FillTransparency = originalTransparency
+            end
+        end)
+    end
+end
+
+local function createDynamicGroundStain(cake)
+    local primary = cake.PrimaryPart
+    if not primary then return end
+    local rayParams = RaycastParams.new()
+    rayParams.FilterType = Enum.RaycastFilterType.Exclude
+    rayParams.FilterDescendantsInstances = { cake, Runtime }
+    local hit = Workspace:Raycast(primary.Position, Vector3.new(0, -120, 0), rayParams)
+    if not hit then return end
+    local stain = Instance.new("Part")
+    stain.Name = "CakeGroundStain"
+    stain.Anchored = true
+    stain.CanCollide = false
+    stain.Transparency = 1
+    stain.Size = Vector3.new(4 * cake:GetScale(), 0.04, 4 * cake:GetScale())
+    stain.CFrame = CFrame.new(hit.Position + hit.Normal * 0.03)
+    stain.Parent = Runtime
+    local decal = Instance.new("Decal")
+    decal.Name = "CakeStainDecal"
+    decal.Face = Enum.NormalId.Top
+    decal.Texture = "rbxassetid://6880896391"
+    decal.Transparency = 0.15
+    decal.Parent = stain
+    TweenService:Create(decal, TweenInfo.new(CakeConfig.StainVisibleSeconds, Enum.EasingStyle.Quad), { Transparency = 1 }):Play()
+    Debris:AddItem(stain, CakeConfig.StainVisibleSeconds + 0.25)
 end
 local function playLandingEffect(cake)
     local primary = cake.PrimaryPart
@@ -1042,6 +1127,7 @@ local function playLandingEffect(cake)
     emitter.SpreadAngle = Vector2.new(90, 0)
     emitter.Parent = attachment
     emitter:Emit(math.max(8, math.floor(25 * scale)))
+    playSoundAt("CakeLandingSound", 183716578, primary.Position, 1)
     Debris:AddItem(puff, 1)
 end
 
@@ -1081,10 +1167,15 @@ function CakeService.Decorate(cake, isGlow)
     local labelStroke = Instance.new("UIStroke"); labelStroke.Name, labelStroke.Color, labelStroke.LineJoinMode, labelStroke.Thickness, labelStroke.Parent = "TextStroke", Color3.fromRGB(0, 0, 0), Enum.LineJoinMode.Round, 3, labelText
     CakeService.ApplyCakeLevel(cake, initialLevel)
 end
-local function stopEating(cake)
-    local eater = CakeService.Eating[cake]
-    if eater then CakeService.EatingByPlayer[eater] = nil end
-    CakeService.Eating[cake] = nil
+local function stopEating(player)
+    CakeService.EatingByPlayer[player] = nil
+end
+local function stopEatingCake(cake)
+    for eatingPlayer, target in pairs(CakeService.EatingByPlayer) do
+        if target == cake then
+            CakeService.EatingByPlayer[eatingPlayer] = nil
+        end
+    end
 end
 function CakeService.Finish(player, cake)
     if not cake.Parent or cake:GetAttribute("Finishing") then
@@ -1093,7 +1184,8 @@ function CakeService.Finish(player, cake)
 
     cake:SetAttribute("Finishing", true)
     CakeService.Owners[cake] = nil
-    stopEating(cake)
+    stopEatingCake(cake)
+    stopEating(player)
 
     local state = StateService.Get(player)
     if state then
@@ -1145,7 +1237,8 @@ function CakeService.Expire(cake)
 
     cake:SetAttribute("Finishing", true)
     CakeService.Owners[cake] = nil
-    stopEating(cake)
+    stopEatingCake(cake)
+    createDynamicGroundStain(cake)
 
     local startPivot, targetPivot, started = cake:GetPivot(), cake:GetPivot() - Vector3.new(0, 8, 0), os.clock()
     for _, part in ipairs(cake:GetDescendants()) do if part:IsA("BasePart") then part.CanCollide, part.Anchored = false, true end end
@@ -1161,7 +1254,7 @@ function CakeService.Expire(cake)
     end)
 end
 function CakeService.ApplyServerCakeChange(player, cake, change)
-    if CakeService.Owners[cake] ~= player or not cake.Parent or cake:GetAttribute("Finishing") then return false end
+    if not cake or not cake.Parent or cake:GetAttribute("Finishing") then return false end
     change = change or {}
     local damage = math.max(0, tonumber(change.Damage) or 0)
     if change.DamagePercent then
@@ -1175,6 +1268,7 @@ function CakeService.ApplyServerCakeChange(player, cake, change)
         local currentHealth = math.floor(math.max(0, cake:GetAttribute("Health") or 1) + 0.5)
         local hp = math.max(0, currentHealth - damage)
         cake:SetAttribute("Health", hp)
+        if cake.PrimaryPart then playSoundAt("CakeBiteSound", 86778542937419, cake.PrimaryPart.Position, 1) end
         CakeService.RefreshLabel(cake)
         if hp <= 0 then
             CakeService.Finish(player, cake)
@@ -1193,13 +1287,13 @@ end
 function CakeService.DamageCake(player, cake, amount)
     return CakeService.ApplyServerCakeChange(player, cake, { Damage = amount })
 end
-function CakeService.GetCakes(player, maximum, minimumDistance)
+function CakeService.GetCakes(player, maximum, minimumDistance, maximumDistance)
     local root, results = rootOf(player), {}
     if not root then return results end
-    for cake, owner in pairs(CakeService.Owners) do
-        if owner == player and cake.Parent and cake.PrimaryPart and not cake:GetAttribute("Finishing") then
+    for cake in pairs(CakeService.Owners) do
+        if cake.Parent and cake.PrimaryPart and not cake:GetAttribute("Finishing") then
             local distance = (cake.PrimaryPart.Position - root.Position).Magnitude
-            if not minimumDistance or distance >= minimumDistance then table.insert(results, { Cake = cake, Distance = distance }) end
+            if (not minimumDistance or distance >= minimumDistance) and (not maximumDistance or distance <= maximumDistance) then table.insert(results, { Cake = cake, Distance = distance }) end
         end
     end
     table.sort(results, function(a,b) return a.Distance < b.Distance end)
@@ -1208,7 +1302,7 @@ function CakeService.GetCakes(player, maximum, minimumDistance)
 end
 function CakeService.MoveNearPlayer(player, cake, distance, travelSeconds)
     local root = rootOf(player)
-    if not root or CakeService.Owners[cake] ~= player or not cake.PrimaryPart then return false end
+    if not root or not cake or not cake.PrimaryPart or cake:GetAttribute("Finishing") then return false end
     local angle = math.random() * math.pi * 2
     local destination = CFrame.new(root.Position + Vector3.new(math.cos(angle) * distance, 2, math.sin(angle) * distance))
     CakeService.ApplyServerCakeChange(player, cake, { LinearVelocity = Vector3.zero })
@@ -1219,25 +1313,29 @@ function CakeService.MoveNearPlayer(player, cake, distance, travelSeconds)
     end
     return destination
 end
-function CakeService.BeginAutoEat(player, cake)
-    if CakeService.EatingByPlayer[player] or CakeService.Eating[cake] or CakeService.Owners[cake] ~= player then return end
-    CakeService.Eating[cake], CakeService.EatingByPlayer[player] = player, cake
+function CakeService.BeginAutoEat(player)
+    if CakeService.EatingByPlayer[player] then return end
+    CakeService.EatingByPlayer[player] = true
     task.spawn(function()
-        while cake.Parent and CakeService.EatingByPlayer[player] == cake do
+        while player.Parent do
             local root = rootOf(player)
-            if not root or not cake.PrimaryPart or (root.Position - cake.PrimaryPart.Position).Magnitude > 9 then break end
-            CakeService.DamageCake(player, cake, CakeConfig.BaseEatDamagePerSecond + StateService.EffectiveStat(player, "EatSpeed"))
+            if not root then break end
+            local item = CakeService.GetCakes(player, 1, nil, CakeConfig.EatRangeStuds or 9)[1]
+            if not item then break end
+            CakeService.EatingByPlayer[player] = item.Cake
+            CakeService.DamageCake(player, item.Cake, CakeConfig.BaseEatDamagePerSecond + StateService.EffectiveStat(player, "EatSpeed"))
             task.wait(CakeConfig.EatTickSeconds)
         end
-        if CakeService.EatingByPlayer[player] == cake then stopEating(cake) end
+        stopEating(player)
     end)
 end
-function CakeService.HookTouches(player, cake)
+function CakeService.HookTouches(cake)
     for _, part in ipairs(cake:GetDescendants()) do
         if part:IsA("BasePart") then
             part.Touched:Connect(function(hit)
-                if Players:GetPlayerFromCharacter(hit.Parent) == player then
-                    CakeService.BeginAutoEat(player, cake)
+                local toucher = Players:GetPlayerFromCharacter(hit.Parent)
+                if toucher then
+                    CakeService.BeginAutoEat(toucher)
                 end
             end)
         end
@@ -1260,6 +1358,49 @@ local function spawnPositionNear(root)
     return root.Position + Vector3.new(math.cos(angle) * radius, CakeConfig.SpawnHeight, math.sin(angle) * radius)
 end
 
+local function playSpawnFadeIn(cake)
+    local parts = {}
+    for _, part in ipairs(cake:GetDescendants()) do
+        if part:IsA("BasePart") then
+            table.insert(parts, part)
+            part.Transparency = 1
+        end
+    end
+    task.delay(0.2, function()
+        for _, part in ipairs(parts) do
+            if part.Parent then
+                TweenService:Create(part, TweenInfo.new(0.2, Enum.EasingStyle.Quad), { Transparency = 0 }):Play()
+            end
+        end
+    end)
+end
+
+function CakeService.SplitCake(player, sourceCake)
+    if not player or not sourceCake or not sourceCake.Parent or not sourceCake.PrimaryPart then return end
+    local clone = sourceCake:Clone()
+    clone.Name = sourceCake.Name .. "_Split"
+    clone:SetAttribute("Finishing", nil)
+    for _, descendant in ipairs(clone:GetDescendants()) do
+        if descendant:IsA("Highlight") or descendant:IsA("BillboardGui") or descendant:IsA("Trail") or descendant.Name == "MeteorTrailTop" or descendant.Name == "MeteorTrailBottom" then
+            descendant:Destroy()
+        end
+    end
+    clone.Parent = Runtime
+    clone:PivotTo(sourceCake:GetPivot() * CFrame.new(math.random(-6, 6), 4, math.random(-6, 6)))
+    CakeService.Decorate(clone, clone:GetAttribute("IsGlow"))
+    CakeService.Owners[clone] = player
+    CakeService.ApplyServerCakeChange(player, clone, { LinearVelocity = Vector3.new(math.random(-8, 8), 18, math.random(-8, 8)) })
+    CakeService.HookTouches(clone)
+    bindLandingImpact(clone)
+    playSpawnFadeIn(clone)
+    task.delay(CakeConfig.CakeLifetimeSeconds, function()
+        if clone.Parent and CakeService.Owners[clone] then
+            CakeService.Expire(clone)
+        end
+    end)
+    return clone
+end
+
 function CakeService.SpawnNear(player)
     local root = rootOf(player)
     if not root then
@@ -1279,9 +1420,10 @@ function CakeService.SpawnNear(player)
     cake:PivotTo(CFrame.new(spawnPositionNear(root)))
 
     CakeService.Decorate(cake, glow)
+    playSpawnFadeIn(cake)
     CakeService.Owners[cake] = player
     CakeService.ApplyServerCakeChange(player, cake, { LinearVelocity = Vector3.new(0, -CakeConfig.MeteorFallSpeed, 0) })
-    CakeService.HookTouches(player, cake)
+    CakeService.HookTouches(cake)
     bindLandingImpact(cake)
 
     task.spawn(function()
@@ -1298,11 +1440,16 @@ function CakeService.SpawnNear(player)
                 return
             end
             CakeService.ApplyCakeLevel(cake, level + 1)
+            playUpgradeHighlight(cake)
+            local rarity = CakeConfig.Rarities[cake:GetAttribute("RarityKey")]
+            if rarity and rarity.SplitChance and math.random() < rarity.SplitChance then
+                CakeService.SplitCake(player, cake)
+            end
         end
     end)
 
     task.delay(CakeConfig.CakeLifetimeSeconds, function()
-        if cake.Parent and CakeService.Owners[cake] == player then
+        if cake.Parent and CakeService.Owners[cake] then
             CakeService.Expire(cake)
         end
     end)
@@ -1357,7 +1504,7 @@ function CakeService.CleanupPlayer(player)
             end
         end
     end
-    CakeService.EatingByPlayer[player] = nil
+    stopEating(player)
 end
 
 return CakeService
