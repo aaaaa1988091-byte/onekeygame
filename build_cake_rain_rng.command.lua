@@ -72,6 +72,7 @@ local WheelConfig = {
         WheelLevelUp = { ScriptName = "WheelLevelUp", NameKey = "Reward_WheelLevelUp", Weight = 55, Icon = "rbxassetid://6031068426", IsUnlockedDefault = true },
         PlayerSpeed = { ScriptName = "PlayerSpeed", NameKey = "Reward_PlayerSpeed", Weight = 85, Icon = "rbxassetid://6034754445", IsUnlockedDefault = true },
         Lucky = { ScriptName = "Lucky", NameKey = "Reward_Lucky", Weight = 70, Icon = "rbxassetid://6031075938", IsUnlockedDefault = true },
+        CakeSpawnHaste = { ScriptName = "CakeSpawnHaste", NameKey = "Reward_CakeSpawnHaste", Weight = 75, Icon = "rbxassetid://6031763426", IsUnlockedDefault = true },
     },
 }
 return WheelConfig
@@ -85,7 +86,7 @@ local LocalizationConfig = {
         UI_AutoRoll_Active = "Auto-Roll Active...", UI_Shop_Title = "Shop Hub", UI_CakeShop_Title = "Cake Point Shop",
         UI_WheelShop_Title = "Wheel Point Shop", UI_Time_Left = "Time Left: ", UI_No_Buff = "No Active Buff", UI_Spin = "Spin",
         UI_Open_Shop = "Shop", UI_Open_Bag = "Bag", UI_Close = "Close", UI_Buy = "Buy", UI_Bag_Title = "Ability Bag", UI_Bag_Wheel = "Wheel Terms", UI_Bag_Cards = "Drawable Skills", UI_Locked = "Locked", UI_Unlocked = "Owned",
-        Cake_Common = "Common Cake", Cake_Rare = "Rare Cake", Cake_Epic = "Epic Cake", Cake_Legendary = "Legendary Cake", Cake_Mythic = "Mythic Cake", Reward_EatSpeed = "Eat Speed Up", Reward_AutoRoll = "Auto-Roll", Reward_WheelHaste = "Wheel Haste", Reward_WheelLevelUp = "Wheel Level Up", Reward_PlayerSpeed = "Player Speed Up", Reward_Lucky = "Lucky Up", UI_Normal_Wheel = "Reward Wheel", UI_Silver_Wheel = "Silver Wheel", UI_Merchant_Tab = "Mystery Merchant", UI_Upgrade = "Upgrade",
+        Cake_Common = "Common Cake", Cake_Rare = "Rare Cake", Cake_Epic = "Epic Cake", Cake_Legendary = "Legendary Cake", Cake_Mythic = "Mythic Cake", Reward_EatSpeed = "Eat Speed Up", Reward_AutoRoll = "Auto-Roll", Reward_WheelHaste = "Wheel Haste", Reward_WheelLevelUp = "Wheel Level Up", Reward_PlayerSpeed = "Player Speed Up", Reward_Lucky = "Lucky Up", Reward_CakeSpawnHaste = "Cake Rain Speed Up", UI_Normal_Wheel = "Reward Wheel", UI_Silver_Wheel = "Silver Wheel", UI_Merchant_Tab = "Mystery Merchant", UI_Upgrade = "Upgrade",
         Card_Hook = "Grappling Hook", Card_Tornado = "Tornado", Card_Ant = "Ant Courier", Card_Attract = "Cake Attraction",
     },
 }
@@ -98,7 +99,7 @@ local CakeConfig = {
     DataStoreKey = "CakeRainRNG_PlayerData_v2",
     BaseEatDamagePerSecond = 1,
     EatTickSeconds = 1,
-    SpawnInterval = 0.2,
+    SpawnInterval = 1.0,
     SpawnRadius = 30,
     SpawnHeight = 40,
     -- Cake count is intentionally unbounded; CakeLifetimeSeconds is the cleanup limiter.
@@ -109,7 +110,7 @@ local CakeConfig = {
     SinkSeconds = 1.1,
     EatAnimationSeconds = 0.45,
     CakeLifetimeSeconds = 20,
-    MinimumSpawnDistance = 6.56, -- Keep drops away from the player while preserving the original spawn flow
+    MinimumSpawnDistance = 10, -- About 3 meters; keep cakes out of the immediate player area
     MinimumCakeScale = 0.28,
     MaximumCakeScale = 1.45,
     HealthForMaximumScale = 24,
@@ -120,11 +121,11 @@ local CakeConfig = {
     UpgradeDecisionWindowSeconds = 3,
     RarityOrder = { "Common", "Rare", "Epic", "Legendary", "Mythic" },
     Rarities = {
-        Common = { NameKey = "Cake_Common", RarityText = "COMMON", OutlineColor = Color3.fromRGB(210, 210, 210) },
-        Rare = { NameKey = "Cake_Rare", RarityText = "RARE", OutlineColor = Color3.fromRGB(70, 170, 255) },
-        Epic = { NameKey = "Cake_Epic", RarityText = "EPIC", OutlineColor = Color3.fromRGB(185, 85, 255) },
-        Legendary = { NameKey = "Cake_Legendary", RarityText = "LEGENDARY", OutlineColor = Color3.fromRGB(255, 170, 0) },
-        Mythic = { NameKey = "Cake_Mythic", RarityText = "MYTHIC", OutlineColor = Color3.fromRGB(255, 60, 120) },
+        Common = { NameKey = "Cake_Common", RarityText = "COMMON", OutlineColor = Color3.fromRGB(210, 210, 210), BaseHealth = 10, Scale = 1.0 },
+        Rare = { NameKey = "Cake_Rare", RarityText = "RARE", OutlineColor = Color3.fromRGB(70, 170, 255), BaseHealth = 30, Scale = 1.3 },
+        Epic = { NameKey = "Cake_Epic", RarityText = "EPIC", OutlineColor = Color3.fromRGB(185, 85, 255), BaseHealth = 80, Scale = 1.7 },
+        Legendary = { NameKey = "Cake_Legendary", RarityText = "LEGENDARY", OutlineColor = Color3.fromRGB(255, 170, 0), BaseHealth = 200, Scale = 2.2 },
+        Mythic = { NameKey = "Cake_Mythic", RarityText = "MYTHIC", OutlineColor = Color3.fromRGB(255, 60, 120), BaseHealth = 500, Scale = 2.8 },
     },
 }
 return CakeConfig
@@ -290,21 +291,21 @@ for index, name in { "CakePointsLabel", "WheelPointsLabel", "SpinsLabel" } do
     label.Font = Enum.Font.FredokaOne
     label.TextScaled = true
     label.TextXAlignment = Enum.TextXAlignment.Left
-    label.TextColor3 = Color3.fromRGB(74, 68, 64)
+    label.TextColor3 = Color3.fromRGB(255, 255, 255)
 end
 local shopButton = newGui("ImageButton", "ShopButton", mainGui)
-shopButton.Size = UDim2.new(0, 120, 0, 46)
+shopButton.Size = UDim2.new(0, 58, 0, 58)
 shopButton.Position = UDim2.new(0, 18, 0, 148)
 shopButton.BackgroundColor3 = Color3.fromRGB(255, 210, 110)
 shopButton.Image = "rbxassetid://6031265976"
-newGui("UICorner", "Corner", shopButton).CornerRadius = UDim.new(0, 16)
+newGui("UICorner", "Corner", shopButton).CornerRadius = UDim.new(0, 8)
 newGui("UIStroke", "ButtonOutline", shopButton).Color = Color3.fromRGB(255, 245, 210)
 local bagButton = newGui("ImageButton", "BagButton", mainGui)
-bagButton.Size = UDim2.new(0, 120, 0, 46)
-bagButton.Position = UDim2.new(0, 148, 0, 148)
+bagButton.Size = UDim2.new(0, 58, 0, 58)
+bagButton.Position = UDim2.new(0, 86, 0, 148)
 bagButton.BackgroundColor3 = Color3.fromRGB(150, 220, 255)
 bagButton.Image = "rbxassetid://6031265972"
-newGui("UICorner", "Corner", bagButton).CornerRadius = UDim.new(0, 16)
+newGui("UICorner", "Corner", bagButton).CornerRadius = UDim.new(0, 8)
 newGui("UIStroke", "ButtonOutline", bagButton).Color = Color3.fromRGB(225, 250, 255)
 
 local wheel = newGui("Frame", "WheelPanel", mainGui)
@@ -320,7 +321,7 @@ wheelTitle.BackgroundTransparency = 1
 wheelTitle.Font = Enum.Font.FredokaOne
 wheelTitle.Text = "LUCKY WHEEL"
 wheelTitle.TextScaled = true
-wheelTitle.TextColor3 = Color3.fromRGB(72, 66, 62)
+wheelTitle.TextColor3 = Color3.fromRGB(255, 255, 255)
 local disc = newGui("Frame", "WheelDisc", wheel)
 disc.Size = UDim2.new(0, 160, 0, 300)
 disc.Position = UDim2.new(1, -180, 0, 44)
@@ -367,7 +368,7 @@ spinButton.BackgroundColor3 = Color3.fromRGB(200, 125, 117)
 spinButton.Font = Enum.Font.FredokaOne
 spinButton.Text = "SPIN"
 spinButton.TextScaled = true
-spinButton.TextColor3 = Color3.fromRGB(72, 66, 62)
+spinButton.TextColor3 = Color3.fromRGB(255, 255, 255)
 newGui("UICorner", "Corner", spinButton).CornerRadius = UDim.new(0, 8)
 local autoRollToggle = newGui("TextButton", "AutoRollToggle", wheel)
 autoRollToggle.Size = UDim2.new(0, 120, 0, 44)
@@ -376,7 +377,7 @@ autoRollToggle.BackgroundColor3 = Color3.fromRGB(156, 176, 168)
 autoRollToggle.Font = Enum.Font.FredokaOne
 autoRollToggle.Text = "AUTO: OFF"
 autoRollToggle.TextScaled = true
-autoRollToggle.TextColor3 = Color3.fromRGB(72, 66, 62)
+autoRollToggle.TextColor3 = Color3.fromRGB(255, 255, 255)
 autoRollToggle.Visible = false
 newGui("UICorner", "Corner", autoRollToggle).CornerRadius = UDim.new(0, 8)
 local buffFrame = newGui("Frame", "EffectBar", mainGui)
@@ -411,7 +412,7 @@ templateCooldownText.BackgroundTransparency = 1
 templateCooldownText.Size = UDim2.fromScale(1, 1)
 templateCooldownText.Font = Enum.Font.FredokaOne
 templateCooldownText.TextScaled = true
-templateCooldownText.TextColor3 = Color3.fromRGB(74, 68, 64)
+templateCooldownText.TextColor3 = Color3.fromRGB(255, 255, 255)
 templateCooldownText.ZIndex = 3
 templateCooldownText.Visible = false
 
@@ -422,7 +423,7 @@ tooltip.BackgroundColor3 = Color3.fromRGB(15, 15, 20)
 tooltip.BackgroundTransparency = 0.08
 tooltip.Font = Enum.Font.FredokaOne
 tooltip.TextScaled = true
-tooltip.TextColor3 = Color3.fromRGB(74, 68, 64)
+tooltip.TextColor3 = Color3.fromRGB(255, 255, 255)
 tooltip.Visible = false
 newGui("UICorner", "Corner", tooltip).CornerRadius = UDim.new(0, 8)
 
@@ -434,7 +435,7 @@ currentDrawLabel.BackgroundColor3 = Color3.fromRGB(184, 198, 190)
 currentDrawLabel.BackgroundTransparency = 0.12
 currentDrawLabel.Font = Enum.Font.FredokaOne
 currentDrawLabel.TextScaled = true
-currentDrawLabel.TextColor3 = Color3.fromRGB(74, 68, 64)
+currentDrawLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
 currentDrawLabel.Visible = false
 newGui("UICorner", "Corner", currentDrawLabel).CornerRadius = UDim.new(0, 8)
 
@@ -454,7 +455,7 @@ closeShop.BackgroundColor3 = Color3.fromRGB(255, 100, 100)
 closeShop.Font = Enum.Font.FredokaOne
 closeShop.Text = "Close"
 closeShop.TextScaled = true
-closeShop.TextColor3 = Color3.fromRGB(74, 68, 64)
+closeShop.TextColor3 = Color3.fromRGB(255, 255, 255)
 newGui("UICorner", "Corner", closeShop).CornerRadius = UDim.new(0, 10)
 local shopGrid = newGui("ScrollingFrame", "ShopGrid", shopHub)
 shopGrid.Size = UDim2.new(1, -40, 1, -82)
@@ -486,14 +487,14 @@ itemName.Position = UDim2.new(0, 4, 0, 12)
 itemName.Font = Enum.Font.FredokaOne
 itemName.TextScaled = true
 itemName.TextWrapped = true
-itemName.TextColor3 = Color3.fromRGB(35, 25, 20)
+itemName.TextColor3 = Color3.fromRGB(255, 255, 255)
 local itemCost = newGui("TextLabel", "ItemCost", shopTemplate)
 itemCost.BackgroundTransparency = 1
 itemCost.Size = UDim2.new(1, -8, 0, 32)
 itemCost.Position = UDim2.new(0, 4, 1, -40)
 itemCost.Font = Enum.Font.FredokaOne
 itemCost.TextScaled = true
-itemCost.TextColor3 = Color3.fromRGB(85, 50, 15)
+itemCost.TextColor3 = Color3.fromRGB(255, 255, 255)
 
 
 local bagPanel = newGui("Frame", "InventoryBag", mainGui)
@@ -512,7 +513,7 @@ bagTitle.Position = UDim2.new(0, 20, 0, 12)
 bagTitle.Font = Enum.Font.FredokaOne
 bagTitle.Text = "Ability Bag"
 bagTitle.TextScaled = true
-bagTitle.TextColor3 = Color3.fromRGB(67, 87, 82)
+bagTitle.TextColor3 = Color3.fromRGB(255, 255, 255)
 local closeBag = newGui("TextButton", "CloseButton", bagPanel)
 closeBag.Size = UDim2.new(0, 90, 0, 38)
 closeBag.Position = UDim2.new(1, -104, 0, 12)
@@ -520,7 +521,7 @@ closeBag.BackgroundColor3 = Color3.fromRGB(255, 100, 100)
 closeBag.Font = Enum.Font.FredokaOne
 closeBag.Text = "Close"
 closeBag.TextScaled = true
-closeBag.TextColor3 = Color3.fromRGB(74, 68, 64)
+closeBag.TextColor3 = Color3.fromRGB(255, 255, 255)
 newGui("UICorner", "Corner", closeBag).CornerRadius = UDim.new(0, 10)
 local bagList = newGui("ScrollingFrame", "BagList", bagPanel)
 bagList.Size = UDim2.new(1, -260, 1, -82)
@@ -547,7 +548,7 @@ bagEntryName.Position = UDim2.new(0, 5, 1, -46)
 bagEntryName.Font = Enum.Font.FredokaOne
 bagEntryName.TextScaled = true
 bagEntryName.TextWrapped = true
-bagEntryName.TextColor3 = Color3.fromRGB(74, 68, 64)
+bagEntryName.TextColor3 = Color3.fromRGB(255, 255, 255)
 local bagDetail = newGui("Frame", "DetailPanel", bagPanel)
 bagDetail.Size = UDim2.new(0, 210, 1, -82)
 bagDetail.Position = UDim2.new(1, -230, 0, 62)
@@ -560,7 +561,7 @@ detailText.Position = UDim2.new(0, 8, 0, 8)
 detailText.Font = Enum.Font.FredokaOne
 detailText.TextWrapped = true
 detailText.TextScaled = true
-detailText.TextColor3 = Color3.fromRGB(63, 77, 73)
+detailText.TextColor3 = Color3.fromRGB(255, 255, 255)
 detailText.Text = "Select an ability"
 local upgradeButton = newGui("TextButton", "UpgradeButton", bagDetail)
 upgradeButton.Size = UDim2.new(1, -24, 0, 46)
@@ -568,7 +569,7 @@ upgradeButton.Position = UDim2.new(0, 12, 1, -58)
 upgradeButton.BackgroundColor3 = Color3.fromRGB(255, 210, 110)
 upgradeButton.Font = Enum.Font.FredokaOne
 upgradeButton.TextScaled = true
-upgradeButton.TextColor3 = Color3.fromRGB(70, 40, 10)
+upgradeButton.TextColor3 = Color3.fromRGB(255, 255, 255)
 upgradeButton.Text = "Upgrade"
 newGui("UICorner", "Corner", upgradeButton).CornerRadius = UDim.new(0, 10)
 
@@ -955,8 +956,9 @@ function CakeService.ApplyCakeLevel(cake, level)
     local rarity = CakeConfig.Rarities[rarityKey] or CakeConfig.Rarities.Common
     cake:SetAttribute("CakeLevel", level)
     cake:SetAttribute("RarityKey", rarityKey)
-    cake:SetAttribute("MaxHealth", scaledValue(cake:GetAttribute("InitialHealth"), level, initialLevel))
+    cake:SetAttribute("MaxHealth", rarity.BaseHealth or scaledValue(cake:GetAttribute("InitialHealth"), level, initialLevel))
     cake:SetAttribute("Health", cake:GetAttribute("MaxHealth"))
+    cake:SetAttribute("RarityScale", rarity.Scale or cake:GetAttribute("RarityScale") or 1)
     cake:SetAttribute("RewardCakePoints", scaledValue(cake:GetAttribute("InitialReward"), level, initialLevel))
     cake:SetAttribute("RewardWheelTickets", scaledValue(cake:GetAttribute("InitialWheelTickets"), level, initialLevel))
     local outline = cake:FindFirstChild("RarityOutline")
@@ -972,7 +974,9 @@ end
 
 function CakeService.UpdateScale(cake)
     local hp = math.max(0, cake:GetAttribute("Health") or 0)
-    local scale = CakeConfig.MinimumCakeScale + (CakeConfig.MaximumCakeScale - CakeConfig.MinimumCakeScale) * math.clamp(hp / CakeConfig.HealthForMaximumScale, 0, 1)
+    local maxHp = math.max(1, cake:GetAttribute("MaxHealth") or 1)
+    local rarityScale = cake:GetAttribute("RarityScale") or 1
+    local scale = math.max(CakeConfig.MinimumCakeScale, rarityScale * math.clamp(hp / maxHp, 0.18, 1))
     local currentScale = cake:GetScale()
     local previousTarget = cake:GetAttribute("TargetScale") or currentScale
     cake:SetAttribute("TargetScale", scale)
@@ -1015,6 +1019,32 @@ function CakeService.RefreshLabel(cake)
     if labelText then labelText.Text = string.format("[%s] %s (HP: %d/%d)", rarity.RarityText, text(rarity.NameKey), hp, maxHp) end
     CakeService.UpdateScale(cake)
 end
+local function playLandingEffect(cake)
+    local primary = cake.PrimaryPart
+    if not primary then return end
+    local scale = cake:GetAttribute("RarityScale") or cake:GetScale()
+    local puff = Instance.new("Part")
+    puff.Name = "CakeLandingPuff"
+    puff.Anchored = true
+    puff.CanCollide = false
+    puff.Transparency = 1
+    puff.Position = primary.Position
+    puff.Parent = Runtime
+    local attachment = Instance.new("Attachment")
+    attachment.Parent = puff
+    local emitter = Instance.new("ParticleEmitter")
+    emitter.Texture = "rbxasset://textures/particles/smoke_main.dds"
+    emitter.Color = ColorSequence.new(Color3.fromRGB(200, 180, 150))
+    emitter.Size = NumberSequence.new({ NumberSequenceKeypoint.new(0, 1 * scale), NumberSequenceKeypoint.new(1, 3 * scale) })
+    emitter.Transparency = NumberSequence.new({ NumberSequenceKeypoint.new(0, 0.2), NumberSequenceKeypoint.new(1, 1) })
+    emitter.Lifetime = NumberRange.new(0.3, 0.6)
+    emitter.Speed = NumberRange.new(10 * scale, 20 * scale)
+    emitter.SpreadAngle = Vector2.new(90, 0)
+    emitter.Parent = attachment
+    emitter:Emit(math.max(8, math.floor(25 * scale)))
+    Debris:AddItem(puff, 1)
+end
+
 local function disableCakeTrails(cake)
     for _, descendant in ipairs(cake:GetDescendants()) do
         if descendant:IsA("Trail") then descendant.Enabled = false end
@@ -1029,6 +1059,7 @@ local function bindLandingImpact(cake)
         if landed or not hit.CanCollide or hit:IsDescendantOf(Runtime) then return end
         landed = true
         disableCakeTrails(cake)
+        playLandingEffect(cake)
     end)
 end
 
@@ -1311,7 +1342,8 @@ function CakeService.StartPlayer(player)
                 warn("Cake Rain RNG: spawn failed; rain will continue", err)
             end
             StateService.Push(player)
-            task.wait(CakeConfig.SpawnInterval)
+            local spawnHaste = StateService.EffectiveStat(player, "CakeSpawnHaste")
+            task.wait(math.max(0.2, CakeConfig.SpawnInterval - spawnHaste))
         end
     end)
 end
@@ -1348,7 +1380,7 @@ function RewardTemplate.ApplyBuff(player, key, reward, buffType, rarityValues, o
     for valueKey, value in pairs(overrides or {}) do resolved[valueKey] = value end
     resolved.Type = resolved.Type or buffType
     resolved.Level = resolved.Level or RewardTemplate.RarityLevel(resolved.Rarity)
-    resolved.BaseDuration = resolved.BaseDuration or resolved.Duration or 60
+    resolved.BaseDuration = (resolved.BaseDuration or resolved.Duration or 60) * 0.5
     return StateService.AddBuff(player, key, resolved)
 end
 return RewardTemplate
@@ -1359,7 +1391,8 @@ local rewardDefinitions = {
     AutoRoll = { BuffType = "AutoRoll", ByRarity = "{ Common = { Interval = 1.0, MultiRolls = 1, Duration = 180, MaxAbilityLevel = 3 }, Rare = { Interval = 0.9, MultiRolls = 2, Duration = 180, MaxAbilityLevel = 3 }, Epic = { Interval = 0.8, MultiRolls = 3, Duration = 190, MaxAbilityLevel = 3 }, Legendary = { Interval = 0.7, MultiRolls = 4, Duration = 200, MaxAbilityLevel = 3 }, Mythic = { Interval = 0.6, MultiRolls = 5, Duration = 210, MaxAbilityLevel = 3 } }" },
     WheelHaste = { BuffType = "WheelHaste", ByRarity = "{ Common = { Value = 0.10, Duration = 120, MaxAbilityLevel = 3 }, Rare = { Value = 0.22, Duration = 120, MaxAbilityLevel = 3 }, Epic = { Value = 0.36, Duration = 130, MaxAbilityLevel = 3 }, Legendary = { Value = 0.52, Duration = 140, MaxAbilityLevel = 3 }, Mythic = { Value = 0.75, Duration = 150, MaxAbilityLevel = 3 } }" },
     PlayerSpeed = { BuffType = "PlayerSpeed", Overrides = "{ Type = \"Stat\", Stat = \"PlayerSpeed\" }", ByRarity = "{ Common = { Value = 2, Duration = 90, MaxAbilityLevel = 3 }, Rare = { Value = 4, Duration = 100, MaxAbilityLevel = 3 }, Epic = { Value = 6, Duration = 110, MaxAbilityLevel = 3 }, Legendary = { Value = 8, Duration = 120, MaxAbilityLevel = 3 }, Mythic = { Value = 12, Duration = 140, MaxAbilityLevel = 3 } }" },
-    Lucky = { BuffType = "Lucky", Overrides = "{ Type = \"Stat\", Stat = \"Lucky\" }", ByRarity = "{ Common = { Value = 0.05, Duration = 90, MaxAbilityLevel = 3 }, Rare = { Value = 0.10, Duration = 100, MaxAbilityLevel = 3 }, Epic = { Value = 0.18, Duration = 110, MaxAbilityLevel = 3 }, Legendary = { Value = 0.28, Duration = 120, MaxAbilityLevel = 3 }, Mythic = { Value = 0.42, Duration = 140, MaxAbilityLevel = 3 } }" },
+    Lucky = { BuffType = "Lucky", Overrides = "{ Type = \"Stat\", Stat = \"Lucky\" }", ByRarity = "{ Common = { Value = 0.02, Duration = 90, MaxAbilityLevel = 3 }, Rare = { Value = 0.035, Duration = 100, MaxAbilityLevel = 3 }, Epic = { Value = 0.05, Duration = 110, MaxAbilityLevel = 3 }, Legendary = { Value = 0.075, Duration = 120, MaxAbilityLevel = 3 }, Mythic = { Value = 0.10, Duration = 140, MaxAbilityLevel = 3 } }" },
+    CakeSpawnHaste = { BuffType = "CakeSpawnHaste", Overrides = "{ Type = \"Stat\", Stat = \"CakeSpawnHaste\" }", ByRarity = "{ Common = { Value = 0.1, Duration = 90, MaxAbilityLevel = 3 }, Rare = { Value = 0.2, Duration = 100, MaxAbilityLevel = 3 }, Epic = { Value = 0.3, Duration = 110, MaxAbilityLevel = 3 }, Legendary = { Value = 0.4, Duration = 120, MaxAbilityLevel = 3 }, Mythic = { Value = 0.5, Duration = 140, MaxAbilityLevel = 3 } }" },
 }
 for scriptName, definition in pairs(rewardDefinitions) do
     local rewardScript = getOrCreate(rewardScripts, "ModuleScript", scriptName)
@@ -1379,7 +1412,7 @@ local WheelConfig = require(game:GetService("ReplicatedStorage").Configs.WheelCo
 local Template = require(script.Parent.RewardTemplate)
 return function(player, key, reward)
     local levelGain = WheelConfig.WheelLevelBonusByRarity[reward.Rarity] or Template.RarityLevel(reward.Rarity)
-    local duration = WheelConfig.WheelLevelDurationByRarity[reward.Rarity] or 60
+    local duration = (WheelConfig.WheelLevelDurationByRarity[reward.Rarity] or 60) * 0.5
     local stack = StateService.AddBuff(player, key, { NameKey = reward.NameKey, Rarity = reward.Rarity, Type = "WheelLevel", Value = levelGain, Level = levelGain, Icon = reward.Icon, BaseDuration = duration })
     if stack then stack.EffectText = "+" .. tostring(levelGain) .. " wheel level for " .. tostring(duration) .. "s" end
     return stack
@@ -1616,18 +1649,14 @@ end
 local function randomRarity(player, state, capOverride)
     local cap, total = math.min(maxRarityPriority(player, state), capOverride or 999), 0
     local luckyBonus = StateService.EffectiveStat(player, "Lucky")
-    local weights = table.clone(WheelConfig.BaseRarityWeights)
-    if luckyBonus > 0 then
-        weights.Rare = math.floor(weights.Rare * (1 + luckyBonus))
-        weights.Epic = math.floor(weights.Epic * (1 + luckyBonus * 1.5))
-        weights.Legendary = math.floor(weights.Legendary * (1 + luckyBonus * 2))
-        weights.Mythic = math.floor(weights.Mythic * (1 + luckyBonus * 3))
-    end
-    for rarity, weight in pairs(weights) do if (WheelConfig.RarityPriority[rarity] or 1) <= cap then total += weight end end
+    local minimumPriority = (luckyBonus > 0 and math.random() < luckyBonus) and math.min(cap, 2) or 1
+    local weights = WheelConfig.BaseRarityWeights
+    for rarity, weight in pairs(weights) do local priority = WheelConfig.RarityPriority[rarity] or 1 if priority >= minimumPriority and priority <= cap then total += weight end end
     local roll, cursor = math.random() * total, 0
     for _, rarity in ipairs(WheelConfig.RarityOrder) do
         local weight = weights[rarity] or 0
-        if (WheelConfig.RarityPriority[rarity] or 1) <= cap then
+        local priority = WheelConfig.RarityPriority[rarity] or 1
+        if priority >= minimumPriority and priority <= cap then
             cursor += weight
             if roll <= cursor then return rarity end
         end
@@ -2101,7 +2130,7 @@ local function renderSlotItem(slot, parent)
     label.Text = string.format("%s\n[%s]", slot.Name or "Reward", slot.Rarity or "Common")
     label.TextScaled = true
     label.TextWrapped = true
-    label.TextColor3 = Color3.fromRGB(72, 66, 62)
+    label.TextColor3 = Color3.fromRGB(255, 255, 255)
     applyTextStyle(label)
     label.Parent = parent
 end
