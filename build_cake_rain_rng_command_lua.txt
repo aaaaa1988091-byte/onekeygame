@@ -951,7 +951,7 @@ function StateService.GetLeaderboardSnapshot()
 end
 
 function StateService.IsSkillEquipped(state, key)
-    for _, equippedKey in ipairs(state.EquippedSkills or {}) do
+    for _, equippedKey in pairs(state.EquippedSkills or {}) do
         if equippedKey == key then return true end
     end
     return false
@@ -964,7 +964,10 @@ function StateService.EquipSkill(player, key, slot)
     if not state or not card or (not card.IsUnlockedDefault and not state.UnlockedCards[key]) then return false, "LOCKED_SKILL" end
     slot = math.clamp(math.floor(tonumber(slot) or 1), 1, 5)
     state.EquippedSkills = state.EquippedSkills or {}
-    for index, equippedKey in ipairs(state.EquippedSkills) do
+    -- BUG FIX: EquippedSkills is a sparse table keyed by slot (1-5) once any slot is empty.
+    -- ipairs stops at the first nil "hole", which could skip a skill sitting in a later slot
+    -- and leave it registered in two slots at once after a move. pairs() visits every slot.
+    for index, equippedKey in pairs(state.EquippedSkills) do
         if equippedKey == key then state.EquippedSkills[index] = nil end
     end
     state.EquippedSkills[slot] = key
@@ -2532,16 +2535,19 @@ local function endDrag(dropPosition)
     if drag.inputChanged then drag.inputChanged:Disconnect() end
     if drag.inputEnded then drag.inputEnded:Disconnect() end
     clearSlotHighlights()
+    drag.ghost:Destroy() -- destroy right away so the icon doesn't hang mid-air during the network round trip
     local targetIndex
     if dropPosition then
         local _, foundIndex = slotUnderPosition(dropPosition)
         targetIndex = foundIndex
     end
-    if targetIndex then
-        local result = RequestEquipSkill:InvokeServer(drag.key, targetIndex)
-        if result and result.Ok then playSound("Interact") end
+    -- Don't bother re-equipping into the exact slot it was already dragged from (a plain tap/no-move).
+    if targetIndex and targetIndex ~= drag.sourceSlot then
+        local ok, result = pcall(function()
+            return RequestEquipSkill:InvokeServer(drag.key, targetIndex)
+        end)
+        if ok and result and result.Ok then playSound("Interact") end
     end
-    drag.ghost:Destroy()
     refreshBag()
 end
 
