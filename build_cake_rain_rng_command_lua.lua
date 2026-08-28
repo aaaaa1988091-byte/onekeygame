@@ -272,15 +272,15 @@ hudScale.Scale = 1
 
 -- ============================================================================
 -- THEME: Roblox in-world card UI with chunky borders and hard shadows.
--- This HUD intentionally stays transparent around compact floating panels so the
--- live 3D game view remains visible instead of becoming a full-screen menu art.
+-- Default surfaces are white cards with black borders/shadows. Green is kept only
+-- as an optional theme reference and subtle texture tint, never broad panel fill.
 -- ============================================================================
 local Theme = {
-    BgBase = Color3.fromRGB(138, 187, 117),
-    GridLine = Color3.fromRGB(168, 214, 149),
-    Accent = Color3.fromRGB(241, 196, 15),
-    Black = Color3.fromRGB(0, 0, 0),
-    White = Color3.fromRGB(255, 255, 255),
+    White = Color3.fromRGB(255, 255, 255), -- primary card/panel surface
+    Black = Color3.fromRGB(0, 0, 0), -- borders, text, hard shadows
+    Accent = Color3.fromRGB(241, 196, 15), -- CTA buttons, badges, highlights
+    BgBase = Color3.fromRGB(138, 187, 117), -- optional green theme reference only
+    GridLine = Color3.fromRGB(168, 214, 149), -- subtle low-opacity panel texture only
     Green = Color3.fromRGB(22, 163, 74),
     LightGreen = Color3.fromRGB(74, 222, 128),
     Red = Color3.fromRGB(220, 38, 38),
@@ -360,7 +360,7 @@ end
 
 -- Applies the shared chunky card style to floating panels.
 local function applyPanel(frame, cornerRadius)
-    frame.BackgroundColor3 = Theme.BgBase
+    frame.BackgroundColor3 = Theme.White
     frame.BackgroundTransparency = 0.04
     frame.BorderSizePixel = 0
     frame.ClipsDescendants = false
@@ -373,8 +373,8 @@ end
 
 -- Applies a light list well used inside panels for room/shop/bag style card rows.
 local function applyWell(frame, cornerRadius)
-    frame.BackgroundColor3 = Theme.GridLine
-    frame.BackgroundTransparency = 0.12
+    frame.BackgroundColor3 = Theme.White
+    frame.BackgroundTransparency = 0.02
     frame.BorderSizePixel = 0
     addCorner(frame, cornerRadius or 14)
     addChunkyStroke(frame, 3)
@@ -416,8 +416,8 @@ applyPanel(stats, 18)
 addTag(stats, "STATS", Theme.Black)
 local statRows = {
     { Name = "CakePointsLabel", Icon = "rbxassetid://6031068426", Tint = Theme.Accent },
-    { Name = "WheelPointsLabel", Icon = "rbxassetid://6031091002", Tint = Theme.GridLine },
-    { Name = "SpinsLabel", Icon = "rbxassetid://6031763426", Tint = Theme.Green },
+    { Name = "WheelPointsLabel", Icon = "rbxassetid://6031091002", Tint = Theme.Black },
+    { Name = "SpinsLabel", Icon = "rbxassetid://6031763426", Tint = Theme.Accent },
 }
 for index, row in ipairs(statRows) do
     local label = newGui("TextLabel", row.Name, stats)
@@ -439,7 +439,7 @@ applyButtonStyle(shopButton, Theme.Accent, Theme.Text, 10)
 local bagButton = newGui("ImageButton", "BagButton", mainGui)
 bagButton.Size = UDim2.new(0, 58, 0, 58)
 bagButton.Position = UDim2.new(0, 86, 0, 148)
-bagButton.BackgroundColor3 = Theme.BgBase
+bagButton.BackgroundColor3 = Theme.White
 bagButton.Image = "rbxassetid://6031265972"
 applyButtonStyle(bagButton, Theme.White, Theme.Text, 10)
 
@@ -494,12 +494,12 @@ sideLayout.CellPadding = UDim2.new(0, 6, 0, 6)
 local spinButton = newGui("TextButton", "SpinButton", wheel)
 spinButton.Size = UDim2.new(0, 120, 0, 44)
 spinButton.Position = UDim2.new(0.5, -125, 1, -54)
-spinButton.BackgroundColor3 = Theme.Green
+spinButton.BackgroundColor3 = Theme.Accent
 spinButton.Font = Enum.Font.GothamBlack
 spinButton.Text = "SPIN"
 spinButton.TextScaled = true
 spinButton.TextColor3 = Theme.Text
-applyButtonStyle(spinButton, Theme.Green, Theme.White, 10)
+applyButtonStyle(spinButton, Theme.Accent, Theme.Text, 10)
 local autoRollToggle = newGui("TextButton", "AutoRollToggle", wheel)
 autoRollToggle.Size = UDim2.new(0, 120, 0, 44)
 autoRollToggle.Position = UDim2.new(0.5, 5, 1, -54)
@@ -656,21 +656,21 @@ applyButtonStyle(closeBag, Theme.Red, Theme.White, 10)
 local termTabButton = newGui("TextButton", "TermTabButton", bagPanel)
 termTabButton.Size = UDim2.new(0, 120, 0, 34)
 termTabButton.Position = UDim2.new(0, 20, 0, 54)
-termTabButton.BackgroundColor3 = Theme.GridLine
+termTabButton.BackgroundColor3 = Theme.White
 termTabButton.Font = Enum.Font.GothamBlack
 termTabButton.Text = "Terms"
 termTabButton.TextScaled = true
 termTabButton.TextColor3 = Theme.Text
-applyButtonStyle(termTabButton, Theme.GridLine, Theme.Text, 10)
+applyButtonStyle(termTabButton, Theme.White, Theme.Text, 10)
 local skillTabButton = newGui("TextButton", "SkillTabButton", bagPanel)
 skillTabButton.Size = UDim2.new(0, 120, 0, 34)
 skillTabButton.Position = UDim2.new(0, 148, 0, 54)
-skillTabButton.BackgroundColor3 = Theme.BgBase
+skillTabButton.BackgroundColor3 = Theme.Accent
 skillTabButton.Font = Enum.Font.GothamBlack
 skillTabButton.Text = "Skills"
 skillTabButton.TextScaled = true
 skillTabButton.TextColor3 = Theme.Text
-applyButtonStyle(skillTabButton, Theme.BgBase, Theme.Text, 10)
+applyButtonStyle(skillTabButton, Theme.Accent, Theme.Text, 10)
 -- Equipped skill slots now live at the TOP of the bag panel (under the tabs) so they read as a
 -- drag-and-drop destination row above the drawable-skill grid, and the buttons are smaller.
 -- These are pure visual "boxes" -- no numbering, no fixed identity; whatever is in the player's
@@ -752,7 +752,7 @@ detailText.Text = "Select an ability"
 local upgradeButton = newGui("TextButton", "UpgradeButton", bagDetail)
 upgradeButton.Size = UDim2.new(1, -24, 0, 46)
 upgradeButton.Position = UDim2.new(0, 12, 1, -58)
-upgradeButton.BackgroundColor3 = Theme.Green
+upgradeButton.BackgroundColor3 = Theme.Accent
 upgradeButton.Font = Enum.Font.GothamBlack
 upgradeButton.TextScaled = true
 upgradeButton.TextColor3 = Theme.Text
@@ -2990,9 +2990,9 @@ local function refreshBag()
 end
 
 local function refreshStats()
-    stats.CakePointsLabel.Text = L.UI_CakePoints .. tostring(state.CakePoints)
-    stats.WheelPointsLabel.Text = L.UI_WheelPoints .. tostring(state.WheelPoints)
-    stats.SpinsLabel.Text = L.UI_Spins_Left .. tostring(state.WheelSpins)
+    stats.CakePointsLabel.Text = tostring(state.CakePoints)
+    stats.WheelPointsLabel.Text = tostring(state.WheelPoints)
+    stats.SpinsLabel.Text = tostring(state.WheelSpins)
     local autoAvailable = hasAutoRoll()
     if not autoAvailable then autoRollEnabled = false end
     autoRollToggle.Visible = autoAvailable
