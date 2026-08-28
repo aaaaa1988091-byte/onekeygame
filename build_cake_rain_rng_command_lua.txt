@@ -255,12 +255,13 @@ clearChildren(mainGui)
 
 local function styleTextGui(gui)
     if not (gui:IsA("TextLabel") or gui:IsA("TextButton")) then return end
-    gui.Font = Enum.Font.FredokaOne
+    gui.Font = Enum.Font.GothamBlack
     local stroke = gui:FindFirstChild("TextStroke") or Instance.new("UIStroke")
     stroke.Name = "TextStroke"
     stroke.Color = Color3.fromRGB(0, 0, 0)
     stroke.LineJoinMode = Enum.LineJoinMode.Round
-    stroke.Thickness = 3
+    stroke.Thickness = 2
+    stroke.Transparency = gui:IsA("TextLabel") and 0.35 or 1
     stroke.Parent = gui
 end
 
@@ -273,53 +274,101 @@ local function newGui(className, name, parent)
 end
 
 -- ============================================================================
--- THEME: one consistent look across the whole HUD.
--- Background language: semi-transparent near-black panels everywhere (never mixed
--- with a light/paper theme). Accents are high-saturation so they pop against the dark panels.
+-- THEME: one consistent retro-card look across the whole HUD.
+-- The palette and motion are inspired by the provided template: warm paper cards,
+-- thick black borders, punchy yellow accents, and tiny press/hover tweens.
+-- Layout, object names, and gameplay-facing wiring are intentionally unchanged.
 -- ============================================================================
 local Theme = {
-    PanelColor = Color3.fromRGB(18, 16, 26),
-    PanelTransparency = 0.24,
-    PanelStrokeColor = Color3.fromRGB(255, 255, 255),
-    PanelStrokeTransparency = 0.86,
-    WellColor = Color3.fromRGB(10, 9, 16), -- recessed areas (scroll lists) sit a shade darker than their panel
-    WellTransparency = 0.32,
-    CardColor = Color3.fromRGB(34, 30, 46), -- item cards/tiles sitting inside a well
-    CardTransparency = 0.1,
-    Gold = Color3.fromRGB(255, 196, 20), -- currency / primary CTA
-    Cyan = Color3.fromRGB(35, 210, 255), -- wheel points / info accent
-    Magenta = Color3.fromRGB(255, 45, 145), -- skills accent
-    Green = Color3.fromRGB(60, 222, 130), -- positive action (spin, upgrade, auto-roll on)
-    Red = Color3.fromRGB(255, 64, 92), -- close / danger
-    Text = Color3.fromRGB(255, 255, 255),
-    Muted = Color3.fromRGB(176, 172, 190),
+    PanelColor = Color3.fromRGB(245, 245, 240),
+    PanelTransparency = 0,
+    PanelStrokeColor = Color3.fromRGB(0, 0, 0),
+    PanelStrokeTransparency = 0,
+    WellColor = Color3.fromRGB(255, 255, 255),
+    WellTransparency = 0,
+    CardColor = Color3.fromRGB(245, 245, 240),
+    CardTransparency = 0,
+    Gold = Color3.fromRGB(241, 196, 15),
+    Cyan = Color3.fromRGB(59, 130, 246),
+    Magenta = Color3.fromRGB(147, 51, 234),
+    Green = Color3.fromRGB(22, 163, 74),
+    Red = Color3.fromRGB(220, 38, 38),
+    Text = Color3.fromRGB(0, 0, 0),
+    TextOnDark = Color3.fromRGB(255, 255, 255),
+    Muted = Color3.fromRGB(90, 90, 90),
 }
 
--- Applies the shared dark-glass look to any frame/scrollingframe used as a panel.
+local function addRetroStroke(gui, thickness)
+    local stroke = gui:FindFirstChild("RetroStroke") or gui:FindFirstChild("PanelStroke") or gui:FindFirstChild("ButtonOutline") or Instance.new("UIStroke")
+    stroke.Name = stroke.Name == "UIStroke" and "RetroStroke" or stroke.Name
+    stroke.Color = Theme.PanelStrokeColor
+    stroke.Transparency = 0
+    stroke.Thickness = thickness or 3
+    stroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
+    stroke.Parent = gui
+    return stroke
+end
+
+local function addRetroShadow(gui, offset, transparency)
+    if gui:FindFirstChild("RetroShadow") then return end
+    local shadow = Instance.new("Frame")
+    shadow.Name = "RetroShadow"
+    shadow.AnchorPoint = gui.AnchorPoint
+    shadow.Size = gui.Size
+    shadow.Position = UDim2.new(0, offset or 5, 0, offset or 5)
+    shadow.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
+    shadow.BackgroundTransparency = transparency or 0.18
+    shadow.BorderSizePixel = 0
+    shadow.ZIndex = math.max(0, (gui.ZIndex or 1) - 1)
+    shadow.Parent = gui
+    local corner = gui:FindFirstChildOfClass("UICorner")
+    if corner then
+        local shadowCorner = Instance.new("UICorner")
+        shadowCorner.CornerRadius = corner.CornerRadius
+        shadowCorner.Parent = shadow
+    end
+end
+
+local function animatePressable(gui, liftX, liftY)
+    if not (gui:IsA("TextButton") or gui:IsA("ImageButton")) then return end
+    gui.AutoButtonColor = false
+    local basePosition = gui.Position
+    gui.MouseEnter:Connect(function()
+        TweenService:Create(gui, TweenInfo.new(0.1), { Position = basePosition + UDim2.new(0, liftX or 0, 0, liftY or -2) }):Play()
+    end)
+    gui.MouseLeave:Connect(function()
+        TweenService:Create(gui, TweenInfo.new(0.1), { Position = basePosition }):Play()
+    end)
+    gui.MouseButton1Down:Connect(function()
+        TweenService:Create(gui, TweenInfo.new(0.05), { Position = basePosition + UDim2.new(0, 0, 0, 3) }):Play()
+    end)
+    gui.MouseButton1Up:Connect(function()
+        TweenService:Create(gui, TweenInfo.new(0.05), { Position = basePosition + UDim2.new(0, liftX or 0, 0, liftY or -2) }):Play()
+    end)
+end
+
+-- Applies the shared retro card look to any frame/scrollingframe used as a panel.
 local function applyPanel(frame, cornerRadius)
     frame.BackgroundColor3 = Theme.PanelColor
     frame.BackgroundTransparency = Theme.PanelTransparency
     frame.BorderSizePixel = 0
     newGui("UICorner", "Corner", frame).CornerRadius = UDim.new(0, cornerRadius or 18)
-    local stroke = newGui("UIStroke", "PanelStroke", frame)
-    stroke.Color = Theme.PanelStrokeColor
-    stroke.Transparency = Theme.PanelStrokeTransparency
-    stroke.Thickness = 1.5
+    addRetroStroke(frame, 4)
+    addRetroShadow(frame, 6, 0)
     return frame
 end
 
--- Applies the shared "recessed well" look used for scrollable lists sitting inside a panel.
+-- Applies the bright inset-card look used for scrollable lists sitting inside a panel.
 local function applyWell(frame, cornerRadius)
     frame.BackgroundColor3 = Theme.WellColor
     frame.BackgroundTransparency = Theme.WellTransparency
     frame.BorderSizePixel = 0
     newGui("UICorner", "Corner", frame).CornerRadius = UDim.new(0, cornerRadius or 14)
+    addRetroStroke(frame, 3)
     return frame
 end
 
--- Builds an icon+text stat row (e.g. "[cake icon] Cake Points: 120") without needing to change
--- any of the client code that just sets `label.Text = ...` -- the icon is a child overlay and a
--- UIPadding pushes the text to sit after it, so the label keeps working exactly as before.
+-- Builds an icon+text stat row without changing labels the client updates at runtime.
 local function addStatIcon(label, iconId, tintColor)
     local icon = newGui("ImageLabel", "Icon", label)
     icon.BackgroundTransparency = 1
@@ -329,6 +378,12 @@ local function addStatIcon(label, iconId, tintColor)
     icon.ImageColor3 = tintColor or Theme.Text
     local padding = newGui("UIPadding", "IconPadding", label)
     padding.PaddingLeft = UDim.new(0, 32)
+end
+
+local function applyRetroButton(button, textColor)
+    button.TextColor3 = textColor or Theme.Text
+    addRetroStroke(button, 3)
+    animatePressable(button)
 end
 
 local stats = newGui("Frame", "StatsFrame", mainGui)
@@ -356,15 +411,19 @@ shopButton.Size = UDim2.new(0, 58, 0, 58)
 shopButton.Position = UDim2.new(0, 18, 0, 148)
 shopButton.BackgroundColor3 = Theme.Gold
 shopButton.Image = "rbxassetid://6031265976"
+shopButton.ImageColor3 = Theme.PanelStrokeColor
 newGui("UICorner", "Corner", shopButton).CornerRadius = UDim.new(0, 8)
-newGui("UIStroke", "ButtonOutline", shopButton).Color = Theme.Text
+newGui("UIStroke", "ButtonOutline", shopButton).Color = Theme.PanelStrokeColor
+animatePressable(shopButton, -2, 0)
 local bagButton = newGui("ImageButton", "BagButton", mainGui)
 bagButton.Size = UDim2.new(0, 58, 0, 58)
 bagButton.Position = UDim2.new(0, 86, 0, 148)
 bagButton.BackgroundColor3 = Theme.Magenta
 bagButton.Image = "rbxassetid://6031265972"
+bagButton.ImageColor3 = Theme.TextOnDark
 newGui("UICorner", "Corner", bagButton).CornerRadius = UDim.new(0, 8)
-newGui("UIStroke", "ButtonOutline", bagButton).Color = Theme.Text
+newGui("UIStroke", "ButtonOutline", bagButton).Color = Theme.PanelStrokeColor
+animatePressable(bagButton, -2, 0)
 
 local wheel = newGui("Frame", "WheelPanel", mainGui)
 wheel.Name = "WheelPanel"
@@ -423,6 +482,7 @@ spinButton.Text = "SPIN"
 spinButton.TextScaled = true
 spinButton.TextColor3 = Theme.Text
 newGui("UICorner", "Corner", spinButton).CornerRadius = UDim.new(0, 8)
+applyRetroButton(spinButton, Theme.TextOnDark)
 local autoRollToggle = newGui("TextButton", "AutoRollToggle", wheel)
 autoRollToggle.Size = UDim2.new(0, 120, 0, 44)
 autoRollToggle.Position = UDim2.new(0.5, 5, 1, -54)
@@ -433,6 +493,7 @@ autoRollToggle.TextScaled = true
 autoRollToggle.TextColor3 = Theme.Text
 autoRollToggle.Visible = false
 newGui("UICorner", "Corner", autoRollToggle).CornerRadius = UDim.new(0, 8)
+applyRetroButton(autoRollToggle, Theme.TextOnDark)
 local buffFrame = newGui("Frame", "EffectBar", mainGui)
 buffFrame.Size = UDim2.new(0, 392, 0, 74)
 buffFrame.Position = UDim2.new(0, 18, 1, -92)
@@ -502,6 +563,7 @@ closeShop.Text = "Close"
 closeShop.TextScaled = true
 closeShop.TextColor3 = Theme.Text
 newGui("UICorner", "Corner", closeShop).CornerRadius = UDim.new(0, 10)
+applyRetroButton(closeShop, Theme.TextOnDark)
 local shopGrid = newGui("ScrollingFrame", "ShopGrid", shopHub)
 shopGrid.Size = UDim2.new(1, -40, 1, -82)
 shopGrid.Position = UDim2.new(0, 20, 0, 62)
@@ -567,6 +629,7 @@ closeBag.Text = "Close"
 closeBag.TextScaled = true
 closeBag.TextColor3 = Theme.Text
 newGui("UICorner", "Corner", closeBag).CornerRadius = UDim.new(0, 10)
+applyRetroButton(closeBag, Theme.TextOnDark)
 local termTabButton = newGui("TextButton", "TermTabButton", bagPanel)
 termTabButton.Size = UDim2.new(0, 120, 0, 34)
 termTabButton.Position = UDim2.new(0, 20, 0, 54)
@@ -576,6 +639,7 @@ termTabButton.Text = "Terms"
 termTabButton.TextScaled = true
 termTabButton.TextColor3 = Theme.Text
 newGui("UICorner", "Corner", termTabButton).CornerRadius = UDim.new(0, 8)
+applyRetroButton(termTabButton, Theme.TextOnDark)
 local skillTabButton = newGui("TextButton", "SkillTabButton", bagPanel)
 skillTabButton.Size = UDim2.new(0, 120, 0, 34)
 skillTabButton.Position = UDim2.new(0, 148, 0, 54)
@@ -585,6 +649,7 @@ skillTabButton.Text = "Skills"
 skillTabButton.TextScaled = true
 skillTabButton.TextColor3 = Theme.Text
 newGui("UICorner", "Corner", skillTabButton).CornerRadius = UDim.new(0, 8)
+applyRetroButton(skillTabButton, Theme.TextOnDark)
 -- Equipped skill slots now live at the TOP of the bag panel (under the tabs) so they read as a
 -- drag-and-drop destination row above the drawable-skill grid, and the buttons are smaller.
 -- These are pure visual "boxes" -- no numbering, no fixed identity; whatever is in the player's
@@ -672,6 +737,7 @@ upgradeButton.TextScaled = true
 upgradeButton.TextColor3 = Theme.Text
 upgradeButton.Text = "Upgrade"
 newGui("UICorner", "Corner", upgradeButton).CornerRadius = UDim.new(0, 10)
+applyRetroButton(upgradeButton, Theme.TextOnDark)
 
 local serverPackage = getOrCreate(ServerScriptService, "Folder", "CakeRainRNG")
 local servicesPackage = getOrCreate(serverPackage, "Folder", "Services")
