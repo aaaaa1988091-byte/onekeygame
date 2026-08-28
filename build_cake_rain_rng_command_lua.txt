@@ -556,13 +556,11 @@ local equippedLayout = newGui("UIListLayout", "SlotLayout", equippedFrame)
 equippedLayout.FillDirection = Enum.FillDirection.Horizontal
 equippedLayout.Padding = UDim.new(0, 6)
 for slotIndex = 1, 5 do
-    local slot = newGui("TextButton", "SkillSlot" .. tostring(slotIndex), equippedFrame)
+    local slot = newGui("ImageButton", "SkillSlot" .. tostring(slotIndex), equippedFrame)
     slot.Size = UDim2.new(0, 54, 0, 42)
     slot.BackgroundColor3 = Color3.fromRGB(92, 118, 136)
-    slot.Font = Enum.Font.FredokaOne
-    slot.TextScaled = true
-    slot.TextColor3 = Color3.new(1, 1, 1)
-    slot.Text = "" -- empty box shows nothing; filled boxes get their skill's name at runtime
+    slot.Image = "" -- empty box shows nothing; filled boxes get their skill's icon at runtime
+    slot.ScaleType = Enum.ScaleType.Fit
     slot.AutoButtonColor = false
     newGui("UICorner", "Corner", slot).CornerRadius = UDim.new(0, 8)
     -- Magnetic drop highlight: made visible while a dragged skill icon hovers over this slot.
@@ -2747,10 +2745,10 @@ local function refreshBag()
     for boxIndex = 1, 5 do
         local box = boxes:FindFirstChild("SkillSlot" .. tostring(boxIndex))
         if box then
-            -- No "1/2/3/4/5" labels: a filled box shows the skill's name, an empty one shows nothing.
+            -- No "1/2/3/4/5" labels: a filled box shows the skill's icon, an empty one shows nothing.
             local key = equipped[boxIndex]
             local card = key and SkillConfig.Cards[key]
-            box.Text = card and (L[card.NameKey] or key) or ""
+            box.Image = card and (card.Icon or "") or ""
         end
     end
     task.defer(function() list.CanvasSize = UDim2.new(0, 0, 0, list.GridLayout.AbsoluteContentSize.Y + 16) end)
