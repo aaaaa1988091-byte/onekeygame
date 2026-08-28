@@ -272,49 +272,115 @@ local function newGui(className, name, parent)
     return gui
 end
 
+local hudScale = newGui("UIScale", "ResponsiveScale", mainGui)
+hudScale.Scale = 1
+
 -- ============================================================================
--- THEME: one consistent look across the whole HUD.
--- Background language: semi-transparent near-black panels everywhere (never mixed
--- with a light/paper theme). Accents are high-saturation so they pop against the dark panels.
+-- THEME: Roblox in-world card UI with chunky borders and hard shadows.
+-- This HUD intentionally stays transparent around compact floating panels so the
+-- live 3D game view remains visible instead of becoming a full-screen menu art.
 -- ============================================================================
 local Theme = {
-    PanelColor = Color3.fromRGB(18, 16, 26),
-    PanelTransparency = 0.24,
-    PanelStrokeColor = Color3.fromRGB(255, 255, 255),
-    PanelStrokeTransparency = 0.86,
-    WellColor = Color3.fromRGB(10, 9, 16), -- recessed areas (scroll lists) sit a shade darker than their panel
-    WellTransparency = 0.32,
-    CardColor = Color3.fromRGB(34, 30, 46), -- item cards/tiles sitting inside a well
-    CardTransparency = 0.1,
-    Gold = Color3.fromRGB(255, 196, 20), -- currency / primary CTA
-    Cyan = Color3.fromRGB(35, 210, 255), -- wheel points / info accent
-    Magenta = Color3.fromRGB(255, 45, 145), -- skills accent
-    Green = Color3.fromRGB(60, 222, 130), -- positive action (spin, upgrade, auto-roll on)
-    Red = Color3.fromRGB(255, 64, 92), -- close / danger
-    Text = Color3.fromRGB(255, 255, 255),
-    Muted = Color3.fromRGB(176, 172, 190),
+    BgBase = Color3.fromRGB(138, 187, 117),
+    GridLine = Color3.fromRGB(168, 214, 149),
+    Accent = Color3.fromRGB(241, 196, 15),
+    Black = Color3.fromRGB(0, 0, 0),
+    White = Color3.fromRGB(255, 255, 255),
+    Green = Color3.fromRGB(22, 163, 74),
+    LightGreen = Color3.fromRGB(74, 222, 128),
+    Red = Color3.fromRGB(220, 38, 38),
+    Gray = Color3.fromRGB(156, 163, 175),
+    Text = Color3.fromRGB(0, 0, 0),
+    Muted = Color3.fromRGB(48, 60, 44),
 }
 
--- Applies the shared dark-glass look to any frame/scrollingframe used as a panel.
+local function addCorner(instance, radius)
+    local corner = newGui("UICorner", "Corner", instance)
+    corner.CornerRadius = UDim.new(0, radius or 16)
+    return corner
+end
+
+local function addChunkyStroke(instance, thickness)
+    local stroke = newGui("UIStroke", "ChunkyStroke", instance)
+    stroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
+    stroke.Color = Theme.Black
+    stroke.LineJoinMode = Enum.LineJoinMode.Round
+    stroke.Thickness = thickness or 3
+    return stroke
+end
+
+local function addHardShadow(target, offset, radius)
+    local shadow = newGui("Frame", target.Name .. "Shadow", target.Parent)
+    shadow.AnchorPoint = target.AnchorPoint
+    shadow.Size = target.Size
+    shadow.Position = target.Position + UDim2.new(0, offset or 6, 0, offset or 6)
+    shadow.BackgroundColor3 = Theme.Black
+    shadow.BackgroundTransparency = 0
+    shadow.BorderSizePixel = 0
+    shadow.ZIndex = math.max(0, target.ZIndex - 1)
+    shadow.Visible = target.Visible
+    addCorner(shadow, radius or 16)
+    target.ZIndex = math.max(target.ZIndex, shadow.ZIndex + 1)
+    shadow:SetAttribute("HardShadowFor", target.Name)
+    return shadow
+end
+
+local function addTag(parent, text, accentColor)
+    local tag = newGui("Frame", "Tag", parent)
+    tag.AnchorPoint = Vector2.new(0, 0)
+    tag.Size = UDim2.new(0, 132, 0, 30)
+    tag.Position = UDim2.new(0, 20, 0, -16)
+    tag.BackgroundColor3 = accentColor or Theme.Black
+    tag.BorderSizePixel = 0
+    tag.ZIndex = parent.ZIndex + 2
+    addCorner(tag, 8)
+    addChunkyStroke(tag, 3)
+
+    local label = newGui("TextLabel", "Label", tag)
+    label.Size = UDim2.fromScale(1, 1)
+    label.BackgroundTransparency = 1
+    label.Font = Enum.Font.FredokaOne
+    label.Text = text
+    label.TextScaled = true
+    label.TextColor3 = Theme.White
+    label.ZIndex = tag.ZIndex + 1
+    return tag
+end
+
+-- Applies the shared chunky card style to floating panels.
 local function applyPanel(frame, cornerRadius)
-    frame.BackgroundColor3 = Theme.PanelColor
-    frame.BackgroundTransparency = Theme.PanelTransparency
+    frame.BackgroundColor3 = Theme.BgBase
+    frame.BackgroundTransparency = 0.04
     frame.BorderSizePixel = 0
-    newGui("UICorner", "Corner", frame).CornerRadius = UDim.new(0, cornerRadius or 18)
-    local stroke = newGui("UIStroke", "PanelStroke", frame)
-    stroke.Color = Theme.PanelStrokeColor
-    stroke.Transparency = Theme.PanelStrokeTransparency
-    stroke.Thickness = 1.5
+    frame.ClipsDescendants = false
+    addHardShadow(frame, 6, cornerRadius or 18)
+    addCorner(frame, cornerRadius or 18)
+    addChunkyStroke(frame, 4)
     return frame
 end
 
--- Applies the shared "recessed well" look used for scrollable lists sitting inside a panel.
+-- Applies a light list well used inside panels for room/shop/bag style card rows.
 local function applyWell(frame, cornerRadius)
-    frame.BackgroundColor3 = Theme.WellColor
-    frame.BackgroundTransparency = Theme.WellTransparency
+    frame.BackgroundColor3 = Theme.GridLine
+    frame.BackgroundTransparency = 0.12
     frame.BorderSizePixel = 0
-    newGui("UICorner", "Corner", frame).CornerRadius = UDim.new(0, cornerRadius or 14)
+    addCorner(frame, cornerRadius or 14)
+    addChunkyStroke(frame, 3)
     return frame
+end
+
+local function applyButtonStyle(button, color, textColor, radius)
+    button.BackgroundColor3 = color or Theme.Black
+    button.BorderSizePixel = 0
+    button.AutoButtonColor = false
+    if button:IsA("TextButton") then
+        button.TextColor3 = textColor or Theme.White
+        button.Font = Enum.Font.FredokaOne
+    end
+    addHardShadow(button, 5, radius or 10)
+    addCorner(button, radius or 10)
+    addChunkyStroke(button, 3)
+    return button
 end
 
 -- Builds an icon+text stat row (e.g. "[cake icon] Cake Points: 120") without needing to change
@@ -335,9 +401,10 @@ local stats = newGui("Frame", "StatsFrame", mainGui)
 stats.Size = UDim2.new(0, 285, 0, 118)
 stats.Position = UDim2.new(0, 18, 0, 18)
 applyPanel(stats, 18)
+addTag(stats, "STATS", Theme.Black)
 local statRows = {
-    { Name = "CakePointsLabel", Icon = "rbxassetid://6031068426", Tint = Theme.Gold },
-    { Name = "WheelPointsLabel", Icon = "rbxassetid://6031091002", Tint = Theme.Cyan },
+    { Name = "CakePointsLabel", Icon = "rbxassetid://6031068426", Tint = Theme.Accent },
+    { Name = "WheelPointsLabel", Icon = "rbxassetid://6031091002", Tint = Theme.GridLine },
     { Name = "SpinsLabel", Icon = "rbxassetid://6031763426", Tint = Theme.Green },
 }
 for index, row in ipairs(statRows) do
@@ -354,17 +421,15 @@ end
 local shopButton = newGui("ImageButton", "ShopButton", mainGui)
 shopButton.Size = UDim2.new(0, 58, 0, 58)
 shopButton.Position = UDim2.new(0, 18, 0, 148)
-shopButton.BackgroundColor3 = Theme.Gold
+shopButton.BackgroundColor3 = Theme.Accent
 shopButton.Image = "rbxassetid://6031265976"
-newGui("UICorner", "Corner", shopButton).CornerRadius = UDim.new(0, 8)
-newGui("UIStroke", "ButtonOutline", shopButton).Color = Theme.Text
+applyButtonStyle(shopButton, Theme.Accent, Theme.Text, 10)
 local bagButton = newGui("ImageButton", "BagButton", mainGui)
 bagButton.Size = UDim2.new(0, 58, 0, 58)
 bagButton.Position = UDim2.new(0, 86, 0, 148)
-bagButton.BackgroundColor3 = Theme.Magenta
+bagButton.BackgroundColor3 = Theme.BgBase
 bagButton.Image = "rbxassetid://6031265972"
-newGui("UICorner", "Corner", bagButton).CornerRadius = UDim.new(0, 8)
-newGui("UIStroke", "ButtonOutline", bagButton).Color = Theme.Text
+applyButtonStyle(bagButton, Theme.White, Theme.Text, 10)
 
 local wheel = newGui("Frame", "WheelPanel", mainGui)
 wheel.Name = "WheelPanel"
@@ -405,7 +470,7 @@ centerLine.Position = UDim2.new(0, 0, 0, 100)
 centerLine.BackgroundTransparency = 1
 centerLine.ZIndex = 6
 local centerStroke = newGui("UIStroke", "CenterStroke", centerLine)
-centerStroke.Color = Theme.Gold
+centerStroke.Color = Theme.Accent
 centerStroke.Thickness = 3
 local sideGrid = newGui("Frame", "SideGrid", wheel)
 sideGrid.Size = UDim2.new(0, 220, 0, 300)
@@ -422,34 +487,35 @@ spinButton.Font = Enum.Font.FredokaOne
 spinButton.Text = "SPIN"
 spinButton.TextScaled = true
 spinButton.TextColor3 = Theme.Text
-newGui("UICorner", "Corner", spinButton).CornerRadius = UDim.new(0, 8)
+applyButtonStyle(spinButton, Theme.Green, Theme.White, 10)
 local autoRollToggle = newGui("TextButton", "AutoRollToggle", wheel)
 autoRollToggle.Size = UDim2.new(0, 120, 0, 44)
 autoRollToggle.Position = UDim2.new(0.5, 5, 1, -54)
-autoRollToggle.BackgroundColor3 = Theme.PanelColor
+autoRollToggle.BackgroundColor3 = Theme.White
 autoRollToggle.Font = Enum.Font.FredokaOne
 autoRollToggle.Text = "AUTO: OFF"
 autoRollToggle.TextScaled = true
 autoRollToggle.TextColor3 = Theme.Text
 autoRollToggle.Visible = false
-newGui("UICorner", "Corner", autoRollToggle).CornerRadius = UDim.new(0, 8)
+applyButtonStyle(autoRollToggle, Theme.Black, Theme.White, 10)
 local buffFrame = newGui("Frame", "EffectBar", mainGui)
 buffFrame.Size = UDim2.new(0, 392, 0, 74)
 buffFrame.Position = UDim2.new(0, 18, 1, -92)
-applyPanel(buffFrame, 16)
 buffFrame.Visible = false
+applyPanel(buffFrame, 16)
+addTag(buffFrame, "BUFFS", Theme.Black)
 -- The client clones this only for active effects; the empty HUD has no placeholder icons.
 local effectTemplate = newGui("ImageButton", "EffectIconTemplate", buffFrame)
 effectTemplate.Size = UDim2.new(0, 46, 0, 46)
-effectTemplate.BackgroundColor3 = Theme.CardColor
-effectTemplate.BackgroundTransparency = Theme.CardTransparency
+effectTemplate.BackgroundColor3 = Theme.White
+effectTemplate.BackgroundTransparency = 0
 effectTemplate.AutoButtonColor = false
 effectTemplate.Visible = false
 effectTemplate.Image = ""
 newGui("UICorner", "Corner", effectTemplate).CornerRadius = UDim.new(0, 10)
 local templateStroke = newGui("UIStroke", "Outline", effectTemplate)
 templateStroke.Thickness = 2
-templateStroke.Color = Theme.PanelStrokeColor
+templateStroke.Color = Theme.Black
 templateStroke.Transparency = 0.5
 local templateCooldown = newGui("Frame", "CooldownFill", effectTemplate)
 templateCooldown.AnchorPoint = Vector2.new(0, 1)
@@ -493,6 +559,10 @@ shopHub.Size = UDim2.new(0, 620, 0, 360)
 shopHub.Position = UDim2.new(0.5, -310, 0.5, -180)
 shopHub.Visible = false
 applyPanel(shopHub, 18)
+addTag(shopHub, "SHOP", Theme.Black)
+local shopAspect = newGui("UIAspectRatioConstraint", "AspectRatio", shopHub)
+shopAspect.AspectRatio = 1.72
+shopAspect.DominantAxis = Enum.DominantAxis.Width
 local closeShop = newGui("TextButton", "CloseButton", shopHub)
 closeShop.Size = UDim2.new(0, 90, 0, 38)
 closeShop.Position = UDim2.new(1, -104, 0, 12)
@@ -501,7 +571,7 @@ closeShop.Font = Enum.Font.FredokaOne
 closeShop.Text = "Close"
 closeShop.TextScaled = true
 closeShop.TextColor3 = Theme.Text
-newGui("UICorner", "Corner", closeShop).CornerRadius = UDim.new(0, 10)
+applyButtonStyle(closeShop, Theme.Red, Theme.White, 10)
 local shopGrid = newGui("ScrollingFrame", "ShopGrid", shopHub)
 shopGrid.Size = UDim2.new(1, -40, 1, -82)
 shopGrid.Position = UDim2.new(0, 20, 0, 62)
@@ -514,13 +584,13 @@ gridLayout.CellPadding = UDim2.new(0, 12, 0, 12)
 gridLayout.HorizontalAlignment = Enum.HorizontalAlignment.Center
 local shopTemplate = newGui("ImageButton", "ItemTemplate", shopGrid)
 shopTemplate.Size = UDim2.new(0, 128, 0, 128)
-shopTemplate.BackgroundColor3 = Theme.CardColor
-shopTemplate.BackgroundTransparency = Theme.CardTransparency
+shopTemplate.BackgroundColor3 = Theme.White
+shopTemplate.BackgroundTransparency = 0
 shopTemplate.AutoButtonColor = true
 shopTemplate.Visible = false
 newGui("UICorner", "Corner", shopTemplate).CornerRadius = UDim.new(0, 12)
 local shopTemplateStroke = newGui("UIStroke", "Accent", shopTemplate)
-shopTemplateStroke.Color = Theme.Gold
+shopTemplateStroke.Color = Theme.Accent
 shopTemplateStroke.Transparency = 0.4
 shopTemplateStroke.Thickness = 1.5
 local shopIcon = newGui("ImageLabel", "Icon", shopTemplate)
@@ -542,7 +612,7 @@ itemCost.Size = UDim2.new(1, -8, 0, 32)
 itemCost.Position = UDim2.new(0, 4, 1, -40)
 itemCost.Font = Enum.Font.FredokaOne
 itemCost.TextScaled = true
-itemCost.TextColor3 = Theme.Gold
+itemCost.TextColor3 = Theme.Accent
 
 
 local bagPanel = newGui("Frame", "InventoryBag", mainGui)
@@ -550,6 +620,10 @@ bagPanel.Size = UDim2.new(0, 620, 0, 360)
 bagPanel.Position = UDim2.new(0.5, -310, 0.5, -180)
 bagPanel.Visible = false
 applyPanel(bagPanel, 18)
+addTag(bagPanel, "BAG", Theme.Black)
+local bagAspect = newGui("UIAspectRatioConstraint", "AspectRatio", bagPanel)
+bagAspect.AspectRatio = 1.72
+bagAspect.DominantAxis = Enum.DominantAxis.Width
 local bagTitle = newGui("TextLabel", "Title", bagPanel)
 bagTitle.BackgroundTransparency = 1
 bagTitle.Size = UDim2.new(1, -130, 0, 44)
@@ -566,25 +640,25 @@ closeBag.Font = Enum.Font.FredokaOne
 closeBag.Text = "Close"
 closeBag.TextScaled = true
 closeBag.TextColor3 = Theme.Text
-newGui("UICorner", "Corner", closeBag).CornerRadius = UDim.new(0, 10)
+applyButtonStyle(closeBag, Theme.Red, Theme.White, 10)
 local termTabButton = newGui("TextButton", "TermTabButton", bagPanel)
 termTabButton.Size = UDim2.new(0, 120, 0, 34)
 termTabButton.Position = UDim2.new(0, 20, 0, 54)
-termTabButton.BackgroundColor3 = Theme.Cyan
+termTabButton.BackgroundColor3 = Theme.GridLine
 termTabButton.Font = Enum.Font.FredokaOne
 termTabButton.Text = "Terms"
 termTabButton.TextScaled = true
 termTabButton.TextColor3 = Theme.Text
-newGui("UICorner", "Corner", termTabButton).CornerRadius = UDim.new(0, 8)
+applyButtonStyle(termTabButton, Theme.GridLine, Theme.Text, 10)
 local skillTabButton = newGui("TextButton", "SkillTabButton", bagPanel)
 skillTabButton.Size = UDim2.new(0, 120, 0, 34)
 skillTabButton.Position = UDim2.new(0, 148, 0, 54)
-skillTabButton.BackgroundColor3 = Theme.Magenta
+skillTabButton.BackgroundColor3 = Theme.BgBase
 skillTabButton.Font = Enum.Font.FredokaOne
 skillTabButton.Text = "Skills"
 skillTabButton.TextScaled = true
 skillTabButton.TextColor3 = Theme.Text
-newGui("UICorner", "Corner", skillTabButton).CornerRadius = UDim.new(0, 8)
+applyButtonStyle(skillTabButton, Theme.BgBase, Theme.Text, 10)
 -- Equipped skill slots now live at the TOP of the bag panel (under the tabs) so they read as a
 -- drag-and-drop destination row above the drawable-skill grid, and the buttons are smaller.
 -- These are pure visual "boxes" -- no numbering, no fixed identity; whatever is in the player's
@@ -600,20 +674,20 @@ equippedLayout.Padding = UDim.new(0, 6)
 for slotIndex = 1, 5 do
     local slot = newGui("ImageButton", "SkillSlot" .. tostring(slotIndex), equippedFrame)
     slot.Size = UDim2.new(0, 54, 0, 42)
-    slot.BackgroundColor3 = Theme.CardColor
-    slot.BackgroundTransparency = Theme.CardTransparency
+    slot.BackgroundColor3 = Theme.White
+    slot.BackgroundTransparency = 0
     slot.Image = "" -- empty box shows nothing; filled boxes get their skill's icon at runtime
     slot.ScaleType = Enum.ScaleType.Fit
     slot.AutoButtonColor = false
     newGui("UICorner", "Corner", slot).CornerRadius = UDim.new(0, 8)
     local boxStroke = newGui("UIStroke", "BoxStroke", slot)
-    boxStroke.Color = Theme.Gold
+    boxStroke.Color = Theme.Accent
     boxStroke.Transparency = 0.55
     boxStroke.Thickness = 1.5
     -- Magnetic drop highlight: made visible while a dragged skill icon hovers over this slot.
     local highlight = newGui("UIStroke", "Highlight", slot)
     highlight.Thickness = 3
-    highlight.Color = Theme.Gold
+    highlight.Color = Theme.Accent
     highlight.Transparency = 1
 end
 local bagList = newGui("ScrollingFrame", "BagList", bagPanel)
@@ -625,7 +699,7 @@ applyWell(bagList, 14)
 -- Highlighted while dragging a skill DOWN off a box, to show "drop here to put it back".
 local bagDropHint = newGui("UIStroke", "UIStroke_DropHint", bagList)
 bagDropHint.Thickness = 4
-bagDropHint.Color = Theme.Gold
+bagDropHint.Color = Theme.Accent
 bagDropHint.Transparency = 1
 local bagLayout = newGui("UIGridLayout", "GridLayout", bagList)
 bagLayout.CellSize = UDim2.new(0, 128, 0, 128)
@@ -633,13 +707,13 @@ bagLayout.CellPadding = UDim2.new(0, 12, 0, 12)
 bagLayout.HorizontalAlignment = Enum.HorizontalAlignment.Center
 local bagTemplate = newGui("ImageButton", "EntryTemplate", bagList)
 bagTemplate.Size = UDim2.new(0, 128, 0, 128)
-bagTemplate.BackgroundColor3 = Theme.CardColor
-bagTemplate.BackgroundTransparency = Theme.CardTransparency
+bagTemplate.BackgroundColor3 = Theme.White
+bagTemplate.BackgroundTransparency = 0
 bagTemplate.Image = ""
 bagTemplate.Visible = false
 newGui("UICorner", "Corner", bagTemplate).CornerRadius = UDim.new(0, 10)
 local bagTemplateStroke = newGui("UIStroke", "Accent", bagTemplate)
-bagTemplateStroke.Color = Theme.Cyan
+bagTemplateStroke.Color = Theme.GridLine
 bagTemplateStroke.Transparency = 0.45
 bagTemplateStroke.Thickness = 1.5
 local bagEntryName = newGui("TextLabel", "ItemName", bagTemplate)
@@ -671,7 +745,7 @@ upgradeButton.Font = Enum.Font.FredokaOne
 upgradeButton.TextScaled = true
 upgradeButton.TextColor3 = Theme.Text
 upgradeButton.Text = "Upgrade"
-newGui("UICorner", "Corner", upgradeButton).CornerRadius = UDim.new(0, 10)
+applyButtonStyle(upgradeButton, Theme.Accent, Theme.Text, 10)
 
 local serverPackage = getOrCreate(ServerScriptService, "Folder", "CakeRainRNG")
 local servicesPackage = getOrCreate(serverPackage, "Folder", "Services")
@@ -2460,6 +2534,63 @@ local bagPanel = gui:WaitForChild("InventoryBag")
 local closeBag = bagPanel:WaitForChild("CloseButton")
 local shopHub = gui:WaitForChild("ShopHub")
 local closeShop = shopHub:WaitForChild("CloseButton")
+
+local function getHardShadow(target)
+    return target.Parent and target.Parent:FindFirstChild(target.Name .. "Shadow")
+end
+
+local function syncShadowVisibility(target)
+    local shadow = getHardShadow(target)
+    if shadow then shadow.Visible = target.Visible end
+end
+
+local function bindShadowVisibility(target)
+    syncShadowVisibility(target)
+    target:GetPropertyChangedSignal("Visible"):Connect(function()
+        syncShadowVisibility(target)
+    end)
+end
+
+local function bindRaisedButton(button)
+    local shadow = getHardShadow(button)
+    if not shadow then return end
+    local basePosition = button.Position
+    local shadowPosition = shadow.Position
+    local hoverPosition = basePosition + UDim2.new(0, -2, 0, -2)
+    local hoverShadowPosition = shadowPosition + UDim2.new(0, 2, 0, 2)
+    local pressedPosition = basePosition + UDim2.new(0, 3, 0, 3)
+    local pressedShadowPosition = basePosition + UDim2.new(0, 3, 0, 3)
+
+    local function tweenPair(targetPosition, targetShadowPosition)
+        TweenService:Create(button, TweenInfo.new(0.08, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), { Position = targetPosition }):Play()
+        TweenService:Create(shadow, TweenInfo.new(0.08, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), { Position = targetShadowPosition }):Play()
+    end
+
+    button.MouseEnter:Connect(function() tweenPair(hoverPosition, hoverShadowPosition) end)
+    button.MouseLeave:Connect(function() tweenPair(basePosition, shadowPosition) end)
+    button.MouseButton1Down:Connect(function() tweenPair(pressedPosition, pressedShadowPosition) end)
+    button.MouseButton1Up:Connect(function() tweenPair(basePosition, shadowPosition) end)
+end
+
+for _, panel in ipairs({ stats, wheel, buffFrame, currentDrawLabel, shopHub, bagPanel }) do
+    bindShadowVisibility(panel)
+end
+for _, button in ipairs({ shopButton, bagButton, spinButton, autoRollToggle, closeShop, closeBag, bagPanel.TermTabButton, bagPanel.SkillTabButton, bagPanel.DetailPanel.UpgradeButton }) do
+    bindRaisedButton(button)
+end
+
+local function updateResponsiveScale()
+    local camera = workspace.CurrentCamera
+    if not camera then return end
+    local viewport = camera.ViewportSize
+    local compactScale = math.min(viewport.X / 900, viewport.Y / 540)
+    gui.ResponsiveScale.Scale = math.clamp(compactScale, 0.78, 1)
+end
+updateResponsiveScale()
+if workspace.CurrentCamera then
+    workspace.CurrentCamera:GetPropertyChangedSignal("ViewportSize"):Connect(updateResponsiveScale)
+end
+workspace:GetPropertyChangedSignal("CurrentCamera"):Connect(updateResponsiveScale)
 
 local state = { WheelSpins = 0, WheelPoints = 0, WheelLevel = 1, CakePoints = 0, ActiveBuffs = {}, LastWheelReward = nil, Inventory = { WheelRewards = {}, Cards = {}, EquippedSkills = {} } }
 local spinning = false
