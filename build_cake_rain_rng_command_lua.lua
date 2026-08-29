@@ -44,6 +44,8 @@ local requestCardDraw = getOrCreate(eventsFolder, "RemoteFunction", "RequestCard
 local requestShopPurchase = getOrCreate(eventsFolder, "RemoteFunction", "RequestShopPurchase")
 local requestAbilityUpgrade = getOrCreate(eventsFolder, "RemoteFunction", "RequestAbilityUpgrade")
 local requestEquipSkill = getOrCreate(eventsFolder, "RemoteFunction", "RequestEquipSkill")
+local requestClaimDailyTask = getOrCreate(eventsFolder, "RemoteFunction", "RequestClaimDailyTask")
+local requestRedeemCode = getOrCreate(eventsFolder, "RemoteFunction", "RequestRedeemCode")
 local updateClientState = getOrCreate(eventsFolder, "RemoteEvent", "UpdateClientState")
 
 local wheelConfig = getOrCreate(configsFolder, "ModuleScript", "WheelConfig")
@@ -170,6 +172,27 @@ local ShopConfig = {
     },
 }
 return ShopConfig
+]=]
+
+local dailyTaskConfig = getOrCreate(configsFolder, "ModuleScript", "DailyTaskConfig")
+dailyTaskConfig.Source = [=[
+-- Add, remove, or retune daily objectives here.  Progress type must match a server Record call.
+return {
+    ResetClock = "UTC",
+    Tasks = {
+        EatCakes = { Name = "Cake Taster", ProgressType = "EatCakes", Target = 10, Reward = { CakePoints = 120 } },
+        RollWheel = { Name = "Lucky Spinner", ProgressType = "RollWheel", Target = 5, Reward = { WheelSpins = 2 } },
+    },
+}
+]=]
+
+local codeConfig = getOrCreate(configsFolder, "ModuleScript", "CodeConfig")
+codeConfig.Source = [=[
+-- Server-only code catalogue.  Codes are case-insensitive and each code can be redeemed once/player.
+return {
+    WELCOME = { Reward = { CakePoints = 250, WheelSpins = 2 } },
+    RAINYDAY = { Reward = { CakePoints = 100 } },
+}
 ]=]
 
 local uiConfig = getOrCreate(configsFolder, "ModuleScript", "UIConfig")
@@ -510,6 +533,35 @@ bagButton.Position = UDim2.new(0, 86, 0, 148)
 bagButton.BackgroundColor3 = Theme.White
 bagButton.Image = "rbxassetid://6031265972"
 applyButtonStyle(bagButton, Theme.White, Theme.Text, 10)
+
+local taskButton = newGui("TextButton", "TaskButton", mainGui)
+taskButton.Size = UDim2.new(0, 126, 0, 46)
+taskButton.Position = UDim2.new(0, 154, 0, 154)
+taskButton.Text = "DAILY"
+taskButton.TextScaled = true
+applyButtonStyle(taskButton, Theme.Accent, Theme.Text, 10)
+
+local taskPanel = newGui("Frame", "DailyTaskPanel", mainGui)
+taskPanel.Size = UDim2.new(0, 440, 0, 350)
+taskPanel.Position = UDim2.new(.5, -220, .5, -175)
+taskPanel.Visible = false
+applyPanel(taskPanel, 18)
+createPanelTitleHeader(taskPanel, "DAILY TASKS", 205)
+local closeTasks = newGui("TextButton", "CloseButton", taskPanel)
+closeTasks.Size = UDim2.new(0, 82, 0, 36); closeTasks.Position = UDim2.new(1, -96, 0, 12); closeTasks.Text = "CLOSE"; closeTasks.TextScaled = true
+applyButtonStyle(closeTasks, Theme.Red, Theme.White, 10)
+local taskText = newGui("TextLabel", "TaskText", taskPanel)
+taskText.BackgroundTransparency = 1; taskText.Position = UDim2.new(0, 24, 0, 66); taskText.Size = UDim2.new(1, -48, 0, 140)
+taskText.TextXAlignment = Enum.TextXAlignment.Left; taskText.TextYAlignment = Enum.TextYAlignment.Top; taskText.TextWrapped = true; taskText.TextScaled = true
+local claimTaskButton = newGui("TextButton", "ClaimButton", taskPanel)
+claimTaskButton.Size = UDim2.new(1, -48, 0, 42); claimTaskButton.Position = UDim2.new(0, 24, 0, 214); claimTaskButton.Text = "CLAIM FIRST READY TASK"; claimTaskButton.TextScaled = true
+applyButtonStyle(claimTaskButton, Theme.Accent, Theme.Text, 10)
+local codeBox = newGui("TextBox", "CodeBox", taskPanel)
+codeBox.Size = UDim2.new(0.62, -28, 0, 42); codeBox.Position = UDim2.new(0, 24, 1, -64); codeBox.PlaceholderText = "ENTER CODE"; codeBox.ClearTextOnFocus = false; codeBox.TextScaled = true
+applyWell(codeBox, 10)
+local redeemButton = newGui("TextButton", "RedeemButton", taskPanel)
+redeemButton.Size = UDim2.new(.38, -28, 0, 42); redeemButton.Position = UDim2.new(.62, 4, 1, -64); redeemButton.Text = "REDEEM"; redeemButton.TextScaled = true
+applyButtonStyle(redeemButton, Theme.Black, Theme.White, 10)
 
 local wheel = newGui("Frame", "WheelPanel", mainGui)
 wheel.Name = "WheelPanel"
@@ -968,6 +1020,10 @@ function StateService.Create(player, loaded)
         Stats = loaded.Stats or {},
         UnlockedWheelRewards = loaded.UnlockedWheelRewards or {},
         UnlockedCards = loaded.UnlockedCards or {},
+        DailyTaskDay = loaded.DailyTaskDay or "",
+        DailyTaskProgress = loaded.DailyTaskProgress or {},
+        DailyTaskClaims = loaded.DailyTaskClaims or {},
+        RedeemedCodes = loaded.RedeemedCodes or {},
         -- EquippedSkills is a free-form, order-free list of up to 5 skill keys (no slot numbers).
         -- pairs() here also migrates any older save data that stored it as a slot-indexed table.
         EquippedSkills = (function()
@@ -1071,6 +1127,10 @@ function StateService.Serialize(player)
         Stats = state.Stats,
         UnlockedWheelRewards = state.UnlockedWheelRewards,
         UnlockedCards = state.UnlockedCards,
+        DailyTaskDay = state.DailyTaskDay,
+        DailyTaskProgress = state.DailyTaskProgress,
+        DailyTaskClaims = state.DailyTaskClaims,
+        RedeemedCodes = state.RedeemedCodes,
         EquippedSkills = state.EquippedSkills,
     }
 end
@@ -1263,9 +1323,79 @@ function StateService.Push(player)
         ActiveBuffs = StateService.ActiveBuffs(player), UnlockedWheelRewards = state.UnlockedWheelRewards, UnlockedCards = state.UnlockedCards,
         Inventory = StateService.BuildInventory(player),
         ShopItems = StateService.BuildShop and StateService.BuildShop(state) or nil,
+        DailyTasks = StateService.BuildDailyTasks and StateService.BuildDailyTasks(player) or nil,
     })
 end
 return StateService
+]=]
+
+local taskService = getOrCreate(servicesPackage, "ModuleScript", "DailyTaskService")
+taskService.Source = [=[
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local Config = require(ReplicatedStorage.Configs.DailyTaskConfig)
+local StateService = require(script.Parent.StateService)
+local DailyTaskService = {}
+local function dayKey() return os.date("!%Y-%m-%d") end
+local function ensure(state)
+    local day = dayKey()
+    if state.DailyTaskDay ~= day then
+        state.DailyTaskDay, state.DailyTaskProgress, state.DailyTaskClaims = day, {}, {}
+    end
+end
+local function grant(state, reward)
+    for currency, amount in pairs(reward or {}) do state[currency] = (state[currency] or 0) + amount end
+end
+function DailyTaskService.Record(player, progressType, amount)
+    local state = StateService.Get(player); if not state then return end
+    ensure(state)
+    for id, task in pairs(Config.Tasks) do
+        if task.ProgressType == progressType and not state.DailyTaskClaims[id] then
+            state.DailyTaskProgress[id] = math.min(task.Target, (state.DailyTaskProgress[id] or 0) + (amount or 1))
+        end
+    end
+end
+function DailyTaskService.Build(player)
+    local state = StateService.Get(player); if not state then return {} end
+    ensure(state)
+    local tasks = {}
+    for id, task in pairs(Config.Tasks) do
+        table.insert(tasks, { Id = id, Name = task.Name, Progress = state.DailyTaskProgress[id] or 0, Target = task.Target, Reward = task.Reward, Claimed = state.DailyTaskClaims[id] == true })
+    end
+    return tasks
+end
+function DailyTaskService.Claim(player, id)
+    local state, task = StateService.Get(player), Config.Tasks[id]
+    if not state or not task then return false, "INVALID_TASK" end
+    ensure(state)
+    if state.DailyTaskClaims[id] then return false, "ALREADY_CLAIMED" end
+    if (state.DailyTaskProgress[id] or 0) < task.Target then return false, "NOT_COMPLETE" end
+    state.DailyTaskClaims[id] = true; grant(state, task.Reward)
+    StateService.UpdateLeaderstats(player); StateService.Push(player)
+    return true
+end
+StateService.BuildDailyTasks = DailyTaskService.Build
+return DailyTaskService
+]=]
+
+local codeService = getOrCreate(servicesPackage, "ModuleScript", "CodeService")
+codeService.Source = [=[
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local Config = require(ReplicatedStorage.Configs.CodeConfig)
+local StateService = require(script.Parent.StateService)
+local CodeService = {}
+function CodeService.Redeem(player, rawCode)
+    local state = StateService.Get(player)
+    local code = string.upper(string.gsub(tostring(rawCode or ""), "%s+", ""))
+    local entry = Config[code]
+    if not state or not entry then return false, "INVALID_CODE" end
+    state.RedeemedCodes = state.RedeemedCodes or {}
+    if state.RedeemedCodes[code] then return false, "ALREADY_REDEEMED" end
+    state.RedeemedCodes[code] = true
+    for currency, amount in pairs(entry.Reward or {}) do state[currency] = (state[currency] or 0) + amount end
+    StateService.UpdateLeaderstats(player); StateService.Push(player)
+    return true, entry.Reward
+end
+return CodeService
 ]=]
 
 local serverGuardService = getOrCreate(servicesPackage, "ModuleScript", "ServerGuardService")
@@ -1615,6 +1745,7 @@ local StateService = require(script.Parent.StateService)
 local CakeEffectsService = require(script.Parent.CakeEffectsService)
 local CakeAccessService = require(script.Parent.CakeAccessService)
 local CakeMovementService = require(script.Parent.CakeMovementService)
+local DailyTaskService = require(script.Parent.DailyTaskService)
 local CakeModels = ReplicatedStorage:FindFirstChild("cake") or ReplicatedStorage.Models.cake
 
 -- Public cake API used by SkillService.  Keep all cake movement/damage here so skills
@@ -1825,6 +1956,7 @@ function CakeService.Finish(player, cake)
     if state then
         state.CakePoints += cake:GetAttribute("RewardCakePoints") or 1
         state.WheelSpins += cake:GetAttribute("RewardWheelTickets") or 1
+        DailyTaskService.Record(player, "EatCakes", 1)
         StateService.UpdateLeaderstats(player); StateService.Push(player)
     end
     -- Eating is deliberately distinct from expiry: disable physics, then shrink/fade into the player.
@@ -2455,6 +2587,8 @@ local ShopConfig = require(Configs.ShopConfig)
 local LocalizationConfig = require(Configs.LocalizationConfig)
 local StateService = require(script.Parent.StateService)
 local SkillService = require(script.Parent.SkillService)
+local DailyTaskService = require(script.Parent.DailyTaskService)
+local CodeService = require(script.Parent.CodeService)
 local RewardService = require(script.Parent.RewardService)
 local ServerGuardService = require(script.Parent.ServerGuardService)
 
@@ -2616,10 +2750,22 @@ function WheelService.Start()
             table.insert(pending, { Slots = slots, Picked = picked, PickedIndex = pickedIndex })
         end
         if #pending == 0 then return { Ok = false, Error = "EMPTY_POOL" } end
+        DailyTaskService.Record(player, "RollWheel", #pending)
         state.PendingWheelSpin = pending
         StateService.UpdateLeaderstats(player)
         StateService.Push(player)
         return { Ok = true, Spins = pending }
+    end
+
+    Events.RequestClaimDailyTask.OnServerInvoke = function(player, taskId)
+        if not ServerGuardService.Allow(player, "RequestClaimDailyTask", 8, 5) then return { Ok = false, Error = "RATE_LIMIT" } end
+        local ok, result = DailyTaskService.Claim(player, tostring(taskId))
+        return { Ok = ok, Reward = ok and result or nil, Error = ok and nil or result }
+    end
+    Events.RequestRedeemCode.OnServerInvoke = function(player, code)
+        if not ServerGuardService.Allow(player, "RequestRedeemCode", 6, 10) then return { Ok = false, Error = "RATE_LIMIT" } end
+        local ok, result = CodeService.Redeem(player, code)
+        return { Ok = ok, Reward = ok and result or nil, Error = ok and nil or result }
     end
 
     Events.RequestCardDraw.OnServerInvoke = function(player)
@@ -2784,7 +2930,17 @@ function ClientUIService.Initialize(gui, refs)
     updateResponsiveScale()
     for _, panel in ipairs(refs.Panels) do
         syncShadow(panel, 9)
-        panel:GetPropertyChangedSignal("Visible"):Connect(function() syncShadow(panel, 9) end)
+        local restPosition = panel.Position
+        panel:GetPropertyChangedSignal("Visible"):Connect(function()
+            if not panel.Visible then syncShadow(panel, 9); return end
+            local shadow = shadowFor(panel)
+            panel.Position = restPosition + UDim2.new(0, 0, 0, 24)
+            syncShadow(panel, 9)
+            TweenService:Create(panel, TweenInfo.new(.18, Enum.EasingStyle.Back, Enum.EasingDirection.Out), { Position = restPosition }):Play()
+            if shadow then
+                TweenService:Create(shadow, TweenInfo.new(.18, Enum.EasingStyle.Back, Enum.EasingDirection.Out), { Position = restPosition + UDim2.new(0, 9, 0, 9) }):Play()
+            end
+        end)
     end
     for _, button in ipairs(refs.Buttons) do bindButton(button) end
     for _, descendant in ipairs(gui:GetDescendants()) do
@@ -2850,6 +3006,8 @@ local RequestWheelSpin = Events:WaitForChild("RequestWheelSpin")
 local RequestShopPurchase = Events:WaitForChild("RequestShopPurchase")
 local RequestAbilityUpgrade = Events:WaitForChild("RequestAbilityUpgrade")
 local RequestEquipSkill = Events:WaitForChild("RequestEquipSkill")
+local RequestClaimDailyTask = Events:WaitForChild("RequestClaimDailyTask")
+local RequestRedeemCode = Events:WaitForChild("RequestRedeemCode")
 local UpdateClientState = Events:WaitForChild("UpdateClientState")
 local LocalizationConfig = require(Configs:WaitForChild("LocalizationConfig"))
 local ShopConfig = require(Configs:WaitForChild("ShopConfig"))
@@ -2873,12 +3031,15 @@ local bagPanel = gui:WaitForChild("InventoryBag")
 local closeBag = bagPanel:WaitForChild("CloseButton")
 local shopHub = gui:WaitForChild("ShopHub")
 local closeShop = shopHub:WaitForChild("CloseButton")
+local taskButton = gui:WaitForChild("TaskButton")
+local taskPanel = gui:WaitForChild("DailyTaskPanel")
+local closeTasks = taskPanel:WaitForChild("CloseButton")
 
 local ClientUIService = require(ReplicatedStorage:WaitForChild("ClientModules"):WaitForChild("ClientUIService"))
 ClientUIService.Initialize(gui, {
     Stats = stats, ShopButton = shopButton, BagButton = bagButton, ShopHub = shopHub, BagPanel = bagPanel,
-    Panels = { stats, wheel, buffFrame, currentDrawLabel, shopHub, bagPanel },
-    Buttons = { shopButton, bagButton, spinButton, autoRollToggle, closeShop, closeBag, bagPanel.TermTabButton, bagPanel.SkillTabButton, bagPanel.DetailPanel.UpgradeButton },
+    Panels = { stats, wheel, buffFrame, currentDrawLabel, shopHub, bagPanel, taskPanel },
+    Buttons = { shopButton, bagButton, taskButton, spinButton, autoRollToggle, closeShop, closeBag, closeTasks, taskPanel.ClaimButton, taskPanel.RedeemButton, bagPanel.TermTabButton, bagPanel.SkillTabButton, bagPanel.DetailPanel.UpgradeButton },
 })
 
 local state = { WheelSpins = 0, WheelPoints = 0, WheelLevel = 1, CakePoints = 0, ActiveBuffs = {}, LastWheelReward = nil, Inventory = { WheelRewards = {}, Cards = {}, EquippedSkills = {} } }
@@ -3201,6 +3362,7 @@ local function refreshBag()
     task.defer(function() list.CanvasSize = UDim2.new(0, 0, 0, list.GridLayout.AbsoluteContentSize.Y + 16) end)
 end
 
+local refreshDailyTasks
 local function refreshStats()
     stats.CakePointsLabel.Text = tostring(state.CakePoints)
     stats.WheelPointsLabel.Text = tostring(state.WheelPoints)
@@ -3223,6 +3385,7 @@ local function refreshStats()
     end
     refreshEffectBar()
     refreshBag()
+    refreshDailyTasks()
     bindShopButtons()
 end
 
@@ -3506,6 +3669,28 @@ end)
 closeBag.Activated:Connect(function()
     playSound("Button")
     bagPanel.Visible = false
+end)
+
+function refreshDailyTasks()
+    local lines, firstReady = {}, nil
+    for _, task in ipairs(state.DailyTasks or {}) do
+        local status = task.Claimed and "CLAIMED" or (task.Progress >= task.Target and "READY" or (tostring(task.Progress) .. "/" .. tostring(task.Target)))
+        table.insert(lines, string.format("%s  %s  (+%s cake / +%s spin)", task.Name, status, tostring((task.Reward or {}).CakePoints or 0), tostring((task.Reward or {}).WheelSpins or 0)))
+        if not firstReady and not task.Claimed and task.Progress >= task.Target then firstReady = task.Id end
+    end
+    taskPanel.TaskText.Text = #lines > 0 and table.concat(lines, "\n\n") or "No daily tasks configured."
+    taskPanel.ClaimButton:SetAttribute("TaskId", firstReady)
+    taskPanel.ClaimButton.BackgroundColor3 = firstReady and Color3.fromRGB(241, 196, 15) or Color3.fromRGB(255, 255, 255)
+end
+taskButton.Activated:Connect(function() playSound("Button"); taskPanel.Visible = true; refreshDailyTasks() end)
+closeTasks.Activated:Connect(function() playSound("Button"); taskPanel.Visible = false end)
+taskPanel.ClaimButton.Activated:Connect(function()
+    local id = taskPanel.ClaimButton:GetAttribute("TaskId")
+    if id then playSound("Interact"); RequestClaimDailyTask:InvokeServer(id) end
+end)
+taskPanel.RedeemButton.Activated:Connect(function()
+    local code = taskPanel.CodeBox.Text
+    if code ~= "" then playSound("Interact"); RequestRedeemCode:InvokeServer(code); taskPanel.CodeBox.Text = "" end
 end)
 
 UpdateClientState.OnClientEvent:Connect(function(newState)
