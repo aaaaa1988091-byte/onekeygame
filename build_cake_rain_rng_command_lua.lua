@@ -371,17 +371,18 @@ local function createCard(config)
 end
 
 local function addHardShadow(target, offset, radius, transparency)
-    local shadow = newGui("Frame", target.Name .. "Shadow", target.Parent)
-    shadow.AnchorPoint = target.AnchorPoint
-    shadow.Size = target.Size
-    shadow.Position = target.Position + UDim2.new(0, offset or 6, 0, offset or 6)
+    -- Shadow is owned by its visual body, never a sibling in the parent hierarchy.  This keeps
+    -- card movement, visibility, cloning, and ZIndex together as one reusable component.
+    local shadow = newGui("Frame", "HardShadow", target)
+    shadow.AnchorPoint = Vector2.new(0, 0)
+    shadow.Size = UDim2.fromScale(1, 1)
+    shadow.Position = UDim2.new(0, offset or 6, 0, offset or 6)
     shadow.BackgroundColor3 = Theme.Black
     shadow.BackgroundTransparency = transparency == nil and ShadowStyle.ELEMENT or transparency
     shadow.BorderSizePixel = 0
     shadow.ZIndex = math.max(0, target.ZIndex - 1)
     shadow.Visible = target.Visible
     addCorner(shadow, radius or 16)
-    target.ZIndex = math.max(target.ZIndex, shadow.ZIndex + 1)
     shadow:SetAttribute("HardShadowFor", target.Name)
     return shadow
 end
@@ -582,6 +583,7 @@ local redeemButton = newGui("TextButton", "RedeemButton", codePanel); redeemButt
 
 local wheel = newGui("Frame", "WheelPanel", mainGui)
 wheel.Name = "WheelPanel"
+wheel.ZIndex = 20
 wheel.Size = UDim2.new(0, 420, 0, 410)
 wheel.AnchorPoint = Vector2.new(1, 0.5)
 wheel.Position = UDim2.new(1, -20, 0.5, 0)
@@ -2899,30 +2901,29 @@ local GuiService = game:GetService("GuiService")
 local ClientUIService = {}
 
 local function shadowFor(target)
-    return target.Parent and target.Parent:FindFirstChild(target.Name .. "Shadow")
+    return target:FindFirstChild("HardShadow")
 end
 
 local function syncShadow(target, offset)
     local shadow = shadowFor(target)
     if not shadow then return end
     shadow.Visible = target.Visible
-    shadow.AnchorPoint = target.AnchorPoint
-    shadow.Size = target.Size
-    shadow.Position = target.Position + UDim2.new(0, offset or 6, 0, offset or 6)
+    shadow.AnchorPoint = Vector2.new(0, 0)
+    shadow.Size = UDim2.fromScale(1, 1)
+    shadow.Position = UDim2.new(0, offset or 6, 0, offset or 6)
 end
 
 local function bindButton(button)
     local shadow = shadowFor(button)
     if not shadow then return end
-    local base, baseShadow = button.Position, shadow.Position
-    local function tween(position, shadowPosition)
+    local base = button.Position
+    local function tween(position)
         TweenService:Create(button, TweenInfo.new(.08, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), { Position = position }):Play()
-        TweenService:Create(shadow, TweenInfo.new(.08, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), { Position = shadowPosition }):Play()
     end
-    button.MouseEnter:Connect(function() tween(base + UDim2.new(0, -2, 0, -2), baseShadow + UDim2.new(0, 2, 0, 2)) end)
-    button.MouseLeave:Connect(function() tween(base, baseShadow) end)
-    button.MouseButton1Down:Connect(function() tween(base + UDim2.new(0, 3, 0, 3), baseShadow + UDim2.new(0, 3, 0, 3)) end)
-    button.MouseButton1Up:Connect(function() tween(base, baseShadow) end)
+    button.MouseEnter:Connect(function() tween(base + UDim2.new(0, -2, 0, -2)) end)
+    button.MouseLeave:Connect(function() tween(base) end)
+    button.MouseButton1Down:Connect(function() tween(base + UDim2.new(0, 3, 0, 3)) end)
+    button.MouseButton1Up:Connect(function() tween(base) end)
 end
 
 function ClientUIService.Initialize(gui, refs)
@@ -2954,9 +2955,7 @@ function ClientUIService.Initialize(gui, refs)
             panel.Position = restPosition + UDim2.new(0, 0, 0, 24)
             syncShadow(panel, 9)
             TweenService:Create(panel, TweenInfo.new(.18, Enum.EasingStyle.Back, Enum.EasingDirection.Out), { Position = restPosition }):Play()
-            if shadow then
-                TweenService:Create(shadow, TweenInfo.new(.18, Enum.EasingStyle.Back, Enum.EasingDirection.Out), { Position = restPosition + UDim2.new(0, 9, 0, 9) }):Play()
-            end
+
         end)
     end
     for _, button in ipairs(refs.Buttons) do bindButton(button) end
@@ -3007,8 +3006,8 @@ end
 return ClientSoundService
 ]=]
 
-local clientScript = getOrCreate(StarterPlayer.StarterPlayerScripts, "LocalScript", "CakeRainRNGClient")
-clientScript.Source = [=[
+local clientController = getOrCreate(clientPackage, "ModuleScript", "CakeRainRNGClientController")
+clientController.Source = [=[
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Players = game:GetService("Players")
 local TweenService = game:GetService("TweenService")
@@ -3445,6 +3444,7 @@ local function renderSlotItem(slot, parent)
         icon.Position = UDim2.new(0.5, -21, 0, 8)
         icon.BackgroundTransparency = 1
         icon.Image = slot.Icon
+        icon.ZIndex = parent.ZIndex + 1
         icon.Parent = parent
     end
     local label = Instance.new("TextLabel")
@@ -3456,6 +3456,7 @@ local function renderSlotItem(slot, parent)
     label.TextScaled = true
     label.TextWrapped = true
     label.TextColor3 = Color3.fromRGB(255, 255, 255)
+    label.ZIndex = parent.ZIndex + 1
     applyTextStyle(label)
     label.Parent = parent
 end
@@ -3474,6 +3475,7 @@ local function makeMiniCell(sideGrid, order)
     cell.LayoutOrder = order
     cell.Size = UDim2.new(0, 0, 0, 0)
     cell.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+    cell.ZIndex = sideGrid.ZIndex + 1
     cell.BorderSizePixel = 0
     cell.Parent = sideGrid
     Instance.new("UICorner", cell).CornerRadius = UDim.new(0, 8)
@@ -3488,6 +3490,7 @@ local function makeMiniCell(sideGrid, order)
     holder.Name = "Content"
     holder.Size = UDim2.fromScale(1, 1)
     holder.BackgroundTransparency = 1
+    holder.ZIndex = cell.ZIndex + 1
     holder.BorderSizePixel = 0
     holder.Parent = cell
     Instance.new("UICorner", holder).CornerRadius = UDim.new(0, 8)
@@ -3740,6 +3743,13 @@ UpdateClientState.OnClientEvent:Connect(function(newState)
 end)
 
 refreshStats()
+]=]
+
+local clientScript = getOrCreate(StarterPlayer.StarterPlayerScripts, "LocalScript", "CakeRainRNGClient")
+clientScript.Source = [=[
+-- Bootstrap only: gameplay controller, UI layout, and sound are split into ClientModules.
+require(game:GetService("ReplicatedStorage"):WaitForChild("ClientModules"):WaitForChild("CakeRainRNGClientController"))
+
 ]=]
 
 if recording then
