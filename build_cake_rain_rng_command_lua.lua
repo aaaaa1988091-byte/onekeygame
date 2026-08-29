@@ -450,6 +450,7 @@ end
 
 local function applyButtonStyle(button, color, textColor, radius)
     button.BackgroundColor3 = color or Theme.Black
+    button.BackgroundTransparency = 0 -- Primary controls must remain solid, never washed out.
     button.BorderSizePixel = 0
     button.AutoButtonColor = false
     if button:IsA("TextButton") then
@@ -634,8 +635,8 @@ currentDrawLabel.Visible = false
 applyPanel(currentDrawLabel, 8)
 
 local shopHub = newGui("Frame", "ShopHub", mainGui)
-shopHub.Size = UDim2.new(0, 620, 0, 360)
-shopHub.Position = UDim2.new(0.5, -310, 0.5, -180)
+shopHub.Size = UDim2.new(0, 700, 0, 430)
+shopHub.Position = UDim2.new(0.5, -350, 0.5, -215)
 shopHub.Visible = false
 applyPanel(shopHub, 18)
 createPanelTitleHeader(shopHub, "SHOP", 170)
@@ -702,8 +703,8 @@ itemCost.TextColor3 = Theme.Accent
 
 
 local bagPanel = newGui("Frame", "InventoryBag", mainGui)
-bagPanel.Size = UDim2.new(0, 620, 0, 360)
-bagPanel.Position = UDim2.new(0.5, -310, 0.5, -180)
+bagPanel.Size = UDim2.new(0, 700, 0, 430)
+bagPanel.Position = UDim2.new(0.5, -350, 0.5, -215)
 bagPanel.Visible = false
 applyPanel(bagPanel, 18)
 createPanelTitleHeader(bagPanel, "ABILITY BAG", 210)
@@ -2725,6 +2726,114 @@ game:BindToClose(function()
 end)
 ]=]
 
+local clientPackage = getOrCreate(ReplicatedStorage, "Folder", "ClientModules")
+local clientUIService = getOrCreate(clientPackage, "ModuleScript", "ClientUIService")
+clientUIService.Source = [=[
+-- LocalScript UI bootstrap is isolated here so game state, wheel logic, and bag drag/drop remain
+-- independently editable.  This module owns only responsive layout and card-button feedback.
+local TweenService = game:GetService("TweenService")
+local GuiService = game:GetService("GuiService")
+local ClientUIService = {}
+
+local function shadowFor(target)
+    return target.Parent and target.Parent:FindFirstChild(target.Name .. "Shadow")
+end
+
+local function syncShadow(target, offset)
+    local shadow = shadowFor(target)
+    if not shadow then return end
+    shadow.Visible = target.Visible
+    shadow.AnchorPoint = target.AnchorPoint
+    shadow.Size = target.Size
+    shadow.Position = target.Position + UDim2.new(0, offset or 6, 0, offset or 6)
+end
+
+local function bindButton(button)
+    local shadow = shadowFor(button)
+    if not shadow then return end
+    local base, baseShadow = button.Position, shadow.Position
+    local function tween(position, shadowPosition)
+        TweenService:Create(button, TweenInfo.new(.08, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), { Position = position }):Play()
+        TweenService:Create(shadow, TweenInfo.new(.08, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), { Position = shadowPosition }):Play()
+    end
+    button.MouseEnter:Connect(function() tween(base + UDim2.new(0, -2, 0, -2), baseShadow + UDim2.new(0, 2, 0, 2)) end)
+    button.MouseLeave:Connect(function() tween(base, baseShadow) end)
+    button.MouseButton1Down:Connect(function() tween(base + UDim2.new(0, 3, 0, 3), baseShadow + UDim2.new(0, 3, 0, 3)) end)
+    button.MouseButton1Up:Connect(function() tween(base, baseShadow) end)
+end
+
+function ClientUIService.Initialize(gui, refs)
+    local function updateResponsiveScale()
+        local camera = workspace.CurrentCamera
+        if not camera then return end
+        local viewport, inset = camera.ViewportSize, GuiService:GetGuiInset()
+        gui.ResponsiveScale.Scale = math.clamp(math.min(viewport.X / 980, viewport.Y / 620), .78, 1)
+        refs.Stats.Position = UDim2.new(0, 18 + inset.X, 0, 18 + inset.Y)
+        refs.ShopButton.Position = UDim2.new(0, 18 + inset.X, 0, 148 + inset.Y)
+        refs.BagButton.Position = UDim2.new(0, 86 + inset.X, 0, 148 + inset.Y)
+        if viewport.X < 760 then
+            refs.ShopHub.Size, refs.ShopHub.Position = UDim2.new(.92, 0, 0, 360), UDim2.new(.04, 0, .5, -180)
+            refs.BagPanel.Size, refs.BagPanel.Position = UDim2.new(.92, 0, 0, 360), UDim2.new(.04, 0, .5, -180)
+        else
+            refs.ShopHub.Size, refs.ShopHub.Position = UDim2.new(0, 700, 0, 430), UDim2.new(.5, -350, .5, -215)
+            refs.BagPanel.Size, refs.BagPanel.Position = UDim2.new(0, 700, 0, 430), UDim2.new(.5, -350, .5, -215)
+        end
+        for _, panel in ipairs(refs.Panels) do syncShadow(panel, 9) end
+        for _, button in ipairs(refs.Buttons) do syncShadow(button, 4) end
+    end
+    updateResponsiveScale()
+    for _, panel in ipairs(refs.Panels) do
+        syncShadow(panel, 9)
+        panel:GetPropertyChangedSignal("Visible"):Connect(function() syncShadow(panel, 9) end)
+    end
+    for _, button in ipairs(refs.Buttons) do bindButton(button) end
+    for _, descendant in ipairs(gui:GetDescendants()) do
+        if descendant.Name == "PanelGrid" and descendant:IsA("ImageLabel") then
+            TweenService:Create(descendant, TweenInfo.new(12, Enum.EasingStyle.Linear, Enum.EasingDirection.InOut, -1), { ImageRectOffset = Vector2.new(28, 28) }):Play()
+        end
+    end
+    if workspace.CurrentCamera then workspace.CurrentCamera:GetPropertyChangedSignal("ViewportSize"):Connect(updateResponsiveScale) end
+    workspace:GetPropertyChangedSignal("CurrentCamera"):Connect(updateResponsiveScale)
+end
+return ClientUIService
+]=]
+
+local clientSoundService = getOrCreate(clientPackage, "ModuleScript", "ClientSoundService")
+clientSoundService.Source = [=[
+-- Keeps client audio lifecycle out of the gameplay LocalScript.
+local ContentProvider = game:GetService("ContentProvider")
+local SoundService = game:GetService("SoundService")
+local ClientSoundService = {}
+
+function ClientSoundService.Create(sounds)
+    local folder = Instance.new("Folder")
+    folder.Name = "CakeRainSounds"
+    folder.Parent = SoundService
+    local volumes = { Button = 1.8, Interact = 1.6, WheelTick = .5, CakeShrink = 1.6 }
+    local templates = {}
+    for key, soundId in pairs(sounds or {}) do
+        local sound = Instance.new("Sound")
+        sound.Name, sound.SoundId, sound.Volume, sound.Parent = key .. "Template", soundId, volumes[key] or 1, folder
+        templates[key] = sound
+    end
+    task.spawn(function()
+        local preload = {}
+        for _, sound in pairs(templates) do table.insert(preload, sound) end
+        pcall(function() ContentProvider:PreloadAsync(preload) end)
+    end)
+    return function(key, volume)
+        local template = templates[key]
+        if not template then return end
+        local sound = template:Clone()
+        sound.Name, sound.Volume, sound.Parent = key .. "Sound", volume or template.Volume, folder
+        sound:Play()
+        sound.Ended:Connect(function() sound:Destroy() end)
+        task.delay(4, function() if sound.Parent then sound:Destroy() end end)
+    end
+end
+return ClientSoundService
+]=]
+
 local clientScript = getOrCreate(StarterPlayer.StarterPlayerScripts, "LocalScript", "CakeRainRNGClient")
 clientScript.Source = [=[
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -2732,9 +2841,7 @@ local Players = game:GetService("Players")
 local TweenService = game:GetService("TweenService")
 local RunService = game:GetService("RunService")
 local SoundService = game:GetService("SoundService")
-local ContentProvider = game:GetService("ContentProvider")
 local UserInputService = game:GetService("UserInputService")
-local GuiService = game:GetService("GuiService")
 
 local player = Players.LocalPlayer
 local Events = ReplicatedStorage:WaitForChild("Events")
@@ -2767,98 +2874,12 @@ local closeBag = bagPanel:WaitForChild("CloseButton")
 local shopHub = gui:WaitForChild("ShopHub")
 local closeShop = shopHub:WaitForChild("CloseButton")
 
-local function getHardShadow(target)
-    return target.Parent and target.Parent:FindFirstChild(target.Name .. "Shadow")
-end
-
-local function syncShadowVisibility(target)
-    local shadow = getHardShadow(target)
-    if shadow then shadow.Visible = target.Visible end
-end
-
-local function syncShadowGeometry(target, offset)
-    local shadow = getHardShadow(target)
-    if not shadow then return end
-    shadow.AnchorPoint = target.AnchorPoint
-    shadow.Size = target.Size
-    shadow.Position = target.Position + UDim2.new(0, offset or 6, 0, offset or 6)
-end
-
-local function bindShadowVisibility(target)
-    syncShadowVisibility(target)
-    target:GetPropertyChangedSignal("Visible"):Connect(function()
-        syncShadowVisibility(target)
-    end)
-end
-
-local function bindRaisedButton(button)
-    local shadow = getHardShadow(button)
-    if not shadow then return end
-    local basePosition = button.Position
-    local shadowPosition = shadow.Position
-    local hoverPosition = basePosition + UDim2.new(0, -2, 0, -2)
-    local hoverShadowPosition = shadowPosition + UDim2.new(0, 2, 0, 2)
-    local pressedPosition = basePosition + UDim2.new(0, 3, 0, 3)
-    local pressedShadowPosition = basePosition + UDim2.new(0, 3, 0, 3)
-
-    local function tweenPair(targetPosition, targetShadowPosition)
-        TweenService:Create(button, TweenInfo.new(0.08, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), { Position = targetPosition }):Play()
-        TweenService:Create(shadow, TweenInfo.new(0.08, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), { Position = targetShadowPosition }):Play()
-    end
-
-    button.MouseEnter:Connect(function() tweenPair(hoverPosition, hoverShadowPosition) end)
-    button.MouseLeave:Connect(function() tweenPair(basePosition, shadowPosition) end)
-    button.MouseButton1Down:Connect(function() tweenPair(pressedPosition, pressedShadowPosition) end)
-    button.MouseButton1Up:Connect(function() tweenPair(basePosition, shadowPosition) end)
-end
-
-local function updateResponsiveScale()
-    local camera = workspace.CurrentCamera
-    if not camera then return end
-    local viewport = camera.ViewportSize
-    local insetTopLeft = GuiService:GetGuiInset()
-    local compactScale = math.min(viewport.X / 900, viewport.Y / 540)
-    gui.ResponsiveScale.Scale = math.clamp(compactScale, 0.78, 1)
-    stats.Position = UDim2.new(0, 18 + insetTopLeft.X, 0, 18 + insetTopLeft.Y)
-    shopButton.Position = UDim2.new(0, 18 + insetTopLeft.X, 0, 148 + insetTopLeft.Y)
-    bagButton.Position = UDim2.new(0, 86 + insetTopLeft.X, 0, 148 + insetTopLeft.Y)
-    if viewport.X < 760 then
-        shopHub.Size = UDim2.new(0.92, 0, 0, 320)
-        shopHub.Position = UDim2.new(0.04, 0, 0.5, -160)
-        bagPanel.Size = UDim2.new(0.92, 0, 0, 320)
-        bagPanel.Position = UDim2.new(0.04, 0, 0.5, -160)
-    else
-        shopHub.Size = UDim2.new(0, 620, 0, 360)
-        shopHub.Position = UDim2.new(0.5, -310, 0.5, -180)
-        bagPanel.Size = UDim2.new(0, 620, 0, 360)
-        bagPanel.Position = UDim2.new(0.5, -310, 0.5, -180)
-    end
-    for _, panel in ipairs({ stats, wheel, buffFrame, currentDrawLabel, shopHub, bagPanel }) do
-        syncShadowGeometry(panel, 6)
-    end
-    for _, button in ipairs({ shopButton, bagButton, spinButton, autoRollToggle, closeShop, closeBag, bagPanel.TermTabButton, bagPanel.SkillTabButton, bagPanel.DetailPanel.UpgradeButton }) do
-        syncShadowGeometry(button, 5)
-    end
-end
-updateResponsiveScale()
-for _, panel in ipairs({ stats, wheel, buffFrame, currentDrawLabel, shopHub, bagPanel }) do
-    bindShadowVisibility(panel)
-end
-for _, button in ipairs({ shopButton, bagButton, spinButton, autoRollToggle, closeShop, closeBag, bagPanel.TermTabButton, bagPanel.SkillTabButton, bagPanel.DetailPanel.UpgradeButton }) do
-    bindRaisedButton(button)
-end
-for _, descendant in ipairs(gui:GetDescendants()) do
-    if descendant.Name == "PanelGrid" and descendant:IsA("ImageLabel") then
-        descendant.ImageRectOffset = Vector2.new(0, 0)
-        TweenService:Create(descendant, TweenInfo.new(12, Enum.EasingStyle.Linear, Enum.EasingDirection.InOut, -1), {
-            ImageRectOffset = Vector2.new(28, 28),
-        }):Play()
-    end
-end
-if workspace.CurrentCamera then
-    workspace.CurrentCamera:GetPropertyChangedSignal("ViewportSize"):Connect(updateResponsiveScale)
-end
-workspace:GetPropertyChangedSignal("CurrentCamera"):Connect(updateResponsiveScale)
+local ClientUIService = require(ReplicatedStorage:WaitForChild("ClientModules"):WaitForChild("ClientUIService"))
+ClientUIService.Initialize(gui, {
+    Stats = stats, ShopButton = shopButton, BagButton = bagButton, ShopHub = shopHub, BagPanel = bagPanel,
+    Panels = { stats, wheel, buffFrame, currentDrawLabel, shopHub, bagPanel },
+    Buttons = { shopButton, bagButton, spinButton, autoRollToggle, closeShop, closeBag, bagPanel.TermTabButton, bagPanel.SkillTabButton, bagPanel.DetailPanel.UpgradeButton },
+})
 
 local state = { WheelSpins = 0, WheelPoints = 0, WheelLevel = 1, CakePoints = 0, ActiveBuffs = {}, LastWheelReward = nil, Inventory = { WheelRewards = {}, Cards = {}, EquippedSkills = {} } }
 local spinning = false
@@ -2866,40 +2887,9 @@ local autoRollEnabled = false
 local autoRollThread = nil
 local wheelRewardGeneration = 0
 
-local soundFolder = Instance.new("Folder")
-soundFolder.Name = "CakeRainSounds"
-soundFolder.Parent = SoundService
+local ClientSoundService = require(ReplicatedStorage:WaitForChild("ClientModules"):WaitForChild("ClientSoundService"))
+local playSound = ClientSoundService.Create(UIConfig.Sounds)
 
--- Button clicks should read as punchy/responsive; the wheel-tick sound reuses the same asset
--- (see UIConfig.Sounds.WheelTick) but needs to sit well below it since it repeats rapidly
--- during a spin and would otherwise get fatiguing/overpowering.
-local soundVolumes = { Button = 1.8, Interact = 1.6, WheelTick = 0.5, CakeShrink = 1.6 }
-local soundTemplates = {}
-for key, soundId in pairs(UIConfig.Sounds or {}) do
-    local sound = Instance.new("Sound")
-    sound.Name = key .. "Template"
-    sound.SoundId = soundId
-    sound.Volume = soundVolumes[key] or 1
-    sound.Parent = soundFolder
-    soundTemplates[key] = sound
-end
-task.spawn(function()
-    local preloadList = {}
-    for _, sound in pairs(soundTemplates) do table.insert(preloadList, sound) end
-    pcall(function() ContentProvider:PreloadAsync(preloadList) end)
-end)
-
-local function playSound(soundKey, volume)
-    local template = soundTemplates[soundKey]
-    if not template then return end
-    local sound = template:Clone()
-    sound.Name = soundKey .. "Sound"
-    sound.Volume = volume or template.Volume
-    sound.Parent = soundFolder
-    sound:Play()
-    sound.Ended:Connect(function() sound:Destroy() end)
-    task.delay(4, function() if sound.Parent then sound:Destroy() end end)
-end
 
 local function buttonLabel(item)
     local name = L[item.NameKey] or item.NameKey
@@ -3163,8 +3153,9 @@ local function addBagTile(template, item, order)
     -- A skill already sitting in a top box is locked here at the bottom: it can only be moved by
     -- dragging it FROM its box, never re-dragged from this grid.
     local lockedByEquip = bagMode == "Skills" and isEquipped(item.Key)
-    tile.BackgroundColor3 = Color3.fromRGB(34, 30, 46)
-    tile.BackgroundTransparency = lockedByEquip and 0.55 or 0.1
+    tile.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+    tile.BackgroundTransparency = 0
+    if lockedByEquip then tile.BackgroundColor3 = Color3.fromRGB(156, 163, 175) end
     tile.Parent = template.Parent
     tile.InputBegan:Connect(function(input)
         if input.UserInputType ~= Enum.UserInputType.MouseButton1 and input.UserInputType ~= Enum.UserInputType.Touch then return end
@@ -3191,8 +3182,10 @@ local function refreshBag()
             addBagTile(template, item, order)
         end
     end
-    bagPanel.TermTabButton.BackgroundTransparency = bagMode == "Terms" and 0 or 0.55
-    bagPanel.SkillTabButton.BackgroundTransparency = bagMode == "Skills" and 0 or 0.55
+    bagPanel.TermTabButton.BackgroundTransparency = 0
+    bagPanel.SkillTabButton.BackgroundTransparency = 0
+    bagPanel.TermTabButton.BackgroundColor3 = bagMode == "Terms" and Color3.fromRGB(241, 196, 15) or Color3.fromRGB(255, 255, 255)
+    bagPanel.SkillTabButton.BackgroundColor3 = bagMode == "Skills" and Color3.fromRGB(241, 196, 15) or Color3.fromRGB(255, 255, 255)
     local boxes = getSkillBoxes()
     boxes.Visible = bagMode == "Skills"
     local equipped = (state.Inventory and state.Inventory.EquippedSkills) or {}
@@ -3216,7 +3209,8 @@ local function refreshStats()
     if not autoAvailable then autoRollEnabled = false end
     autoRollToggle.Visible = autoAvailable
     autoRollToggle.Text = autoRollEnabled and "Auto-Roll: ON" or "Auto-Roll: OFF"
-    autoRollToggle.BackgroundColor3 = autoRollEnabled and Color3.fromRGB(60, 222, 130) or Color3.fromRGB(18, 16, 26)
+    autoRollToggle.BackgroundColor3 = autoRollEnabled and Color3.fromRGB(241, 196, 15) or Color3.fromRGB(255, 255, 255)
+    autoRollToggle.TextColor3 = Color3.fromRGB(0, 0, 0)
     wheel.Visible = state.WheelSpins > 0 or spinning or autoAvailable
     local reward = state.LastWheelReward
     currentDrawLabel.Visible = reward ~= nil
@@ -3255,7 +3249,7 @@ local function renderSlotItem(slot, parent)
         end
     end
     parent.BackgroundColor3 = slot.Color or Color3.fromRGB(34, 30, 46)
-    parent.BackgroundTransparency = 0.18
+    parent.BackgroundTransparency = 0
     parent.BorderSizePixel = 0
     if not parent:FindFirstChildOfClass("UICorner") then
         local corner = Instance.new("UICorner")
@@ -3296,7 +3290,7 @@ local function makeMiniCell(sideGrid, order)
     cell.Name = "MiniCell" .. order
     cell.LayoutOrder = order
     cell.Size = UDim2.new(0, 0, 0, 0)
-    cell.BackgroundColor3 = Color3.fromRGB(34, 30, 46)
+    cell.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
     cell.BorderSizePixel = 0
     cell.Parent = sideGrid
     Instance.new("UICorner", cell).CornerRadius = UDim.new(0, 8)
