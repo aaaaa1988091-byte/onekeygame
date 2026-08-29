@@ -251,6 +251,7 @@ mapBase.Material = Enum.Material.WoodPlanks
 local mainGui = getOrCreate(StarterGui, "ScreenGui", "CakeRainRNGHUD")
 mainGui.ResetOnSpawn = false
 mainGui.IgnoreGuiInset = false
+mainGui.ZIndexBehavior = Enum.ZIndexBehavior.Global
 clearChildren(mainGui)
 
 local function styleTextGui(gui)
@@ -263,6 +264,11 @@ local function newGui(className, name, parent)
     local gui = Instance.new(className)
     gui.Name = name
     gui.Parent = parent
+    -- Global ZIndex is deliberate: every visual child explicitly sits above its GUI parent,
+    -- preventing labels and icons from disappearing behind card bodies or hard shadows.
+    if gui:IsA("GuiObject") and parent and parent:IsA("GuiObject") then
+        gui.ZIndex = parent.ZIndex + 1
+    end
     styleTextGui(gui)
     return gui
 end
@@ -279,8 +285,8 @@ local Theme = {
     White = Color3.fromRGB(255, 255, 255), -- primary card/panel surface
     Black = Color3.fromRGB(0, 0, 0), -- borders, text, hard shadows
     Accent = Color3.fromRGB(241, 196, 15), -- CTA buttons, badges, highlights
-    BgBase = Color3.fromRGB(138, 187, 117), -- optional green theme reference only
-    GridLine = Color3.fromRGB(168, 214, 149), -- subtle low-opacity panel texture only
+    BgBase = Color3.fromRGB(255, 255, 255), -- UI surfaces remain white by default
+    GridLine = Color3.fromRGB(190, 190, 190), -- neutral low-opacity panel texture only
     Green = Color3.fromRGB(22, 163, 74),
     LightGreen = Color3.fromRGB(74, 222, 128),
     Red = Color3.fromRGB(220, 38, 38),
@@ -304,13 +310,50 @@ local function addChunkyStroke(instance, thickness)
     return stroke
 end
 
-local function addHardShadow(target, offset, radius)
+local ShadowStyle = {
+    PANEL = 0,
+    ELEMENT = 0.78,
+}
+
+-- The single card factory used by new panels, headers, and reusable card components.  Its
+-- ShadowFrame never moves; interaction tweens only move BodyFrame for a tactile hard-shadow feel.
+local function createCard(config)
+    local zBase = config.zIndexBase or 2
+    local card = newGui("Frame", config.name or "CardFrame", config.parent)
+    card.Size = config.size
+    card.Position = config.position or UDim2.fromScale(0, 0)
+    card.AnchorPoint = config.anchorPoint or Vector2.new(0, 0)
+    card.BackgroundTransparency = 1
+    card.BorderSizePixel = 0
+    card.ZIndex = zBase
+
+    local shadow = newGui("Frame", "ShadowFrame", card)
+    shadow.Size = UDim2.fromScale(1, 1)
+    shadow.Position = UDim2.new(0, config.shadowOffset or 6, 0, config.shadowOffset or 6)
+    shadow.BackgroundColor3 = Theme.Black
+    shadow.BackgroundTransparency = config.shadowStyle ~= nil and config.shadowStyle or ShadowStyle.ELEMENT
+    shadow.BorderSizePixel = 0
+    shadow.ZIndex = zBase
+    addCorner(shadow, config.cornerRadius or 16)
+
+    local body = newGui("Frame", "BodyFrame", card)
+    body.Size = UDim2.fromScale(1, 1)
+    body.BackgroundColor3 = config.bodyColor or Theme.White
+    body.BackgroundTransparency = config.bodyTransparency or 0
+    body.BorderSizePixel = 0
+    body.ZIndex = zBase + 1
+    addCorner(body, config.cornerRadius or 16)
+    addChunkyStroke(body, config.strokeThickness or 3)
+    return card, shadow, body
+end
+
+local function addHardShadow(target, offset, radius, transparency)
     local shadow = newGui("Frame", target.Name .. "Shadow", target.Parent)
     shadow.AnchorPoint = target.AnchorPoint
     shadow.Size = target.Size
     shadow.Position = target.Position + UDim2.new(0, offset or 6, 0, offset or 6)
     shadow.BackgroundColor3 = Theme.Black
-    shadow.BackgroundTransparency = 0
+    shadow.BackgroundTransparency = transparency == nil and ShadowStyle.ELEMENT or transparency
     shadow.BorderSizePixel = 0
     shadow.ZIndex = math.max(0, target.ZIndex - 1)
     shadow.Visible = target.Visible
@@ -318,6 +361,29 @@ local function addHardShadow(target, offset, radius)
     target.ZIndex = math.max(target.ZIndex, shadow.ZIndex + 1)
     shadow:SetAttribute("HardShadowFor", target.Name)
     return shadow
+end
+
+-- Fixed, black title plaque for every independent panel.  Text always receives an explicit
+-- ZIndex above the plaque to remain readable with ScreenGui.ZIndexBehavior = Global.
+local function createPanelTitleHeader(parent, text, width)
+    local card, _, body = createCard({
+        name = "PanelTitleHeader", size = UDim2.new(0, width or 170, 0, 44),
+        position = UDim2.new(0, 22, 0, -21), parent = parent,
+        shadowStyle = ShadowStyle.ELEMENT, shadowOffset = 4, cornerRadius = 12,
+        zIndexBase = math.max(10, parent.ZIndex + 4), bodyColor = Theme.Black,
+    })
+    local label = newGui("TextLabel", "TitleLabel", body)
+    label.BackgroundTransparency = 1
+    label.Size = UDim2.fromScale(1, 1)
+    label.Font = Enum.Font.GothamBlack
+    label.Text = text
+    label.TextColor3 = Theme.White
+    label.TextSize = 22
+    label.ZIndex = body.ZIndex + 1
+    local padding = newGui("UIPadding", "Padding", body)
+    padding.PaddingLeft = UDim.new(0, 16)
+    padding.PaddingRight = UDim.new(0, 16)
+    return card
 end
 
 local function addPanelGrid(parent)
@@ -364,7 +430,7 @@ local function applyPanel(frame, cornerRadius)
     frame.BackgroundTransparency = 0.04
     frame.BorderSizePixel = 0
     frame.ClipsDescendants = false
-    addHardShadow(frame, 6, cornerRadius or 18)
+    addHardShadow(frame, 9, cornerRadius or 18, ShadowStyle.PANEL)
     addCorner(frame, cornerRadius or 18)
     addPanelGrid(frame)
     addChunkyStroke(frame, 4)
@@ -376,6 +442,7 @@ local function applyWell(frame, cornerRadius)
     frame.BackgroundColor3 = Theme.White
     frame.BackgroundTransparency = 0.02
     frame.BorderSizePixel = 0
+    addHardShadow(frame, 4, cornerRadius or 14, ShadowStyle.ELEMENT)
     addCorner(frame, cornerRadius or 14)
     addChunkyStroke(frame, 3)
     return frame
@@ -389,7 +456,7 @@ local function applyButtonStyle(button, color, textColor, radius)
         button.TextColor3 = textColor or Theme.White
         button.Font = Enum.Font.GothamBlack
     end
-    addHardShadow(button, 5, radius or 10)
+    addHardShadow(button, 4, radius or 10, ShadowStyle.ELEMENT)
     addCorner(button, radius or 10)
     addChunkyStroke(button, 3)
     return button
@@ -571,7 +638,7 @@ shopHub.Size = UDim2.new(0, 620, 0, 360)
 shopHub.Position = UDim2.new(0.5, -310, 0.5, -180)
 shopHub.Visible = false
 applyPanel(shopHub, 18)
-addTag(shopHub, "SHOP", Theme.Black)
+createPanelTitleHeader(shopHub, "SHOP", 170)
 local shopAspect = newGui("UIAspectRatioConstraint", "AspectRatio", shopHub)
 shopAspect.AspectRatio = 1.72
 shopAspect.DominantAxis = Enum.DominantAxis.Width
@@ -590,6 +657,13 @@ shopGrid.Position = UDim2.new(0, 20, 0, 62)
 shopGrid.ScrollBarThickness = 8
 shopGrid.CanvasSize = UDim2.new(0, 0, 0, 0)
 applyWell(shopGrid, 14)
+shopGrid.ScrollBarThickness = 6
+shopGrid.ScrollBarImageColor3 = Theme.Black
+local shopGridPadding = newGui("UIPadding", "ListPadding", shopGrid)
+shopGridPadding.PaddingLeft = UDim.new(0, 10)
+shopGridPadding.PaddingRight = UDim.new(0, 16)
+shopGridPadding.PaddingTop = UDim.new(0, 10)
+shopGridPadding.PaddingBottom = UDim.new(0, 10)
 local gridLayout = newGui("UIGridLayout", "GridLayout", shopGrid)
 gridLayout.CellSize = UDim2.new(0, 128, 0, 128)
 gridLayout.CellPadding = UDim2.new(0, 12, 0, 12)
@@ -632,18 +706,10 @@ bagPanel.Size = UDim2.new(0, 620, 0, 360)
 bagPanel.Position = UDim2.new(0.5, -310, 0.5, -180)
 bagPanel.Visible = false
 applyPanel(bagPanel, 18)
-addTag(bagPanel, "BAG", Theme.Black)
+createPanelTitleHeader(bagPanel, "ABILITY BAG", 210)
 local bagAspect = newGui("UIAspectRatioConstraint", "AspectRatio", bagPanel)
 bagAspect.AspectRatio = 1.72
 bagAspect.DominantAxis = Enum.DominantAxis.Width
-local bagTitle = newGui("TextLabel", "Title", bagPanel)
-bagTitle.BackgroundTransparency = 1
-bagTitle.Size = UDim2.new(1, -130, 0, 44)
-bagTitle.Position = UDim2.new(0, 20, 0, 12)
-bagTitle.Font = Enum.Font.GothamBlack
-bagTitle.Text = "Ability Bag"
-bagTitle.TextScaled = true
-bagTitle.TextColor3 = Theme.Text
 local closeBag = newGui("TextButton", "CloseButton", bagPanel)
 closeBag.Size = UDim2.new(0, 90, 0, 38)
 closeBag.Position = UDim2.new(1, -104, 0, 12)
@@ -708,6 +774,13 @@ bagList.Position = UDim2.new(0, 20, 0, 148)
 bagList.ScrollBarThickness = 8
 bagList.CanvasSize = UDim2.new(0, 0, 0, 0)
 applyWell(bagList, 14)
+bagList.ScrollBarThickness = 6
+bagList.ScrollBarImageColor3 = Theme.Black
+local bagListPadding = newGui("UIPadding", "ListPadding", bagList)
+bagListPadding.PaddingLeft = UDim.new(0, 10)
+bagListPadding.PaddingRight = UDim.new(0, 16)
+bagListPadding.PaddingTop = UDim.new(0, 10)
+bagListPadding.PaddingBottom = UDim.new(0, 10)
 -- Highlighted while dragging a skill DOWN off a box, to show "drop here to put it back".
 local bagDropHint = newGui("UIStroke", "UIStroke_DropHint", bagList)
 bagDropHint.Thickness = 4
