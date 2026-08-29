@@ -1459,6 +1459,72 @@ end
 return CakeEffectsService
 ]=]
 
+-- Cake responsibilities are intentionally split: access arbitration, movement, rain scheduling,
+-- and the CakeService façade can now evolve without skill scripts mutating instances directly.
+local cakeAccessService = getOrCreate(servicesPackage, "ModuleScript", "CakeAccessService")
+cakeAccessService.Source = [=[
+-- Tracks the single player currently eating each cake.  This is server-only state: clients and
+-- skills never receive a bypass, so a cake being eaten cannot be moved, damaged, or stolen.
+local CakeAccessService = { EaterByCake = {}, CakeByEater = {} }
+
+function CakeAccessService.IsAvailableTo(player, cake)
+    local eater = CakeAccessService.EaterByCake[cake]
+    return eater == nil or eater == player
+end
+
+function CakeAccessService.ClaimForEating(player, cake)
+    if not player or not cake or not cake.Parent or not CakeAccessService.IsAvailableTo(player, cake) then
+        return false
+    end
+    local previous = CakeAccessService.CakeByEater[player]
+    if previous and previous ~= cake then
+        CakeAccessService.EaterByCake[previous] = nil
+    end
+    CakeAccessService.EaterByCake[cake] = player
+    CakeAccessService.CakeByEater[player] = cake
+    return true
+end
+
+function CakeAccessService.ReleasePlayer(player)
+    local cake = CakeAccessService.CakeByEater[player]
+    if cake and CakeAccessService.EaterByCake[cake] == player then
+        CakeAccessService.EaterByCake[cake] = nil
+    end
+    CakeAccessService.CakeByEater[player] = nil
+end
+
+function CakeAccessService.ReleaseCake(cake)
+    local player = CakeAccessService.EaterByCake[cake]
+    if player and CakeAccessService.CakeByEater[player] == cake then
+        CakeAccessService.CakeByEater[player] = nil
+    end
+    CakeAccessService.EaterByCake[cake] = nil
+end
+
+return CakeAccessService
+]=]
+
+local cakeMovementService = getOrCreate(servicesPackage, "ModuleScript", "CakeMovementService")
+cakeMovementService.Source = [=[
+-- The only low-level server movement operations for cakes.  Authorization stays in CakeService.
+local CakeMovementService = {}
+
+function CakeMovementService.Apply(cake, change)
+    local primary = cake and cake.PrimaryPart
+    if not primary then return false end
+    if change.LinearVelocity ~= nil then
+        primary.AssemblyLinearVelocity = change.LinearVelocity
+    end
+    if change.CFrame then
+        if change.LinearVelocity == nil then primary.AssemblyLinearVelocity = Vector3.zero end
+        cake:PivotTo(change.CFrame)
+    end
+    return true
+end
+
+return CakeMovementService
+]=]
+
 local cakeService = getOrCreate(servicesPackage, "ModuleScript", "CakeService")
 cakeService.Source = [=[
 local Debris = game:GetService("Debris")
@@ -1473,12 +1539,14 @@ local CakeConfig = require(Configs.CakeConfig)
 local LocalizationConfig = require(Configs.LocalizationConfig)
 local StateService = require(script.Parent.StateService)
 local CakeEffectsService = require(script.Parent.CakeEffectsService)
+local CakeAccessService = require(script.Parent.CakeAccessService)
+local CakeMovementService = require(script.Parent.CakeMovementService)
 local CakeModels = ReplicatedStorage:FindFirstChild("cake") or ReplicatedStorage.Models.cake
 
 -- Public cake API used by SkillService.  Keep all cake movement/damage here so skills
 -- cannot bypass rewards, animation, or cleanup rules. Cakes are world objects: any
 -- nearby player can eat them, and each eat tick reselects the nearest cake in range.
-local CakeService = { Owners = {}, EatingByPlayer = {}, TouchingByPlayer = {} }
+local CakeService = { Owners = {}, EatingByPlayer = {}, TouchingByPlayer = {}, Access = CakeAccessService }
 local Runtime = Workspace:FindFirstChild("cake") or Instance.new("Folder")
 Runtime.Name, Runtime.Parent = "cake", Workspace
 local function text(key) return LocalizationConfig["en-us"][key] or key end
@@ -1633,17 +1701,23 @@ function CakeService.Decorate(cake, isGlow)
     CakeService.ApplyCakeLevel(cake, initialLevel)
 end
 local function stopEating(player)
+    CakeAccessService.ReleasePlayer(player)
     CakeService.EatingByPlayer[player] = nil
 end
 local function stopEatingCake(cake)
-    for eatingPlayer, target in pairs(CakeService.EatingByPlayer) do
-        if target == cake then
-            CakeService.EatingByPlayer[eatingPlayer] = nil
-        end
+    local eatingPlayer = CakeAccessService.EaterByCake[cake]
+    CakeAccessService.ReleaseCake(cake)
+    if eatingPlayer then CakeService.EatingByPlayer[eatingPlayer] = nil end
+    for player, target in pairs(CakeService.EatingByPlayer) do
+        if target == cake then CakeService.EatingByPlayer[player] = nil end
     end
-    for _, touching in pairs(CakeService.TouchingByPlayer) do
-        touching[cake] = nil
-    end
+    for _, touching in pairs(CakeService.TouchingByPlayer) do touching[cake] = nil end
+end
+
+-- Public server-side eligibility check for skill authors.  A false result means another player
+-- has already claimed the cake by eating it; no skill is allowed to affect that cake.
+function CakeService.CanAffectCake(player, cake)
+    return cake and cake.Parent and not cake:GetAttribute("Finishing") and CakeAccessService.IsAvailableTo(player, cake)
 end
 local function touchedCakesFor(player)
     CakeService.TouchingByPlayer[player] = CakeService.TouchingByPlayer[player] or {}
@@ -1654,7 +1728,7 @@ local function nearestTouchedCake(player)
     if not root then return nil end
     local bestCake, bestDistance
     for cake in pairs(touchedCakesFor(player)) do
-        if cake.Parent and cake.PrimaryPart and not cake:GetAttribute("Finishing") then
+        if CakeService.CanAffectCake(player, cake) and cake.PrimaryPart then
             local distance = (cake.PrimaryPart.Position - root.Position).Magnitude
             if distance <= (CakeConfig.EatRangeStuds or 9) and (not bestDistance or distance < bestDistance) then
                 bestCake, bestDistance = cake, distance
@@ -1740,7 +1814,7 @@ function CakeService.Expire(cake)
     end)
 end
 function CakeService.ApplyServerCakeChange(player, cake, change)
-    if not cake or not cake.Parent or cake:GetAttribute("Finishing") then return false end
+    if not CakeService.CanAffectCake(player, cake) then return false, "CAKE_BEING_EATEN" end
     change = change or {}
     local damage = math.max(0, tonumber(change.Damage) or 0)
     if change.DamagePercent then
@@ -1761,14 +1835,17 @@ function CakeService.ApplyServerCakeChange(player, cake, change)
             return true
         end
     end
-    if cake.PrimaryPart and change.LinearVelocity then
-        cake.PrimaryPart.AssemblyLinearVelocity = change.LinearVelocity
-    end
-    if cake.PrimaryPart and change.CFrame then
-        if change.LinearVelocity == nil then cake.PrimaryPart.AssemblyLinearVelocity = Vector3.zero end
-        cake:PivotTo(change.CFrame)
-    end
+    CakeMovementService.Apply(cake, change)
     return true
+end
+
+-- Explicit server APIs for skills that change cake coordinates or vectors.  They route through
+-- the same access guard as damage and therefore cannot influence another player's active meal.
+function CakeService.SetCakeVelocity(player, cake, velocity)
+    return CakeService.ApplyServerCakeChange(player, cake, { LinearVelocity = velocity })
+end
+function CakeService.SetCakeCFrame(player, cake, cframe)
+    return CakeService.ApplyServerCakeChange(player, cake, { CFrame = cframe })
 end
 function CakeService.DamageCake(player, cake, amount)
     return CakeService.ApplyServerCakeChange(player, cake, { Damage = amount })
@@ -1777,7 +1854,7 @@ function CakeService.GetCakes(player, maximum, minimumDistance, maximumDistance)
     local root, results = rootOf(player), {}
     if not root then return results end
     for cake in pairs(CakeService.Owners) do
-        if cake.Parent and cake.PrimaryPart and not cake:GetAttribute("Finishing") then
+        if CakeService.CanAffectCake(player, cake) and cake.PrimaryPart then
             local distance = (cake.PrimaryPart.Position - root.Position).Magnitude
             if (not minimumDistance or distance >= minimumDistance) and (not maximumDistance or distance <= maximumDistance) then table.insert(results, { Cake = cake, Distance = distance }) end
         end
@@ -1788,7 +1865,7 @@ function CakeService.GetCakes(player, maximum, minimumDistance, maximumDistance)
 end
 function CakeService.MoveNearPlayer(player, cake, distance, travelSeconds)
     local root = rootOf(player)
-    if not root or not cake or not cake.PrimaryPart or cake:GetAttribute("Finishing") then return false end
+    if not root or not CakeService.CanAffectCake(player, cake) or not cake.PrimaryPart then return false end
     local angle = math.random() * math.pi * 2
     local destination = CFrame.new(root.Position + Vector3.new(math.cos(angle) * distance, 2, math.sin(angle) * distance))
     CakeService.ApplyServerCakeChange(player, cake, { LinearVelocity = Vector3.zero })
@@ -1806,8 +1883,15 @@ function CakeService.BeginAutoEat(player)
         while player.Parent do
             local cake = nearestTouchedCake(player)
             if not cake then break end
+            -- Claim before the first bite.  Concurrent touch events can only give one player
+            -- this cake; all other eaters and skills see it as unavailable immediately.
+            if not CakeAccessService.ClaimForEating(player, cake) then
+                continue
+            end
             CakeService.EatingByPlayer[player] = cake
-            CakeService.DamageCake(player, cake, CakeConfig.BaseEatDamagePerSecond + StateService.EffectiveStat(player, "EatSpeed"))
+            if CakeService.CanAffectCake(player, cake) then
+                CakeService.DamageCake(player, cake, CakeConfig.BaseEatDamagePerSecond + StateService.EffectiveStat(player, "EatSpeed"))
+            end
             task.wait(CakeConfig.EatTickSeconds)
         end
         stopEating(player)
@@ -1985,6 +2069,65 @@ end
 return CakeService
 ]=]
 
+local cakeSpawnService = getOrCreate(servicesPackage, "ModuleScript", "CakeSpawnService")
+cakeSpawnService.Source = [=[
+-- Generation boundary.  Rain schedulers call this API instead of knowing how a cake is cloned,
+-- decorated, upgraded, split, registered, or expired.
+local CakeService = require(script.Parent.CakeService)
+local CakeSpawnService = {}
+
+function CakeSpawnService.SpawnNear(player)
+    return CakeService.SpawnNear(player)
+end
+
+function CakeSpawnService.Split(player, sourceCake)
+    return CakeService.SplitCake(player, sourceCake)
+end
+
+return CakeSpawnService
+]=]
+
+local cakeRainService = getOrCreate(servicesPackage, "ModuleScript", "CakeRainService")
+cakeRainService.Source = [=[
+-- Owns the per-player cake-rain schedule only; creation stays behind CakeSpawnService.
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local CakeConfig = require(ReplicatedStorage.Configs.CakeConfig)
+local StateService = require(script.Parent.StateService)
+local CakeSpawnService = require(script.Parent.CakeSpawnService)
+local CakeRainService = {}
+
+function CakeRainService.StartPlayer(player)
+    local function burst()
+        task.spawn(function()
+            for _ = 1, CakeConfig.InitialBurstCount do
+                if not player.Parent then return end
+                CakeSpawnService.SpawnNear(player)
+                task.wait(.18)
+            end
+        end)
+    end
+    player.CharacterAdded:Connect(function(character)
+        character:WaitForChild("HumanoidRootPart", 10)
+        task.wait(.35)
+        burst()
+    end)
+    if player.Character then burst() end
+    task.spawn(function()
+        while player.Parent do
+            local character = player.Character or player.CharacterAdded:Wait()
+            character:WaitForChild("HumanoidRootPart", 10)
+            local humanoid = character:FindFirstChildOfClass("Humanoid")
+            if humanoid then humanoid.WalkSpeed = 16 + StateService.EffectiveStat(player, "PlayerSpeed") end
+            local ok, err = pcall(CakeSpawnService.SpawnNear, player)
+            if not ok then warn("Cake Rain RNG: spawn failed; rain will continue", err) end
+            StateService.Push(player)
+            task.wait(math.max(.2, CakeConfig.SpawnInterval - StateService.EffectiveStat(player, "CakeSpawnHaste")))
+        end
+    end)
+end
+return CakeRainService
+]=]
+
 -- Every wheel term chooses its own module, so its stacking and special behavior can evolve independently.
 local rewardScripts = getOrCreate(servicesPackage, "Folder", "RewardScripts")
 local rewardTemplate = getOrCreate(rewardScripts, "ModuleScript", "RewardTemplate")
@@ -2078,7 +2221,9 @@ function Template.New(player, parameters)
         Damage = function(_, cake, amount) return CakeService.ApplyServerCakeChange(player, cake, { Damage = amount }) end,
         DamagePercent = function(_, cake, percent) return CakeService.ApplyServerCakeChange(player, cake, { DamagePercent = percent }) end,
         MoveNear = function(_, cake, distance, seconds) return CakeService.MoveNearPlayer(player, cake, distance, seconds) end,
-        SetMomentum = function(_, cake, velocity) return CakeService.ApplyServerCakeChange(player, cake, { LinearVelocity = velocity }) end,
+        SetMomentum = function(_, cake, velocity) return CakeService.SetCakeVelocity(player, cake, velocity) end,
+        SetPosition = function(_, cake, cframe) return CakeService.SetCakeCFrame(player, cake, cframe) end,
+        CanAffectCake = function(_, cake) return CakeService.CanAffectCake(player, cake) end,
         GetAbilityLevel = function(_, abilityKey)
             local state, best, now = StateService.Get(player), 0, os.clock()
             if not state then return best end
@@ -2464,6 +2609,7 @@ local Players = game:GetService("Players")
 local DataService = require(script.Parent.Services.DataService)
 local StateService = require(script.Parent.Services.StateService)
 local CakeService = require(script.Parent.Services.CakeService)
+local CakeRainService = require(script.Parent.Services.CakeRainService)
 local WheelService = require(script.Parent.Services.WheelService)
 local SkillService = require(script.Parent.Services.SkillService)
 local GlobalLeaderboardService = require(script.Parent.Services.GlobalLeaderboardService)
@@ -2475,7 +2621,7 @@ GlobalLeaderboardService.Start()
 local function setupPlayer(player)
     StateService.Create(player, DataService.Load(player))
     SkillService.ResumePlayer(player)
-    CakeService.StartPlayer(player)
+    CakeRainService.StartPlayer(player)
 end
 
 Players.PlayerAdded:Connect(setupPlayer)
