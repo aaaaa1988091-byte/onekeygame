@@ -3743,6 +3743,7 @@ UpdateClientState.OnClientEvent:Connect(function(newState)
 end)
 
 refreshStats()
+return true
 ]=]
 
 local clientScript = getOrCreate(StarterPlayer.StarterPlayerScripts, "LocalScript", "CakeRainRNGClient")
