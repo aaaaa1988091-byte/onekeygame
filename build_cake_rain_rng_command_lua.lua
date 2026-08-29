@@ -540,28 +540,45 @@ taskButton.Position = UDim2.new(0, 154, 0, 154)
 taskButton.Text = "DAILY"
 taskButton.TextScaled = true
 applyButtonStyle(taskButton, Theme.Accent, Theme.Text, 10)
+local codeButton = newGui("TextButton", "CodeButton", mainGui)
+codeButton.Size = UDim2.new(0, 126, 0, 46)
+codeButton.Position = UDim2.new(0, 154, 0, 208)
+codeButton.Text = "CODES"
+codeButton.TextScaled = true
+applyButtonStyle(codeButton, Theme.White, Theme.Text, 10)
 
 local taskPanel = newGui("Frame", "DailyTaskPanel", mainGui)
-taskPanel.Size = UDim2.new(0, 440, 0, 350)
-taskPanel.Position = UDim2.new(.5, -220, .5, -175)
+taskPanel.Size = UDim2.new(0, 500, 0, 440)
+taskPanel.Position = UDim2.new(.5, -250, .5, -220)
 taskPanel.Visible = false
 applyPanel(taskPanel, 18)
 createPanelTitleHeader(taskPanel, "DAILY TASKS", 205)
 local closeTasks = newGui("TextButton", "CloseButton", taskPanel)
 closeTasks.Size = UDim2.new(0, 82, 0, 36); closeTasks.Position = UDim2.new(1, -96, 0, 12); closeTasks.Text = "CLOSE"; closeTasks.TextScaled = true
 applyButtonStyle(closeTasks, Theme.Red, Theme.White, 10)
-local taskText = newGui("TextLabel", "TaskText", taskPanel)
-taskText.BackgroundTransparency = 1; taskText.Position = UDim2.new(0, 24, 0, 66); taskText.Size = UDim2.new(1, -48, 0, 140)
-taskText.TextXAlignment = Enum.TextXAlignment.Left; taskText.TextYAlignment = Enum.TextYAlignment.Top; taskText.TextWrapped = true; taskText.TextScaled = true
-local claimTaskButton = newGui("TextButton", "ClaimButton", taskPanel)
-claimTaskButton.Size = UDim2.new(1, -48, 0, 42); claimTaskButton.Position = UDim2.new(0, 24, 0, 214); claimTaskButton.Text = "CLAIM FIRST READY TASK"; claimTaskButton.TextScaled = true
-applyButtonStyle(claimTaskButton, Theme.Accent, Theme.Text, 10)
-local codeBox = newGui("TextBox", "CodeBox", taskPanel)
-codeBox.Size = UDim2.new(0.62, -28, 0, 42); codeBox.Position = UDim2.new(0, 24, 1, -64); codeBox.PlaceholderText = "ENTER CODE"; codeBox.ClearTextOnFocus = false; codeBox.TextScaled = true
-applyWell(codeBox, 10)
-local redeemButton = newGui("TextButton", "RedeemButton", taskPanel)
-redeemButton.Size = UDim2.new(.38, -28, 0, 42); redeemButton.Position = UDim2.new(.62, 4, 1, -64); redeemButton.Text = "REDEEM"; redeemButton.TextScaled = true
-applyButtonStyle(redeemButton, Theme.Black, Theme.White, 10)
+local taskList = newGui("ScrollingFrame", "TaskList", taskPanel)
+taskList.Size = UDim2.new(1, -44, 1, -88); taskList.Position = UDim2.new(0, 22, 0, 62); taskList.CanvasSize = UDim2.new(); taskList.ScrollBarThickness = 6; taskList.ScrollBarImageColor3 = Theme.Black
+applyWell(taskList, 14)
+local taskPadding = newGui("UIPadding", "Padding", taskList); taskPadding.PaddingLeft = UDim.new(0, 10); taskPadding.PaddingRight = UDim.new(0, 16); taskPadding.PaddingTop = UDim.new(0, 10); taskPadding.PaddingBottom = UDim.new(0, 10)
+local taskLayout = newGui("UIListLayout", "Layout", taskList); taskLayout.Padding = UDim.new(0, 12)
+local taskTemplate = newGui("TextButton", "TaskTemplate", taskList)
+taskTemplate.Size = UDim2.new(1, -2, 0, 112); taskTemplate.BackgroundColor3 = Theme.White; taskTemplate.Visible = false; taskTemplate.Text = ""; taskTemplate.AutoButtonColor = false
+applyButtonStyle(taskTemplate, Theme.White, Theme.Text, 12)
+local taskName = newGui("TextLabel", "Name", taskTemplate); taskName.BackgroundTransparency = 1; taskName.Position = UDim2.new(0, 14, 0, 10); taskName.Size = UDim2.new(.62, 0, 0, 26); taskName.TextXAlignment = Enum.TextXAlignment.Left; taskName.TextScaled = true
+local taskReward = newGui("TextLabel", "Reward", taskTemplate); taskReward.BackgroundTransparency = 1; taskReward.Position = UDim2.new(.62, 0, 0, 10); taskReward.Size = UDim2.new(.35, -10, 0, 26); taskReward.TextXAlignment = Enum.TextXAlignment.Right; taskReward.TextScaled = true; taskReward.TextColor3 = Theme.Accent
+local progressBack = newGui("Frame", "ProgressBack", taskTemplate); progressBack.Size = UDim2.new(1, -28, 0, 18); progressBack.Position = UDim2.new(0, 14, 0, 46); progressBack.BackgroundColor3 = Theme.Black; addCorner(progressBack, 8)
+local progressFill = newGui("Frame", "ProgressFill", progressBack); progressFill.Size = UDim2.new(0, 0, 1, 0); progressFill.BackgroundColor3 = Theme.Accent; addCorner(progressFill, 8)
+local progressLabel = newGui("TextLabel", "ProgressLabel", taskTemplate); progressLabel.BackgroundTransparency = 1; progressLabel.Position = UDim2.new(0, 14, 0, 70); progressLabel.Size = UDim2.new(.55, 0, 0, 28); progressLabel.TextXAlignment = Enum.TextXAlignment.Left; progressLabel.TextScaled = true
+local claimLabel = newGui("TextLabel", "ClaimLabel", taskTemplate); claimLabel.BackgroundColor3 = Theme.Black; claimLabel.Position = UDim2.new(.62, 0, 0, 72); claimLabel.Size = UDim2.new(.35, -10, 0, 26); claimLabel.TextColor3 = Theme.White; claimLabel.Text = "IN PROGRESS"; claimLabel.TextScaled = true; addCorner(claimLabel, 8)
+
+local codePanel = newGui("Frame", "CodePanel", mainGui)
+codePanel.Size = UDim2.new(0, 400, 0, 240); codePanel.Position = UDim2.new(.5, -200, .5, -120); codePanel.Visible = false
+applyPanel(codePanel, 18)
+createPanelTitleHeader(codePanel, "REDEEM CODE", 205)
+local closeCode = newGui("TextButton", "CloseButton", codePanel); closeCode.Size = UDim2.new(0, 82, 0, 36); closeCode.Position = UDim2.new(1, -96, 0, 12); closeCode.Text = "CLOSE"; closeCode.TextScaled = true; applyButtonStyle(closeCode, Theme.Red, Theme.White, 10)
+local codeHint = newGui("TextLabel", "Hint", codePanel); codeHint.BackgroundTransparency = 1; codeHint.Position = UDim2.new(0, 24, 0, 70); codeHint.Size = UDim2.new(1, -48, 0, 32); codeHint.Text = "Enter a reward code"; codeHint.TextScaled = true
+local codeBox = newGui("TextBox", "CodeBox", codePanel); codeBox.Size = UDim2.new(1, -48, 0, 44); codeBox.Position = UDim2.new(0, 24, 0, 112); codeBox.PlaceholderText = "ENTER CODE"; codeBox.ClearTextOnFocus = false; codeBox.TextScaled = true; applyWell(codeBox, 10)
+local redeemButton = newGui("TextButton", "RedeemButton", codePanel); redeemButton.Size = UDim2.new(1, -48, 0, 42); redeemButton.Position = UDim2.new(0, 24, 1, -62); redeemButton.Text = "REDEEM"; redeemButton.TextScaled = true; applyButtonStyle(redeemButton, Theme.Black, Theme.White, 10)
 
 local wheel = newGui("Frame", "WheelPanel", mainGui)
 wheel.Name = "WheelPanel"
@@ -3034,12 +3051,15 @@ local closeShop = shopHub:WaitForChild("CloseButton")
 local taskButton = gui:WaitForChild("TaskButton")
 local taskPanel = gui:WaitForChild("DailyTaskPanel")
 local closeTasks = taskPanel:WaitForChild("CloseButton")
+local codeButton = gui:WaitForChild("CodeButton")
+local codePanel = gui:WaitForChild("CodePanel")
+local closeCode = codePanel:WaitForChild("CloseButton")
 
 local ClientUIService = require(ReplicatedStorage:WaitForChild("ClientModules"):WaitForChild("ClientUIService"))
 ClientUIService.Initialize(gui, {
     Stats = stats, ShopButton = shopButton, BagButton = bagButton, ShopHub = shopHub, BagPanel = bagPanel,
-    Panels = { stats, wheel, buffFrame, currentDrawLabel, shopHub, bagPanel, taskPanel },
-    Buttons = { shopButton, bagButton, taskButton, spinButton, autoRollToggle, closeShop, closeBag, closeTasks, taskPanel.ClaimButton, taskPanel.RedeemButton, bagPanel.TermTabButton, bagPanel.SkillTabButton, bagPanel.DetailPanel.UpgradeButton },
+    Panels = { stats, wheel, buffFrame, currentDrawLabel, shopHub, bagPanel, taskPanel, codePanel },
+    Buttons = { shopButton, bagButton, taskButton, codeButton, spinButton, autoRollToggle, closeShop, closeBag, closeTasks, closeCode, codePanel.RedeemButton, bagPanel.TermTabButton, bagPanel.SkillTabButton, bagPanel.DetailPanel.UpgradeButton },
 })
 
 local state = { WheelSpins = 0, WheelPoints = 0, WheelLevel = 1, CakePoints = 0, ActiveBuffs = {}, LastWheelReward = nil, Inventory = { WheelRewards = {}, Cards = {}, EquippedSkills = {} } }
@@ -3624,13 +3644,13 @@ end)
 shopButton.Activated:Connect(function()
     playSound("Button")
     shopHub.Visible = not shopHub.Visible
-    if shopHub.Visible then bagPanel.Visible = false end
+    if shopHub.Visible then bagPanel.Visible = false; taskPanel.Visible = false; codePanel.Visible = false end
 end)
 bagButton.Activated:Connect(function()
     playSound("Button")
     bagPanel.Visible = not bagPanel.Visible
     if bagPanel.Visible then
-        shopHub.Visible = false
+        shopHub.Visible = false; taskPanel.Visible = false; codePanel.Visible = false
         refreshBag()
     end
 end)
@@ -3672,25 +3692,36 @@ closeBag.Activated:Connect(function()
 end)
 
 function refreshDailyTasks()
-    local lines, firstReady = {}, nil
-    for _, task in ipairs(state.DailyTasks or {}) do
-        local status = task.Claimed and "CLAIMED" or (task.Progress >= task.Target and "READY" or (tostring(task.Progress) .. "/" .. tostring(task.Target)))
-        table.insert(lines, string.format("%s  %s  (+%s cake / +%s spin)", task.Name, status, tostring((task.Reward or {}).CakePoints or 0), tostring((task.Reward or {}).WheelSpins or 0)))
-        if not firstReady and not task.Claimed and task.Progress >= task.Target then firstReady = task.Id end
+    local list, template = taskPanel.TaskList, taskPanel.TaskList.TaskTemplate
+    for _, child in ipairs(list:GetChildren()) do if child:IsA("TextButton") and child ~= template then child:Destroy() end end
+    for order, task in ipairs(state.DailyTasks or {}) do
+        local card = template:Clone(); card.Name = "Task_" .. task.Id; card.LayoutOrder = order; card.Visible = true
+        card:WaitForChild("Name").Text = task.Name
+        card.Reward.Text = string.format("+%s cake  +%s spin", tostring((task.Reward or {}).CakePoints or 0), tostring((task.Reward or {}).WheelSpins or 0))
+        local ratio = math.clamp(task.Progress / math.max(1, task.Target), 0, 1)
+        card.ProgressBack.ProgressFill.Size = UDim2.new(ratio, 0, 1, 0)
+        card.ProgressLabel.Text = string.format("%d / %d", task.Progress, task.Target)
+        card.ClaimLabel.Text = task.Claimed and "CLAIMED" or (ratio >= 1 and "CLAIM" or "IN PROGRESS")
+        card.ClaimLabel.BackgroundColor3 = ratio >= 1 and not task.Claimed and Color3.fromRGB(241, 196, 15) or Color3.fromRGB(0, 0, 0)
+        card.ClaimLabel.TextColor3 = ratio >= 1 and not task.Claimed and Color3.fromRGB(0, 0, 0) or Color3.fromRGB(255, 255, 255)
+        card.Activated:Connect(function()
+            if not task.Claimed and ratio >= 1 then playSound("Interact"); RequestClaimDailyTask:InvokeServer(task.Id) end
+        end)
+        card.Parent = list
     end
-    taskPanel.TaskText.Text = #lines > 0 and table.concat(lines, "\n\n") or "No daily tasks configured."
-    taskPanel.ClaimButton:SetAttribute("TaskId", firstReady)
-    taskPanel.ClaimButton.BackgroundColor3 = firstReady and Color3.fromRGB(241, 196, 15) or Color3.fromRGB(255, 255, 255)
+    task.defer(function() list.CanvasSize = UDim2.new(0, 0, 0, list.Layout.AbsoluteContentSize.Y + 20) end)
 end
-taskButton.Activated:Connect(function() playSound("Button"); taskPanel.Visible = true; refreshDailyTasks() end)
+local modalPanels = { shopHub, bagPanel, taskPanel, codePanel }
+local function openExclusive(panel)
+    for _, candidate in ipairs(modalPanels) do candidate.Visible = candidate == panel and not panel.Visible end
+end
+taskButton.Activated:Connect(function() playSound("Button"); openExclusive(taskPanel); refreshDailyTasks() end)
+codeButton.Activated:Connect(function() playSound("Button"); openExclusive(codePanel) end)
 closeTasks.Activated:Connect(function() playSound("Button"); taskPanel.Visible = false end)
-taskPanel.ClaimButton.Activated:Connect(function()
-    local id = taskPanel.ClaimButton:GetAttribute("TaskId")
-    if id then playSound("Interact"); RequestClaimDailyTask:InvokeServer(id) end
-end)
-taskPanel.RedeemButton.Activated:Connect(function()
-    local code = taskPanel.CodeBox.Text
-    if code ~= "" then playSound("Interact"); RequestRedeemCode:InvokeServer(code); taskPanel.CodeBox.Text = "" end
+closeCode.Activated:Connect(function() playSound("Button"); codePanel.Visible = false end)
+codePanel.RedeemButton.Activated:Connect(function()
+    local code = codePanel.CodeBox.Text
+    if code ~= "" then playSound("Interact"); RequestRedeemCode:InvokeServer(code); codePanel.CodeBox.Text = "" end
 end)
 
 UpdateClientState.OnClientEvent:Connect(function(newState)
