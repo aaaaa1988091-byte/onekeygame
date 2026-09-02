@@ -44,6 +44,8 @@ local requestCardDraw = getOrCreate(eventsFolder, "RemoteFunction", "RequestCard
 local requestShopPurchase = getOrCreate(eventsFolder, "RemoteFunction", "RequestShopPurchase")
 local requestAbilityUpgrade = getOrCreate(eventsFolder, "RemoteFunction", "RequestAbilityUpgrade")
 local requestEquipSkill = getOrCreate(eventsFolder, "RemoteFunction", "RequestEquipSkill")
+local requestClaimDailyTask = getOrCreate(eventsFolder, "RemoteFunction", "RequestClaimDailyTask")
+local requestRedeemCode = getOrCreate(eventsFolder, "RemoteFunction", "RequestRedeemCode")
 local updateClientState = getOrCreate(eventsFolder, "RemoteEvent", "UpdateClientState")
 
 local wheelConfig = getOrCreate(configsFolder, "ModuleScript", "WheelConfig")
@@ -172,6 +174,27 @@ local ShopConfig = {
 return ShopConfig
 ]=]
 
+local dailyTaskConfig = getOrCreate(configsFolder, "ModuleScript", "DailyTaskConfig")
+dailyTaskConfig.Source = [=[
+-- Add, remove, or retune daily objectives here.  Progress type must match a server Record call.
+return {
+    ResetClock = "UTC",
+    Tasks = {
+        EatCakes = { Name = "Cake Taster", ProgressType = "EatCakes", Target = 10, Reward = { CakePoints = 120 } },
+        RollWheel = { Name = "Lucky Spinner", ProgressType = "RollWheel", Target = 5, Reward = { WheelSpins = 2 } },
+    },
+}
+]=]
+
+local codeConfig = getOrCreate(configsFolder, "ModuleScript", "CodeConfig")
+codeConfig.Source = [=[
+-- Server-only code catalogue.  Codes are case-insensitive and each code can be redeemed once/player.
+return {
+    WELCOME = { Reward = { CakePoints = 250, WheelSpins = 2 } },
+    RAINYDAY = { Reward = { CakePoints = 100 } },
+}
+]=]
+
 local uiConfig = getOrCreate(configsFolder, "ModuleScript", "UIConfig")
 uiConfig.Source = [=[
 local UIConfig = {
@@ -251,6 +274,7 @@ mapBase.Material = Enum.Material.WoodPlanks
 local mainGui = getOrCreate(StarterGui, "ScreenGui", "CakeRainRNGHUD")
 mainGui.ResetOnSpawn = false
 mainGui.IgnoreGuiInset = false
+mainGui.ZIndexBehavior = Enum.ZIndexBehavior.Global
 clearChildren(mainGui)
 
 local function styleTextGui(gui)
@@ -263,6 +287,11 @@ local function newGui(className, name, parent)
     local gui = Instance.new(className)
     gui.Name = name
     gui.Parent = parent
+    -- Global ZIndex is deliberate: every visual child explicitly sits above its GUI parent,
+    -- preventing labels and icons from disappearing behind card bodies or hard shadows.
+    if gui:IsA("GuiObject") and parent and parent:IsA("GuiObject") then
+        gui.ZIndex = parent.ZIndex + 1
+    end
     styleTextGui(gui)
     return gui
 end
@@ -279,8 +308,8 @@ local Theme = {
     White = Color3.fromRGB(255, 255, 255), -- primary card/panel surface
     Black = Color3.fromRGB(0, 0, 0), -- borders, text, hard shadows
     Accent = Color3.fromRGB(241, 196, 15), -- CTA buttons, badges, highlights
-    BgBase = Color3.fromRGB(138, 187, 117), -- optional green theme reference only
-    GridLine = Color3.fromRGB(168, 214, 149), -- subtle low-opacity panel texture only
+    BgBase = Color3.fromRGB(255, 255, 255), -- UI surfaces remain white by default
+    GridLine = Color3.fromRGB(190, 190, 190), -- neutral low-opacity panel texture only
     Green = Color3.fromRGB(22, 163, 74),
     LightGreen = Color3.fromRGB(74, 222, 128),
     Red = Color3.fromRGB(220, 38, 38),
@@ -304,20 +333,81 @@ local function addChunkyStroke(instance, thickness)
     return stroke
 end
 
-local function addHardShadow(target, offset, radius)
-    local shadow = newGui("Frame", target.Name .. "Shadow", target.Parent)
-    shadow.AnchorPoint = target.AnchorPoint
-    shadow.Size = target.Size
-    shadow.Position = target.Position + UDim2.new(0, offset or 6, 0, offset or 6)
+local ShadowStyle = {
+    PANEL = 0,
+    ELEMENT = 0.78,
+}
+
+-- The single card factory used by new panels, headers, and reusable card components.  Its
+-- ShadowFrame never moves; interaction tweens only move BodyFrame for a tactile hard-shadow feel.
+local function createCard(config)
+    local zBase = config.zIndexBase or 2
+    local card = newGui("Frame", config.name or "CardFrame", config.parent)
+    card.Size = config.size
+    card.Position = config.position or UDim2.fromScale(0, 0)
+    card.AnchorPoint = config.anchorPoint or Vector2.new(0, 0)
+    card.BackgroundTransparency = 1
+    card.BorderSizePixel = 0
+    card.ZIndex = zBase
+
+    local shadow = newGui("Frame", "ShadowFrame", card)
+    shadow.Size = UDim2.fromScale(1, 1)
+    shadow.Position = UDim2.new(0, config.shadowOffset or 6, 0, config.shadowOffset or 6)
     shadow.BackgroundColor3 = Theme.Black
-    shadow.BackgroundTransparency = 0
+    shadow.BackgroundTransparency = config.shadowStyle ~= nil and config.shadowStyle or ShadowStyle.ELEMENT
+    shadow.BorderSizePixel = 0
+    shadow.ZIndex = zBase
+    addCorner(shadow, config.cornerRadius or 16)
+
+    local body = newGui("Frame", "BodyFrame", card)
+    body.Size = UDim2.fromScale(1, 1)
+    body.BackgroundColor3 = config.bodyColor or Theme.White
+    body.BackgroundTransparency = config.bodyTransparency or 0
+    body.BorderSizePixel = 0
+    body.ZIndex = zBase + 1
+    addCorner(body, config.cornerRadius or 16)
+    addChunkyStroke(body, config.strokeThickness or 3)
+    return card, shadow, body
+end
+
+local function addHardShadow(target, offset, radius, transparency)
+    -- Shadow is owned by its visual body, never a sibling in the parent hierarchy.  This keeps
+    -- card movement, visibility, cloning, and ZIndex together as one reusable component.
+    local shadow = newGui("Frame", "HardShadow", target)
+    shadow.AnchorPoint = Vector2.new(0, 0)
+    shadow.Size = UDim2.fromScale(1, 1)
+    shadow.Position = UDim2.new(0, offset or 6, 0, offset or 6)
+    shadow.BackgroundColor3 = Theme.Black
+    shadow.BackgroundTransparency = transparency == nil and ShadowStyle.ELEMENT or transparency
     shadow.BorderSizePixel = 0
     shadow.ZIndex = math.max(0, target.ZIndex - 1)
     shadow.Visible = target.Visible
     addCorner(shadow, radius or 16)
-    target.ZIndex = math.max(target.ZIndex, shadow.ZIndex + 1)
     shadow:SetAttribute("HardShadowFor", target.Name)
     return shadow
+end
+
+-- Fixed, black title plaque for every independent panel.  Text always receives an explicit
+-- ZIndex above the plaque to remain readable with ScreenGui.ZIndexBehavior = Global.
+local function createPanelTitleHeader(parent, text, width)
+    local card, _, body = createCard({
+        name = "PanelTitleHeader", size = UDim2.new(0, width or 170, 0, 44),
+        position = UDim2.new(0, 22, 0, -21), parent = parent,
+        shadowStyle = ShadowStyle.ELEMENT, shadowOffset = 4, cornerRadius = 12,
+        zIndexBase = math.max(10, parent.ZIndex + 4), bodyColor = Theme.Black,
+    })
+    local label = newGui("TextLabel", "TitleLabel", body)
+    label.BackgroundTransparency = 1
+    label.Size = UDim2.fromScale(1, 1)
+    label.Font = Enum.Font.GothamBlack
+    label.Text = text
+    label.TextColor3 = Theme.White
+    label.TextSize = 22
+    label.ZIndex = body.ZIndex + 1
+    local padding = newGui("UIPadding", "Padding", body)
+    padding.PaddingLeft = UDim.new(0, 16)
+    padding.PaddingRight = UDim.new(0, 16)
+    return card
 end
 
 local function addPanelGrid(parent)
@@ -364,7 +454,7 @@ local function applyPanel(frame, cornerRadius)
     frame.BackgroundTransparency = 0.04
     frame.BorderSizePixel = 0
     frame.ClipsDescendants = false
-    addHardShadow(frame, 6, cornerRadius or 18)
+    addHardShadow(frame, 9, cornerRadius or 18, ShadowStyle.PANEL)
     addCorner(frame, cornerRadius or 18)
     addPanelGrid(frame)
     addChunkyStroke(frame, 4)
@@ -376,6 +466,7 @@ local function applyWell(frame, cornerRadius)
     frame.BackgroundColor3 = Theme.White
     frame.BackgroundTransparency = 0.02
     frame.BorderSizePixel = 0
+    addHardShadow(frame, 4, cornerRadius or 14, ShadowStyle.ELEMENT)
     addCorner(frame, cornerRadius or 14)
     addChunkyStroke(frame, 3)
     return frame
@@ -383,13 +474,14 @@ end
 
 local function applyButtonStyle(button, color, textColor, radius)
     button.BackgroundColor3 = color or Theme.Black
+    button.BackgroundTransparency = 0 -- Primary controls must remain solid, never washed out.
     button.BorderSizePixel = 0
     button.AutoButtonColor = false
     if button:IsA("TextButton") then
         button.TextColor3 = textColor or Theme.White
         button.Font = Enum.Font.GothamBlack
     end
-    addHardShadow(button, 5, radius or 10)
+    addHardShadow(button, 4, radius or 10, ShadowStyle.ELEMENT)
     addCorner(button, radius or 10)
     addChunkyStroke(button, 3)
     return button
@@ -443,8 +535,55 @@ bagButton.BackgroundColor3 = Theme.White
 bagButton.Image = "rbxassetid://6031265972"
 applyButtonStyle(bagButton, Theme.White, Theme.Text, 10)
 
+local taskButton = newGui("TextButton", "TaskButton", mainGui)
+taskButton.Size = UDim2.new(0, 126, 0, 46)
+taskButton.Position = UDim2.new(0, 154, 0, 154)
+taskButton.Text = "DAILY"
+taskButton.TextScaled = true
+applyButtonStyle(taskButton, Theme.Accent, Theme.Text, 10)
+local codeButton = newGui("TextButton", "CodeButton", mainGui)
+codeButton.Size = UDim2.new(0, 126, 0, 46)
+codeButton.Position = UDim2.new(0, 154, 0, 208)
+codeButton.Text = "CODES"
+codeButton.TextScaled = true
+applyButtonStyle(codeButton, Theme.White, Theme.Text, 10)
+
+local taskPanel = newGui("Frame", "DailyTaskPanel", mainGui)
+taskPanel.Size = UDim2.new(0, 500, 0, 440)
+taskPanel.Position = UDim2.new(.5, -250, .5, -220)
+taskPanel.Visible = false
+applyPanel(taskPanel, 18)
+createPanelTitleHeader(taskPanel, "DAILY TASKS", 205)
+local closeTasks = newGui("TextButton", "CloseButton", taskPanel)
+closeTasks.Size = UDim2.new(0, 82, 0, 36); closeTasks.Position = UDim2.new(1, -96, 0, 12); closeTasks.Text = "CLOSE"; closeTasks.TextScaled = true
+applyButtonStyle(closeTasks, Theme.Red, Theme.White, 10)
+local taskList = newGui("ScrollingFrame", "TaskList", taskPanel)
+taskList.Size = UDim2.new(1, -44, 1, -88); taskList.Position = UDim2.new(0, 22, 0, 62); taskList.CanvasSize = UDim2.new(); taskList.ScrollBarThickness = 6; taskList.ScrollBarImageColor3 = Theme.Black
+applyWell(taskList, 14)
+local taskPadding = newGui("UIPadding", "Padding", taskList); taskPadding.PaddingLeft = UDim.new(0, 10); taskPadding.PaddingRight = UDim.new(0, 16); taskPadding.PaddingTop = UDim.new(0, 10); taskPadding.PaddingBottom = UDim.new(0, 10)
+local taskLayout = newGui("UIListLayout", "Layout", taskList); taskLayout.Padding = UDim.new(0, 12)
+local taskTemplate = newGui("TextButton", "TaskTemplate", taskList)
+taskTemplate.Size = UDim2.new(1, -2, 0, 112); taskTemplate.BackgroundColor3 = Theme.White; taskTemplate.Visible = false; taskTemplate.Text = ""; taskTemplate.AutoButtonColor = false
+applyButtonStyle(taskTemplate, Theme.White, Theme.Text, 12)
+local taskName = newGui("TextLabel", "Name", taskTemplate); taskName.BackgroundTransparency = 1; taskName.Position = UDim2.new(0, 14, 0, 10); taskName.Size = UDim2.new(.62, 0, 0, 26); taskName.TextXAlignment = Enum.TextXAlignment.Left; taskName.TextScaled = true
+local taskReward = newGui("TextLabel", "Reward", taskTemplate); taskReward.BackgroundTransparency = 1; taskReward.Position = UDim2.new(.62, 0, 0, 10); taskReward.Size = UDim2.new(.35, -10, 0, 26); taskReward.TextXAlignment = Enum.TextXAlignment.Right; taskReward.TextScaled = true; taskReward.TextColor3 = Theme.Accent
+local progressBack = newGui("Frame", "ProgressBack", taskTemplate); progressBack.Size = UDim2.new(1, -28, 0, 18); progressBack.Position = UDim2.new(0, 14, 0, 46); progressBack.BackgroundColor3 = Theme.Black; addCorner(progressBack, 8)
+local progressFill = newGui("Frame", "ProgressFill", progressBack); progressFill.Size = UDim2.new(0, 0, 1, 0); progressFill.BackgroundColor3 = Theme.Accent; addCorner(progressFill, 8)
+local progressLabel = newGui("TextLabel", "ProgressLabel", taskTemplate); progressLabel.BackgroundTransparency = 1; progressLabel.Position = UDim2.new(0, 14, 0, 70); progressLabel.Size = UDim2.new(.55, 0, 0, 28); progressLabel.TextXAlignment = Enum.TextXAlignment.Left; progressLabel.TextScaled = true
+local claimLabel = newGui("TextLabel", "ClaimLabel", taskTemplate); claimLabel.BackgroundColor3 = Theme.Black; claimLabel.Position = UDim2.new(.62, 0, 0, 72); claimLabel.Size = UDim2.new(.35, -10, 0, 26); claimLabel.TextColor3 = Theme.White; claimLabel.Text = "IN PROGRESS"; claimLabel.TextScaled = true; addCorner(claimLabel, 8)
+
+local codePanel = newGui("Frame", "CodePanel", mainGui)
+codePanel.Size = UDim2.new(0, 400, 0, 240); codePanel.Position = UDim2.new(.5, -200, .5, -120); codePanel.Visible = false
+applyPanel(codePanel, 18)
+createPanelTitleHeader(codePanel, "REDEEM CODE", 205)
+local closeCode = newGui("TextButton", "CloseButton", codePanel); closeCode.Size = UDim2.new(0, 82, 0, 36); closeCode.Position = UDim2.new(1, -96, 0, 12); closeCode.Text = "CLOSE"; closeCode.TextScaled = true; applyButtonStyle(closeCode, Theme.Red, Theme.White, 10)
+local codeHint = newGui("TextLabel", "Hint", codePanel); codeHint.BackgroundTransparency = 1; codeHint.Position = UDim2.new(0, 24, 0, 70); codeHint.Size = UDim2.new(1, -48, 0, 32); codeHint.Text = "Enter a reward code"; codeHint.TextScaled = true
+local codeBox = newGui("TextBox", "CodeBox", codePanel); codeBox.Size = UDim2.new(1, -48, 0, 44); codeBox.Position = UDim2.new(0, 24, 0, 112); codeBox.PlaceholderText = "ENTER CODE"; codeBox.ClearTextOnFocus = false; codeBox.TextScaled = true; applyWell(codeBox, 10)
+local redeemButton = newGui("TextButton", "RedeemButton", codePanel); redeemButton.Size = UDim2.new(1, -48, 0, 42); redeemButton.Position = UDim2.new(0, 24, 1, -62); redeemButton.Text = "REDEEM"; redeemButton.TextScaled = true; applyButtonStyle(redeemButton, Theme.Black, Theme.White, 10)
+
 local wheel = newGui("Frame", "WheelPanel", mainGui)
 wheel.Name = "WheelPanel"
+wheel.ZIndex = 20
 wheel.Size = UDim2.new(0, 420, 0, 410)
 wheel.AnchorPoint = Vector2.new(1, 0.5)
 wheel.Position = UDim2.new(1, -20, 0.5, 0)
@@ -567,11 +706,11 @@ currentDrawLabel.Visible = false
 applyPanel(currentDrawLabel, 8)
 
 local shopHub = newGui("Frame", "ShopHub", mainGui)
-shopHub.Size = UDim2.new(0, 620, 0, 360)
-shopHub.Position = UDim2.new(0.5, -310, 0.5, -180)
+shopHub.Size = UDim2.new(0, 700, 0, 430)
+shopHub.Position = UDim2.new(0.5, -350, 0.5, -215)
 shopHub.Visible = false
 applyPanel(shopHub, 18)
-addTag(shopHub, "SHOP", Theme.Black)
+createPanelTitleHeader(shopHub, "SHOP", 170)
 local shopAspect = newGui("UIAspectRatioConstraint", "AspectRatio", shopHub)
 shopAspect.AspectRatio = 1.72
 shopAspect.DominantAxis = Enum.DominantAxis.Width
@@ -590,6 +729,13 @@ shopGrid.Position = UDim2.new(0, 20, 0, 62)
 shopGrid.ScrollBarThickness = 8
 shopGrid.CanvasSize = UDim2.new(0, 0, 0, 0)
 applyWell(shopGrid, 14)
+shopGrid.ScrollBarThickness = 6
+shopGrid.ScrollBarImageColor3 = Theme.Black
+local shopGridPadding = newGui("UIPadding", "ListPadding", shopGrid)
+shopGridPadding.PaddingLeft = UDim.new(0, 10)
+shopGridPadding.PaddingRight = UDim.new(0, 16)
+shopGridPadding.PaddingTop = UDim.new(0, 10)
+shopGridPadding.PaddingBottom = UDim.new(0, 10)
 local gridLayout = newGui("UIGridLayout", "GridLayout", shopGrid)
 gridLayout.CellSize = UDim2.new(0, 128, 0, 128)
 gridLayout.CellPadding = UDim2.new(0, 12, 0, 12)
@@ -628,22 +774,14 @@ itemCost.TextColor3 = Theme.Accent
 
 
 local bagPanel = newGui("Frame", "InventoryBag", mainGui)
-bagPanel.Size = UDim2.new(0, 620, 0, 360)
-bagPanel.Position = UDim2.new(0.5, -310, 0.5, -180)
+bagPanel.Size = UDim2.new(0, 700, 0, 430)
+bagPanel.Position = UDim2.new(0.5, -350, 0.5, -215)
 bagPanel.Visible = false
 applyPanel(bagPanel, 18)
-addTag(bagPanel, "BAG", Theme.Black)
+createPanelTitleHeader(bagPanel, "ABILITY BAG", 210)
 local bagAspect = newGui("UIAspectRatioConstraint", "AspectRatio", bagPanel)
 bagAspect.AspectRatio = 1.72
 bagAspect.DominantAxis = Enum.DominantAxis.Width
-local bagTitle = newGui("TextLabel", "Title", bagPanel)
-bagTitle.BackgroundTransparency = 1
-bagTitle.Size = UDim2.new(1, -130, 0, 44)
-bagTitle.Position = UDim2.new(0, 20, 0, 12)
-bagTitle.Font = Enum.Font.GothamBlack
-bagTitle.Text = "Ability Bag"
-bagTitle.TextScaled = true
-bagTitle.TextColor3 = Theme.Text
 local closeBag = newGui("TextButton", "CloseButton", bagPanel)
 closeBag.Size = UDim2.new(0, 90, 0, 38)
 closeBag.Position = UDim2.new(1, -104, 0, 12)
@@ -708,6 +846,13 @@ bagList.Position = UDim2.new(0, 20, 0, 148)
 bagList.ScrollBarThickness = 8
 bagList.CanvasSize = UDim2.new(0, 0, 0, 0)
 applyWell(bagList, 14)
+bagList.ScrollBarThickness = 6
+bagList.ScrollBarImageColor3 = Theme.Black
+local bagListPadding = newGui("UIPadding", "ListPadding", bagList)
+bagListPadding.PaddingLeft = UDim.new(0, 10)
+bagListPadding.PaddingRight = UDim.new(0, 16)
+bagListPadding.PaddingTop = UDim.new(0, 10)
+bagListPadding.PaddingBottom = UDim.new(0, 10)
 -- Highlighted while dragging a skill DOWN off a box, to show "drop here to put it back".
 local bagDropHint = newGui("UIStroke", "UIStroke_DropHint", bagList)
 bagDropHint.Thickness = 4
@@ -894,6 +1039,10 @@ function StateService.Create(player, loaded)
         Stats = loaded.Stats or {},
         UnlockedWheelRewards = loaded.UnlockedWheelRewards or {},
         UnlockedCards = loaded.UnlockedCards or {},
+        DailyTaskDay = loaded.DailyTaskDay or "",
+        DailyTaskProgress = loaded.DailyTaskProgress or {},
+        DailyTaskClaims = loaded.DailyTaskClaims or {},
+        RedeemedCodes = loaded.RedeemedCodes or {},
         -- EquippedSkills is a free-form, order-free list of up to 5 skill keys (no slot numbers).
         -- pairs() here also migrates any older save data that stored it as a slot-indexed table.
         EquippedSkills = (function()
@@ -997,6 +1146,10 @@ function StateService.Serialize(player)
         Stats = state.Stats,
         UnlockedWheelRewards = state.UnlockedWheelRewards,
         UnlockedCards = state.UnlockedCards,
+        DailyTaskDay = state.DailyTaskDay,
+        DailyTaskProgress = state.DailyTaskProgress,
+        DailyTaskClaims = state.DailyTaskClaims,
+        RedeemedCodes = state.RedeemedCodes,
         EquippedSkills = state.EquippedSkills,
     }
 end
@@ -1189,9 +1342,79 @@ function StateService.Push(player)
         ActiveBuffs = StateService.ActiveBuffs(player), UnlockedWheelRewards = state.UnlockedWheelRewards, UnlockedCards = state.UnlockedCards,
         Inventory = StateService.BuildInventory(player),
         ShopItems = StateService.BuildShop and StateService.BuildShop(state) or nil,
+        DailyTasks = StateService.BuildDailyTasks and StateService.BuildDailyTasks(player) or nil,
     })
 end
 return StateService
+]=]
+
+local taskService = getOrCreate(servicesPackage, "ModuleScript", "DailyTaskService")
+taskService.Source = [=[
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local Config = require(ReplicatedStorage.Configs.DailyTaskConfig)
+local StateService = require(script.Parent.StateService)
+local DailyTaskService = {}
+local function dayKey() return os.date("!%Y-%m-%d") end
+local function ensure(state)
+    local day = dayKey()
+    if state.DailyTaskDay ~= day then
+        state.DailyTaskDay, state.DailyTaskProgress, state.DailyTaskClaims = day, {}, {}
+    end
+end
+local function grant(state, reward)
+    for currency, amount in pairs(reward or {}) do state[currency] = (state[currency] or 0) + amount end
+end
+function DailyTaskService.Record(player, progressType, amount)
+    local state = StateService.Get(player); if not state then return end
+    ensure(state)
+    for id, task in pairs(Config.Tasks) do
+        if task.ProgressType == progressType and not state.DailyTaskClaims[id] then
+            state.DailyTaskProgress[id] = math.min(task.Target, (state.DailyTaskProgress[id] or 0) + (amount or 1))
+        end
+    end
+end
+function DailyTaskService.Build(player)
+    local state = StateService.Get(player); if not state then return {} end
+    ensure(state)
+    local tasks = {}
+    for id, task in pairs(Config.Tasks) do
+        table.insert(tasks, { Id = id, Name = task.Name, Progress = state.DailyTaskProgress[id] or 0, Target = task.Target, Reward = task.Reward, Claimed = state.DailyTaskClaims[id] == true })
+    end
+    return tasks
+end
+function DailyTaskService.Claim(player, id)
+    local state, task = StateService.Get(player), Config.Tasks[id]
+    if not state or not task then return false, "INVALID_TASK" end
+    ensure(state)
+    if state.DailyTaskClaims[id] then return false, "ALREADY_CLAIMED" end
+    if (state.DailyTaskProgress[id] or 0) < task.Target then return false, "NOT_COMPLETE" end
+    state.DailyTaskClaims[id] = true; grant(state, task.Reward)
+    StateService.UpdateLeaderstats(player); StateService.Push(player)
+    return true
+end
+StateService.BuildDailyTasks = DailyTaskService.Build
+return DailyTaskService
+]=]
+
+local codeService = getOrCreate(servicesPackage, "ModuleScript", "CodeService")
+codeService.Source = [=[
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local Config = require(ReplicatedStorage.Configs.CodeConfig)
+local StateService = require(script.Parent.StateService)
+local CodeService = {}
+function CodeService.Redeem(player, rawCode)
+    local state = StateService.Get(player)
+    local code = string.upper(string.gsub(tostring(rawCode or ""), "%s+", ""))
+    local entry = Config[code]
+    if not state or not entry then return false, "INVALID_CODE" end
+    state.RedeemedCodes = state.RedeemedCodes or {}
+    if state.RedeemedCodes[code] then return false, "ALREADY_REDEEMED" end
+    state.RedeemedCodes[code] = true
+    for currency, amount in pairs(entry.Reward or {}) do state[currency] = (state[currency] or 0) + amount end
+    StateService.UpdateLeaderstats(player); StateService.Push(player)
+    return true, entry.Reward
+end
+return CodeService
 ]=]
 
 local serverGuardService = getOrCreate(servicesPackage, "ModuleScript", "ServerGuardService")
@@ -1459,6 +1682,72 @@ end
 return CakeEffectsService
 ]=]
 
+-- Cake responsibilities are intentionally split: access arbitration, movement, rain scheduling,
+-- and the CakeService façade can now evolve without skill scripts mutating instances directly.
+local cakeAccessService = getOrCreate(servicesPackage, "ModuleScript", "CakeAccessService")
+cakeAccessService.Source = [=[
+-- Tracks the single player currently eating each cake.  This is server-only state: clients and
+-- skills never receive a bypass, so a cake being eaten cannot be moved, damaged, or stolen.
+local CakeAccessService = { EaterByCake = {}, CakeByEater = {} }
+
+function CakeAccessService.IsAvailableTo(player, cake)
+    local eater = CakeAccessService.EaterByCake[cake]
+    return eater == nil or eater == player
+end
+
+function CakeAccessService.ClaimForEating(player, cake)
+    if not player or not cake or not cake.Parent or not CakeAccessService.IsAvailableTo(player, cake) then
+        return false
+    end
+    local previous = CakeAccessService.CakeByEater[player]
+    if previous and previous ~= cake then
+        CakeAccessService.EaterByCake[previous] = nil
+    end
+    CakeAccessService.EaterByCake[cake] = player
+    CakeAccessService.CakeByEater[player] = cake
+    return true
+end
+
+function CakeAccessService.ReleasePlayer(player)
+    local cake = CakeAccessService.CakeByEater[player]
+    if cake and CakeAccessService.EaterByCake[cake] == player then
+        CakeAccessService.EaterByCake[cake] = nil
+    end
+    CakeAccessService.CakeByEater[player] = nil
+end
+
+function CakeAccessService.ReleaseCake(cake)
+    local player = CakeAccessService.EaterByCake[cake]
+    if player and CakeAccessService.CakeByEater[player] == cake then
+        CakeAccessService.CakeByEater[player] = nil
+    end
+    CakeAccessService.EaterByCake[cake] = nil
+end
+
+return CakeAccessService
+]=]
+
+local cakeMovementService = getOrCreate(servicesPackage, "ModuleScript", "CakeMovementService")
+cakeMovementService.Source = [=[
+-- The only low-level server movement operations for cakes.  Authorization stays in CakeService.
+local CakeMovementService = {}
+
+function CakeMovementService.Apply(cake, change)
+    local primary = cake and cake.PrimaryPart
+    if not primary then return false end
+    if change.LinearVelocity ~= nil then
+        primary.AssemblyLinearVelocity = change.LinearVelocity
+    end
+    if change.CFrame then
+        if change.LinearVelocity == nil then primary.AssemblyLinearVelocity = Vector3.zero end
+        cake:PivotTo(change.CFrame)
+    end
+    return true
+end
+
+return CakeMovementService
+]=]
+
 local cakeService = getOrCreate(servicesPackage, "ModuleScript", "CakeService")
 cakeService.Source = [=[
 local Debris = game:GetService("Debris")
@@ -1473,12 +1762,15 @@ local CakeConfig = require(Configs.CakeConfig)
 local LocalizationConfig = require(Configs.LocalizationConfig)
 local StateService = require(script.Parent.StateService)
 local CakeEffectsService = require(script.Parent.CakeEffectsService)
+local CakeAccessService = require(script.Parent.CakeAccessService)
+local CakeMovementService = require(script.Parent.CakeMovementService)
+local DailyTaskService = require(script.Parent.DailyTaskService)
 local CakeModels = ReplicatedStorage:FindFirstChild("cake") or ReplicatedStorage.Models.cake
 
 -- Public cake API used by SkillService.  Keep all cake movement/damage here so skills
 -- cannot bypass rewards, animation, or cleanup rules. Cakes are world objects: any
 -- nearby player can eat them, and each eat tick reselects the nearest cake in range.
-local CakeService = { Owners = {}, EatingByPlayer = {}, TouchingByPlayer = {} }
+local CakeService = { Owners = {}, EatingByPlayer = {}, TouchingByPlayer = {}, Access = CakeAccessService }
 local Runtime = Workspace:FindFirstChild("cake") or Instance.new("Folder")
 Runtime.Name, Runtime.Parent = "cake", Workspace
 local function text(key) return LocalizationConfig["en-us"][key] or key end
@@ -1633,17 +1925,23 @@ function CakeService.Decorate(cake, isGlow)
     CakeService.ApplyCakeLevel(cake, initialLevel)
 end
 local function stopEating(player)
+    CakeAccessService.ReleasePlayer(player)
     CakeService.EatingByPlayer[player] = nil
 end
 local function stopEatingCake(cake)
-    for eatingPlayer, target in pairs(CakeService.EatingByPlayer) do
-        if target == cake then
-            CakeService.EatingByPlayer[eatingPlayer] = nil
-        end
+    local eatingPlayer = CakeAccessService.EaterByCake[cake]
+    CakeAccessService.ReleaseCake(cake)
+    if eatingPlayer then CakeService.EatingByPlayer[eatingPlayer] = nil end
+    for player, target in pairs(CakeService.EatingByPlayer) do
+        if target == cake then CakeService.EatingByPlayer[player] = nil end
     end
-    for _, touching in pairs(CakeService.TouchingByPlayer) do
-        touching[cake] = nil
-    end
+    for _, touching in pairs(CakeService.TouchingByPlayer) do touching[cake] = nil end
+end
+
+-- Public server-side eligibility check for skill authors.  A false result means another player
+-- has already claimed the cake by eating it; no skill is allowed to affect that cake.
+function CakeService.CanAffectCake(player, cake)
+    return cake and cake.Parent and not cake:GetAttribute("Finishing") and CakeAccessService.IsAvailableTo(player, cake)
 end
 local function touchedCakesFor(player)
     CakeService.TouchingByPlayer[player] = CakeService.TouchingByPlayer[player] or {}
@@ -1654,7 +1952,7 @@ local function nearestTouchedCake(player)
     if not root then return nil end
     local bestCake, bestDistance
     for cake in pairs(touchedCakesFor(player)) do
-        if cake.Parent and cake.PrimaryPart and not cake:GetAttribute("Finishing") then
+        if CakeService.CanAffectCake(player, cake) and cake.PrimaryPart then
             local distance = (cake.PrimaryPart.Position - root.Position).Magnitude
             if distance <= (CakeConfig.EatRangeStuds or 9) and (not bestDistance or distance < bestDistance) then
                 bestCake, bestDistance = cake, distance
@@ -1677,6 +1975,7 @@ function CakeService.Finish(player, cake)
     if state then
         state.CakePoints += cake:GetAttribute("RewardCakePoints") or 1
         state.WheelSpins += cake:GetAttribute("RewardWheelTickets") or 1
+        DailyTaskService.Record(player, "EatCakes", 1)
         StateService.UpdateLeaderstats(player); StateService.Push(player)
     end
     -- Eating is deliberately distinct from expiry: disable physics, then shrink/fade into the player.
@@ -1740,7 +2039,7 @@ function CakeService.Expire(cake)
     end)
 end
 function CakeService.ApplyServerCakeChange(player, cake, change)
-    if not cake or not cake.Parent or cake:GetAttribute("Finishing") then return false end
+    if not CakeService.CanAffectCake(player, cake) then return false, "CAKE_BEING_EATEN" end
     change = change or {}
     local damage = math.max(0, tonumber(change.Damage) or 0)
     if change.DamagePercent then
@@ -1761,14 +2060,17 @@ function CakeService.ApplyServerCakeChange(player, cake, change)
             return true
         end
     end
-    if cake.PrimaryPart and change.LinearVelocity then
-        cake.PrimaryPart.AssemblyLinearVelocity = change.LinearVelocity
-    end
-    if cake.PrimaryPart and change.CFrame then
-        if change.LinearVelocity == nil then cake.PrimaryPart.AssemblyLinearVelocity = Vector3.zero end
-        cake:PivotTo(change.CFrame)
-    end
+    CakeMovementService.Apply(cake, change)
     return true
+end
+
+-- Explicit server APIs for skills that change cake coordinates or vectors.  They route through
+-- the same access guard as damage and therefore cannot influence another player's active meal.
+function CakeService.SetCakeVelocity(player, cake, velocity)
+    return CakeService.ApplyServerCakeChange(player, cake, { LinearVelocity = velocity })
+end
+function CakeService.SetCakeCFrame(player, cake, cframe)
+    return CakeService.ApplyServerCakeChange(player, cake, { CFrame = cframe })
 end
 function CakeService.DamageCake(player, cake, amount)
     return CakeService.ApplyServerCakeChange(player, cake, { Damage = amount })
@@ -1777,7 +2079,7 @@ function CakeService.GetCakes(player, maximum, minimumDistance, maximumDistance)
     local root, results = rootOf(player), {}
     if not root then return results end
     for cake in pairs(CakeService.Owners) do
-        if cake.Parent and cake.PrimaryPart and not cake:GetAttribute("Finishing") then
+        if CakeService.CanAffectCake(player, cake) and cake.PrimaryPart then
             local distance = (cake.PrimaryPart.Position - root.Position).Magnitude
             if (not minimumDistance or distance >= minimumDistance) and (not maximumDistance or distance <= maximumDistance) then table.insert(results, { Cake = cake, Distance = distance }) end
         end
@@ -1788,7 +2090,7 @@ function CakeService.GetCakes(player, maximum, minimumDistance, maximumDistance)
 end
 function CakeService.MoveNearPlayer(player, cake, distance, travelSeconds)
     local root = rootOf(player)
-    if not root or not cake or not cake.PrimaryPart or cake:GetAttribute("Finishing") then return false end
+    if not root or not CakeService.CanAffectCake(player, cake) or not cake.PrimaryPart then return false end
     local angle = math.random() * math.pi * 2
     local destination = CFrame.new(root.Position + Vector3.new(math.cos(angle) * distance, 2, math.sin(angle) * distance))
     CakeService.ApplyServerCakeChange(player, cake, { LinearVelocity = Vector3.zero })
@@ -1806,8 +2108,15 @@ function CakeService.BeginAutoEat(player)
         while player.Parent do
             local cake = nearestTouchedCake(player)
             if not cake then break end
+            -- Claim before the first bite.  Concurrent touch events can only give one player
+            -- this cake; all other eaters and skills see it as unavailable immediately.
+            if not CakeAccessService.ClaimForEating(player, cake) then
+                continue
+            end
             CakeService.EatingByPlayer[player] = cake
-            CakeService.DamageCake(player, cake, CakeConfig.BaseEatDamagePerSecond + StateService.EffectiveStat(player, "EatSpeed"))
+            if CakeService.CanAffectCake(player, cake) then
+                CakeService.DamageCake(player, cake, CakeConfig.BaseEatDamagePerSecond + StateService.EffectiveStat(player, "EatSpeed"))
+            end
             task.wait(CakeConfig.EatTickSeconds)
         end
         stopEating(player)
@@ -1985,6 +2294,65 @@ end
 return CakeService
 ]=]
 
+local cakeSpawnService = getOrCreate(servicesPackage, "ModuleScript", "CakeSpawnService")
+cakeSpawnService.Source = [=[
+-- Generation boundary.  Rain schedulers call this API instead of knowing how a cake is cloned,
+-- decorated, upgraded, split, registered, or expired.
+local CakeService = require(script.Parent.CakeService)
+local CakeSpawnService = {}
+
+function CakeSpawnService.SpawnNear(player)
+    return CakeService.SpawnNear(player)
+end
+
+function CakeSpawnService.Split(player, sourceCake)
+    return CakeService.SplitCake(player, sourceCake)
+end
+
+return CakeSpawnService
+]=]
+
+local cakeRainService = getOrCreate(servicesPackage, "ModuleScript", "CakeRainService")
+cakeRainService.Source = [=[
+-- Owns the per-player cake-rain schedule only; creation stays behind CakeSpawnService.
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local CakeConfig = require(ReplicatedStorage.Configs.CakeConfig)
+local StateService = require(script.Parent.StateService)
+local CakeSpawnService = require(script.Parent.CakeSpawnService)
+local CakeRainService = {}
+
+function CakeRainService.StartPlayer(player)
+    local function burst()
+        task.spawn(function()
+            for _ = 1, CakeConfig.InitialBurstCount do
+                if not player.Parent then return end
+                CakeSpawnService.SpawnNear(player)
+                task.wait(.18)
+            end
+        end)
+    end
+    player.CharacterAdded:Connect(function(character)
+        character:WaitForChild("HumanoidRootPart", 10)
+        task.wait(.35)
+        burst()
+    end)
+    if player.Character then burst() end
+    task.spawn(function()
+        while player.Parent do
+            local character = player.Character or player.CharacterAdded:Wait()
+            character:WaitForChild("HumanoidRootPart", 10)
+            local humanoid = character:FindFirstChildOfClass("Humanoid")
+            if humanoid then humanoid.WalkSpeed = 16 + StateService.EffectiveStat(player, "PlayerSpeed") end
+            local ok, err = pcall(CakeSpawnService.SpawnNear, player)
+            if not ok then warn("Cake Rain RNG: spawn failed; rain will continue", err) end
+            StateService.Push(player)
+            task.wait(math.max(.2, CakeConfig.SpawnInterval - StateService.EffectiveStat(player, "CakeSpawnHaste")))
+        end
+    end)
+end
+return CakeRainService
+]=]
+
 -- Every wheel term chooses its own module, so its stacking and special behavior can evolve independently.
 local rewardScripts = getOrCreate(servicesPackage, "Folder", "RewardScripts")
 local rewardTemplate = getOrCreate(rewardScripts, "ModuleScript", "RewardTemplate")
@@ -2078,7 +2446,9 @@ function Template.New(player, parameters)
         Damage = function(_, cake, amount) return CakeService.ApplyServerCakeChange(player, cake, { Damage = amount }) end,
         DamagePercent = function(_, cake, percent) return CakeService.ApplyServerCakeChange(player, cake, { DamagePercent = percent }) end,
         MoveNear = function(_, cake, distance, seconds) return CakeService.MoveNearPlayer(player, cake, distance, seconds) end,
-        SetMomentum = function(_, cake, velocity) return CakeService.ApplyServerCakeChange(player, cake, { LinearVelocity = velocity }) end,
+        SetMomentum = function(_, cake, velocity) return CakeService.SetCakeVelocity(player, cake, velocity) end,
+        SetPosition = function(_, cake, cframe) return CakeService.SetCakeCFrame(player, cake, cframe) end,
+        CanAffectCake = function(_, cake) return CakeService.CanAffectCake(player, cake) end,
         GetAbilityLevel = function(_, abilityKey)
             local state, best, now = StateService.Get(player), 0, os.clock()
             if not state then return best end
@@ -2236,6 +2606,8 @@ local ShopConfig = require(Configs.ShopConfig)
 local LocalizationConfig = require(Configs.LocalizationConfig)
 local StateService = require(script.Parent.StateService)
 local SkillService = require(script.Parent.SkillService)
+local DailyTaskService = require(script.Parent.DailyTaskService)
+local CodeService = require(script.Parent.CodeService)
 local RewardService = require(script.Parent.RewardService)
 local ServerGuardService = require(script.Parent.ServerGuardService)
 
@@ -2397,10 +2769,22 @@ function WheelService.Start()
             table.insert(pending, { Slots = slots, Picked = picked, PickedIndex = pickedIndex })
         end
         if #pending == 0 then return { Ok = false, Error = "EMPTY_POOL" } end
+        DailyTaskService.Record(player, "RollWheel", #pending)
         state.PendingWheelSpin = pending
         StateService.UpdateLeaderstats(player)
         StateService.Push(player)
         return { Ok = true, Spins = pending }
+    end
+
+    Events.RequestClaimDailyTask.OnServerInvoke = function(player, taskId)
+        if not ServerGuardService.Allow(player, "RequestClaimDailyTask", 8, 5) then return { Ok = false, Error = "RATE_LIMIT" } end
+        local ok, result = DailyTaskService.Claim(player, tostring(taskId))
+        return { Ok = ok, Reward = ok and result or nil, Error = ok and nil or result }
+    end
+    Events.RequestRedeemCode.OnServerInvoke = function(player, code)
+        if not ServerGuardService.Allow(player, "RequestRedeemCode", 6, 10) then return { Ok = false, Error = "RATE_LIMIT" } end
+        local ok, result = CodeService.Redeem(player, code)
+        return { Ok = ok, Reward = ok and result or nil, Error = ok and nil or result }
     end
 
     Events.RequestCardDraw.OnServerInvoke = function(player)
@@ -2464,6 +2848,7 @@ local Players = game:GetService("Players")
 local DataService = require(script.Parent.Services.DataService)
 local StateService = require(script.Parent.Services.StateService)
 local CakeService = require(script.Parent.Services.CakeService)
+local CakeRainService = require(script.Parent.Services.CakeRainService)
 local WheelService = require(script.Parent.Services.WheelService)
 local SkillService = require(script.Parent.Services.SkillService)
 local GlobalLeaderboardService = require(script.Parent.Services.GlobalLeaderboardService)
@@ -2475,7 +2860,7 @@ GlobalLeaderboardService.Start()
 local function setupPlayer(player)
     StateService.Create(player, DataService.Load(player))
     SkillService.ResumePlayer(player)
-    CakeService.StartPlayer(player)
+    CakeRainService.StartPlayer(player)
 end
 
 Players.PlayerAdded:Connect(setupPlayer)
@@ -2506,16 +2891,129 @@ game:BindToClose(function()
 end)
 ]=]
 
-local clientScript = getOrCreate(StarterPlayer.StarterPlayerScripts, "LocalScript", "CakeRainRNGClient")
-clientScript.Source = [=[
+local clientPackage = getOrCreate(ReplicatedStorage, "Folder", "ClientModules")
+local clientUIService = getOrCreate(clientPackage, "ModuleScript", "ClientUIService")
+clientUIService.Source = [=[
+-- LocalScript UI bootstrap is isolated here so game state, wheel logic, and bag drag/drop remain
+-- independently editable.  This module owns only responsive layout and card-button feedback.
+local TweenService = game:GetService("TweenService")
+local GuiService = game:GetService("GuiService")
+local ClientUIService = {}
+
+local function shadowFor(target)
+    return target:FindFirstChild("HardShadow")
+end
+
+local function syncShadow(target, offset)
+    local shadow = shadowFor(target)
+    if not shadow then return end
+    shadow.Visible = target.Visible
+    shadow.AnchorPoint = Vector2.new(0, 0)
+    shadow.Size = UDim2.fromScale(1, 1)
+    shadow.Position = UDim2.new(0, offset or 6, 0, offset or 6)
+end
+
+local function bindButton(button)
+    local shadow = shadowFor(button)
+    if not shadow then return end
+    local base = button.Position
+    local function tween(position)
+        TweenService:Create(button, TweenInfo.new(.08, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), { Position = position }):Play()
+    end
+    button.MouseEnter:Connect(function() tween(base + UDim2.new(0, -2, 0, -2)) end)
+    button.MouseLeave:Connect(function() tween(base) end)
+    button.MouseButton1Down:Connect(function() tween(base + UDim2.new(0, 3, 0, 3)) end)
+    button.MouseButton1Up:Connect(function() tween(base) end)
+end
+
+function ClientUIService.Initialize(gui, refs)
+    local function updateResponsiveScale()
+        local camera = workspace.CurrentCamera
+        if not camera then return end
+        local viewport, inset = camera.ViewportSize, GuiService:GetGuiInset()
+        gui.ResponsiveScale.Scale = math.clamp(math.min(viewport.X / 980, viewport.Y / 620), .78, 1)
+        refs.Stats.Position = UDim2.new(0, 18 + inset.X, 0, 18 + inset.Y)
+        refs.ShopButton.Position = UDim2.new(0, 18 + inset.X, 0, 148 + inset.Y)
+        refs.BagButton.Position = UDim2.new(0, 86 + inset.X, 0, 148 + inset.Y)
+        if viewport.X < 760 then
+            refs.ShopHub.Size, refs.ShopHub.Position = UDim2.new(.92, 0, 0, 360), UDim2.new(.04, 0, .5, -180)
+            refs.BagPanel.Size, refs.BagPanel.Position = UDim2.new(.92, 0, 0, 360), UDim2.new(.04, 0, .5, -180)
+        else
+            refs.ShopHub.Size, refs.ShopHub.Position = UDim2.new(0, 700, 0, 430), UDim2.new(.5, -350, .5, -215)
+            refs.BagPanel.Size, refs.BagPanel.Position = UDim2.new(0, 700, 0, 430), UDim2.new(.5, -350, .5, -215)
+        end
+        for _, panel in ipairs(refs.Panels) do syncShadow(panel, 9) end
+        for _, button in ipairs(refs.Buttons) do syncShadow(button, 4) end
+    end
+    updateResponsiveScale()
+    for _, panel in ipairs(refs.Panels) do
+        syncShadow(panel, 9)
+        local restPosition = panel.Position
+        panel:GetPropertyChangedSignal("Visible"):Connect(function()
+            if not panel.Visible then syncShadow(panel, 9); return end
+            local shadow = shadowFor(panel)
+            panel.Position = restPosition + UDim2.new(0, 0, 0, 24)
+            syncShadow(panel, 9)
+            TweenService:Create(panel, TweenInfo.new(.18, Enum.EasingStyle.Back, Enum.EasingDirection.Out), { Position = restPosition }):Play()
+
+        end)
+    end
+    for _, button in ipairs(refs.Buttons) do bindButton(button) end
+    for _, descendant in ipairs(gui:GetDescendants()) do
+        if descendant.Name == "PanelGrid" and descendant:IsA("ImageLabel") then
+            TweenService:Create(descendant, TweenInfo.new(12, Enum.EasingStyle.Linear, Enum.EasingDirection.InOut, -1), { ImageRectOffset = Vector2.new(28, 28) }):Play()
+        end
+    end
+    if workspace.CurrentCamera then workspace.CurrentCamera:GetPropertyChangedSignal("ViewportSize"):Connect(updateResponsiveScale) end
+    workspace:GetPropertyChangedSignal("CurrentCamera"):Connect(updateResponsiveScale)
+end
+return ClientUIService
+]=]
+
+local clientSoundService = getOrCreate(clientPackage, "ModuleScript", "ClientSoundService")
+clientSoundService.Source = [=[
+-- Keeps client audio lifecycle out of the gameplay LocalScript.
+local ContentProvider = game:GetService("ContentProvider")
+local SoundService = game:GetService("SoundService")
+local ClientSoundService = {}
+
+function ClientSoundService.Create(sounds)
+    local folder = Instance.new("Folder")
+    folder.Name = "CakeRainSounds"
+    folder.Parent = SoundService
+    local volumes = { Button = 1.8, Interact = 1.6, WheelTick = .5, CakeShrink = 1.6 }
+    local templates = {}
+    for key, soundId in pairs(sounds or {}) do
+        local sound = Instance.new("Sound")
+        sound.Name, sound.SoundId, sound.Volume, sound.Parent = key .. "Template", soundId, volumes[key] or 1, folder
+        templates[key] = sound
+    end
+    task.spawn(function()
+        local preload = {}
+        for _, sound in pairs(templates) do table.insert(preload, sound) end
+        pcall(function() ContentProvider:PreloadAsync(preload) end)
+    end)
+    return function(key, volume)
+        local template = templates[key]
+        if not template then return end
+        local sound = template:Clone()
+        sound.Name, sound.Volume, sound.Parent = key .. "Sound", volume or template.Volume, folder
+        sound:Play()
+        sound.Ended:Connect(function() sound:Destroy() end)
+        task.delay(4, function() if sound.Parent then sound:Destroy() end end)
+    end
+end
+return ClientSoundService
+]=]
+
+local clientController = getOrCreate(clientPackage, "ModuleScript", "CakeRainRNGClientController")
+clientController.Source = [=[
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Players = game:GetService("Players")
 local TweenService = game:GetService("TweenService")
 local RunService = game:GetService("RunService")
 local SoundService = game:GetService("SoundService")
-local ContentProvider = game:GetService("ContentProvider")
 local UserInputService = game:GetService("UserInputService")
-local GuiService = game:GetService("GuiService")
 
 local player = Players.LocalPlayer
 local Events = ReplicatedStorage:WaitForChild("Events")
@@ -2524,6 +3022,8 @@ local RequestWheelSpin = Events:WaitForChild("RequestWheelSpin")
 local RequestShopPurchase = Events:WaitForChild("RequestShopPurchase")
 local RequestAbilityUpgrade = Events:WaitForChild("RequestAbilityUpgrade")
 local RequestEquipSkill = Events:WaitForChild("RequestEquipSkill")
+local RequestClaimDailyTask = Events:WaitForChild("RequestClaimDailyTask")
+local RequestRedeemCode = Events:WaitForChild("RequestRedeemCode")
 local UpdateClientState = Events:WaitForChild("UpdateClientState")
 local LocalizationConfig = require(Configs:WaitForChild("LocalizationConfig"))
 local ShopConfig = require(Configs:WaitForChild("ShopConfig"))
@@ -2547,99 +3047,19 @@ local bagPanel = gui:WaitForChild("InventoryBag")
 local closeBag = bagPanel:WaitForChild("CloseButton")
 local shopHub = gui:WaitForChild("ShopHub")
 local closeShop = shopHub:WaitForChild("CloseButton")
+local taskButton = gui:WaitForChild("TaskButton")
+local taskPanel = gui:WaitForChild("DailyTaskPanel")
+local closeTasks = taskPanel:WaitForChild("CloseButton")
+local codeButton = gui:WaitForChild("CodeButton")
+local codePanel = gui:WaitForChild("CodePanel")
+local closeCode = codePanel:WaitForChild("CloseButton")
 
-local function getHardShadow(target)
-    return target.Parent and target.Parent:FindFirstChild(target.Name .. "Shadow")
-end
-
-local function syncShadowVisibility(target)
-    local shadow = getHardShadow(target)
-    if shadow then shadow.Visible = target.Visible end
-end
-
-local function syncShadowGeometry(target, offset)
-    local shadow = getHardShadow(target)
-    if not shadow then return end
-    shadow.AnchorPoint = target.AnchorPoint
-    shadow.Size = target.Size
-    shadow.Position = target.Position + UDim2.new(0, offset or 6, 0, offset or 6)
-end
-
-local function bindShadowVisibility(target)
-    syncShadowVisibility(target)
-    target:GetPropertyChangedSignal("Visible"):Connect(function()
-        syncShadowVisibility(target)
-    end)
-end
-
-local function bindRaisedButton(button)
-    local shadow = getHardShadow(button)
-    if not shadow then return end
-    local basePosition = button.Position
-    local shadowPosition = shadow.Position
-    local hoverPosition = basePosition + UDim2.new(0, -2, 0, -2)
-    local hoverShadowPosition = shadowPosition + UDim2.new(0, 2, 0, 2)
-    local pressedPosition = basePosition + UDim2.new(0, 3, 0, 3)
-    local pressedShadowPosition = basePosition + UDim2.new(0, 3, 0, 3)
-
-    local function tweenPair(targetPosition, targetShadowPosition)
-        TweenService:Create(button, TweenInfo.new(0.08, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), { Position = targetPosition }):Play()
-        TweenService:Create(shadow, TweenInfo.new(0.08, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), { Position = targetShadowPosition }):Play()
-    end
-
-    button.MouseEnter:Connect(function() tweenPair(hoverPosition, hoverShadowPosition) end)
-    button.MouseLeave:Connect(function() tweenPair(basePosition, shadowPosition) end)
-    button.MouseButton1Down:Connect(function() tweenPair(pressedPosition, pressedShadowPosition) end)
-    button.MouseButton1Up:Connect(function() tweenPair(basePosition, shadowPosition) end)
-end
-
-local function updateResponsiveScale()
-    local camera = workspace.CurrentCamera
-    if not camera then return end
-    local viewport = camera.ViewportSize
-    local insetTopLeft = GuiService:GetGuiInset()
-    local compactScale = math.min(viewport.X / 900, viewport.Y / 540)
-    gui.ResponsiveScale.Scale = math.clamp(compactScale, 0.78, 1)
-    stats.Position = UDim2.new(0, 18 + insetTopLeft.X, 0, 18 + insetTopLeft.Y)
-    shopButton.Position = UDim2.new(0, 18 + insetTopLeft.X, 0, 148 + insetTopLeft.Y)
-    bagButton.Position = UDim2.new(0, 86 + insetTopLeft.X, 0, 148 + insetTopLeft.Y)
-    if viewport.X < 760 then
-        shopHub.Size = UDim2.new(0.92, 0, 0, 320)
-        shopHub.Position = UDim2.new(0.04, 0, 0.5, -160)
-        bagPanel.Size = UDim2.new(0.92, 0, 0, 320)
-        bagPanel.Position = UDim2.new(0.04, 0, 0.5, -160)
-    else
-        shopHub.Size = UDim2.new(0, 620, 0, 360)
-        shopHub.Position = UDim2.new(0.5, -310, 0.5, -180)
-        bagPanel.Size = UDim2.new(0, 620, 0, 360)
-        bagPanel.Position = UDim2.new(0.5, -310, 0.5, -180)
-    end
-    for _, panel in ipairs({ stats, wheel, buffFrame, currentDrawLabel, shopHub, bagPanel }) do
-        syncShadowGeometry(panel, 6)
-    end
-    for _, button in ipairs({ shopButton, bagButton, spinButton, autoRollToggle, closeShop, closeBag, bagPanel.TermTabButton, bagPanel.SkillTabButton, bagPanel.DetailPanel.UpgradeButton }) do
-        syncShadowGeometry(button, 5)
-    end
-end
-updateResponsiveScale()
-for _, panel in ipairs({ stats, wheel, buffFrame, currentDrawLabel, shopHub, bagPanel }) do
-    bindShadowVisibility(panel)
-end
-for _, button in ipairs({ shopButton, bagButton, spinButton, autoRollToggle, closeShop, closeBag, bagPanel.TermTabButton, bagPanel.SkillTabButton, bagPanel.DetailPanel.UpgradeButton }) do
-    bindRaisedButton(button)
-end
-for _, descendant in ipairs(gui:GetDescendants()) do
-    if descendant.Name == "PanelGrid" and descendant:IsA("ImageLabel") then
-        descendant.ImageRectOffset = Vector2.new(0, 0)
-        TweenService:Create(descendant, TweenInfo.new(12, Enum.EasingStyle.Linear, Enum.EasingDirection.InOut, -1), {
-            ImageRectOffset = Vector2.new(28, 28),
-        }):Play()
-    end
-end
-if workspace.CurrentCamera then
-    workspace.CurrentCamera:GetPropertyChangedSignal("ViewportSize"):Connect(updateResponsiveScale)
-end
-workspace:GetPropertyChangedSignal("CurrentCamera"):Connect(updateResponsiveScale)
+local ClientUIService = require(ReplicatedStorage:WaitForChild("ClientModules"):WaitForChild("ClientUIService"))
+ClientUIService.Initialize(gui, {
+    Stats = stats, ShopButton = shopButton, BagButton = bagButton, ShopHub = shopHub, BagPanel = bagPanel,
+    Panels = { stats, wheel, buffFrame, currentDrawLabel, shopHub, bagPanel, taskPanel, codePanel },
+    Buttons = { shopButton, bagButton, taskButton, codeButton, spinButton, autoRollToggle, closeShop, closeBag, closeTasks, closeCode, codePanel.RedeemButton, bagPanel.TermTabButton, bagPanel.SkillTabButton, bagPanel.DetailPanel.UpgradeButton },
+})
 
 local state = { WheelSpins = 0, WheelPoints = 0, WheelLevel = 1, CakePoints = 0, ActiveBuffs = {}, LastWheelReward = nil, Inventory = { WheelRewards = {}, Cards = {}, EquippedSkills = {} } }
 local spinning = false
@@ -2647,40 +3067,9 @@ local autoRollEnabled = false
 local autoRollThread = nil
 local wheelRewardGeneration = 0
 
-local soundFolder = Instance.new("Folder")
-soundFolder.Name = "CakeRainSounds"
-soundFolder.Parent = SoundService
+local ClientSoundService = require(ReplicatedStorage:WaitForChild("ClientModules"):WaitForChild("ClientSoundService"))
+local playSound = ClientSoundService.Create(UIConfig.Sounds)
 
--- Button clicks should read as punchy/responsive; the wheel-tick sound reuses the same asset
--- (see UIConfig.Sounds.WheelTick) but needs to sit well below it since it repeats rapidly
--- during a spin and would otherwise get fatiguing/overpowering.
-local soundVolumes = { Button = 1.8, Interact = 1.6, WheelTick = 0.5, CakeShrink = 1.6 }
-local soundTemplates = {}
-for key, soundId in pairs(UIConfig.Sounds or {}) do
-    local sound = Instance.new("Sound")
-    sound.Name = key .. "Template"
-    sound.SoundId = soundId
-    sound.Volume = soundVolumes[key] or 1
-    sound.Parent = soundFolder
-    soundTemplates[key] = sound
-end
-task.spawn(function()
-    local preloadList = {}
-    for _, sound in pairs(soundTemplates) do table.insert(preloadList, sound) end
-    pcall(function() ContentProvider:PreloadAsync(preloadList) end)
-end)
-
-local function playSound(soundKey, volume)
-    local template = soundTemplates[soundKey]
-    if not template then return end
-    local sound = template:Clone()
-    sound.Name = soundKey .. "Sound"
-    sound.Volume = volume or template.Volume
-    sound.Parent = soundFolder
-    sound:Play()
-    sound.Ended:Connect(function() sound:Destroy() end)
-    task.delay(4, function() if sound.Parent then sound:Destroy() end end)
-end
 
 local function buttonLabel(item)
     local name = L[item.NameKey] or item.NameKey
@@ -2944,8 +3333,9 @@ local function addBagTile(template, item, order)
     -- A skill already sitting in a top box is locked here at the bottom: it can only be moved by
     -- dragging it FROM its box, never re-dragged from this grid.
     local lockedByEquip = bagMode == "Skills" and isEquipped(item.Key)
-    tile.BackgroundColor3 = Color3.fromRGB(34, 30, 46)
-    tile.BackgroundTransparency = lockedByEquip and 0.55 or 0.1
+    tile.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+    tile.BackgroundTransparency = 0
+    if lockedByEquip then tile.BackgroundColor3 = Color3.fromRGB(156, 163, 175) end
     tile.Parent = template.Parent
     tile.InputBegan:Connect(function(input)
         if input.UserInputType ~= Enum.UserInputType.MouseButton1 and input.UserInputType ~= Enum.UserInputType.Touch then return end
@@ -2972,8 +3362,10 @@ local function refreshBag()
             addBagTile(template, item, order)
         end
     end
-    bagPanel.TermTabButton.BackgroundTransparency = bagMode == "Terms" and 0 or 0.55
-    bagPanel.SkillTabButton.BackgroundTransparency = bagMode == "Skills" and 0 or 0.55
+    bagPanel.TermTabButton.BackgroundTransparency = 0
+    bagPanel.SkillTabButton.BackgroundTransparency = 0
+    bagPanel.TermTabButton.BackgroundColor3 = bagMode == "Terms" and Color3.fromRGB(241, 196, 15) or Color3.fromRGB(255, 255, 255)
+    bagPanel.SkillTabButton.BackgroundColor3 = bagMode == "Skills" and Color3.fromRGB(241, 196, 15) or Color3.fromRGB(255, 255, 255)
     local boxes = getSkillBoxes()
     boxes.Visible = bagMode == "Skills"
     local equipped = (state.Inventory and state.Inventory.EquippedSkills) or {}
@@ -2989,6 +3381,7 @@ local function refreshBag()
     task.defer(function() list.CanvasSize = UDim2.new(0, 0, 0, list.GridLayout.AbsoluteContentSize.Y + 16) end)
 end
 
+local refreshDailyTasks
 local function refreshStats()
     stats.CakePointsLabel.Text = tostring(state.CakePoints)
     stats.WheelPointsLabel.Text = tostring(state.WheelPoints)
@@ -2997,7 +3390,8 @@ local function refreshStats()
     if not autoAvailable then autoRollEnabled = false end
     autoRollToggle.Visible = autoAvailable
     autoRollToggle.Text = autoRollEnabled and "Auto-Roll: ON" or "Auto-Roll: OFF"
-    autoRollToggle.BackgroundColor3 = autoRollEnabled and Color3.fromRGB(60, 222, 130) or Color3.fromRGB(18, 16, 26)
+    autoRollToggle.BackgroundColor3 = autoRollEnabled and Color3.fromRGB(241, 196, 15) or Color3.fromRGB(255, 255, 255)
+    autoRollToggle.TextColor3 = Color3.fromRGB(0, 0, 0)
     wheel.Visible = state.WheelSpins > 0 or spinning or autoAvailable
     local reward = state.LastWheelReward
     currentDrawLabel.Visible = reward ~= nil
@@ -3010,6 +3404,7 @@ local function refreshStats()
     end
     refreshEffectBar()
     refreshBag()
+    refreshDailyTasks()
     bindShopButtons()
 end
 
@@ -3036,7 +3431,7 @@ local function renderSlotItem(slot, parent)
         end
     end
     parent.BackgroundColor3 = slot.Color or Color3.fromRGB(34, 30, 46)
-    parent.BackgroundTransparency = 0.18
+    parent.BackgroundTransparency = 0
     parent.BorderSizePixel = 0
     if not parent:FindFirstChildOfClass("UICorner") then
         local corner = Instance.new("UICorner")
@@ -3049,6 +3444,7 @@ local function renderSlotItem(slot, parent)
         icon.Position = UDim2.new(0.5, -21, 0, 8)
         icon.BackgroundTransparency = 1
         icon.Image = slot.Icon
+        icon.ZIndex = parent.ZIndex + 1
         icon.Parent = parent
     end
     local label = Instance.new("TextLabel")
@@ -3060,6 +3456,7 @@ local function renderSlotItem(slot, parent)
     label.TextScaled = true
     label.TextWrapped = true
     label.TextColor3 = Color3.fromRGB(255, 255, 255)
+    label.ZIndex = parent.ZIndex + 1
     applyTextStyle(label)
     label.Parent = parent
 end
@@ -3077,7 +3474,8 @@ local function makeMiniCell(sideGrid, order)
     cell.Name = "MiniCell" .. order
     cell.LayoutOrder = order
     cell.Size = UDim2.new(0, 0, 0, 0)
-    cell.BackgroundColor3 = Color3.fromRGB(34, 30, 46)
+    cell.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+    cell.ZIndex = sideGrid.ZIndex + 1
     cell.BorderSizePixel = 0
     cell.Parent = sideGrid
     Instance.new("UICorner", cell).CornerRadius = UDim.new(0, 8)
@@ -3092,6 +3490,7 @@ local function makeMiniCell(sideGrid, order)
     holder.Name = "Content"
     holder.Size = UDim2.fromScale(1, 1)
     holder.BackgroundTransparency = 1
+    holder.ZIndex = cell.ZIndex + 1
     holder.BorderSizePixel = 0
     holder.Parent = cell
     Instance.new("UICorner", holder).CornerRadius = UDim.new(0, 8)
@@ -3248,13 +3647,13 @@ end)
 shopButton.Activated:Connect(function()
     playSound("Button")
     shopHub.Visible = not shopHub.Visible
-    if shopHub.Visible then bagPanel.Visible = false end
+    if shopHub.Visible then bagPanel.Visible = false; taskPanel.Visible = false; codePanel.Visible = false end
 end)
 bagButton.Activated:Connect(function()
     playSound("Button")
     bagPanel.Visible = not bagPanel.Visible
     if bagPanel.Visible then
-        shopHub.Visible = false
+        shopHub.Visible = false; taskPanel.Visible = false; codePanel.Visible = false
         refreshBag()
     end
 end)
@@ -3295,6 +3694,39 @@ closeBag.Activated:Connect(function()
     bagPanel.Visible = false
 end)
 
+function refreshDailyTasks()
+    local list, template = taskPanel.TaskList, taskPanel.TaskList.TaskTemplate
+    for _, child in ipairs(list:GetChildren()) do if child:IsA("TextButton") and child ~= template then child:Destroy() end end
+    for order, task in ipairs(state.DailyTasks or {}) do
+        local card = template:Clone(); card.Name = "Task_" .. task.Id; card.LayoutOrder = order; card.Visible = true
+        card:WaitForChild("Name").Text = task.Name
+        card.Reward.Text = string.format("+%s cake  +%s spin", tostring((task.Reward or {}).CakePoints or 0), tostring((task.Reward or {}).WheelSpins or 0))
+        local ratio = math.clamp(task.Progress / math.max(1, task.Target), 0, 1)
+        card.ProgressBack.ProgressFill.Size = UDim2.new(ratio, 0, 1, 0)
+        card.ProgressLabel.Text = string.format("%d / %d", task.Progress, task.Target)
+        card.ClaimLabel.Text = task.Claimed and "CLAIMED" or (ratio >= 1 and "CLAIM" or "IN PROGRESS")
+        card.ClaimLabel.BackgroundColor3 = ratio >= 1 and not task.Claimed and Color3.fromRGB(241, 196, 15) or Color3.fromRGB(0, 0, 0)
+        card.ClaimLabel.TextColor3 = ratio >= 1 and not task.Claimed and Color3.fromRGB(0, 0, 0) or Color3.fromRGB(255, 255, 255)
+        card.Activated:Connect(function()
+            if not task.Claimed and ratio >= 1 then playSound("Interact"); RequestClaimDailyTask:InvokeServer(task.Id) end
+        end)
+        card.Parent = list
+    end
+    task.defer(function() list.CanvasSize = UDim2.new(0, 0, 0, list.Layout.AbsoluteContentSize.Y + 20) end)
+end
+local modalPanels = { shopHub, bagPanel, taskPanel, codePanel }
+local function openExclusive(panel)
+    for _, candidate in ipairs(modalPanels) do candidate.Visible = candidate == panel and not panel.Visible end
+end
+taskButton.Activated:Connect(function() playSound("Button"); openExclusive(taskPanel); refreshDailyTasks() end)
+codeButton.Activated:Connect(function() playSound("Button"); openExclusive(codePanel) end)
+closeTasks.Activated:Connect(function() playSound("Button"); taskPanel.Visible = false end)
+closeCode.Activated:Connect(function() playSound("Button"); codePanel.Visible = false end)
+codePanel.RedeemButton.Activated:Connect(function()
+    local code = codePanel.CodeBox.Text
+    if code ~= "" then playSound("Interact"); RequestRedeemCode:InvokeServer(code); codePanel.CodeBox.Text = "" end
+end)
+
 UpdateClientState.OnClientEvent:Connect(function(newState)
     for key, value in newState do state[key] = value end
     if newState.LastWheelReward then
@@ -3311,6 +3743,14 @@ UpdateClientState.OnClientEvent:Connect(function(newState)
 end)
 
 refreshStats()
+return true
+]=]
+
+local clientScript = getOrCreate(StarterPlayer.StarterPlayerScripts, "LocalScript", "CakeRainRNGClient")
+clientScript.Source = [=[
+-- Bootstrap only: gameplay controller, UI layout, and sound are split into ClientModules.
+require(game:GetService("ReplicatedStorage"):WaitForChild("ClientModules"):WaitForChild("CakeRainRNGClientController"))
+
 ]=]
 
 if recording then
